@@ -1,0 +1,27 @@
+:root[data-theme="rainy-cafe"] {
+  --color-bg-primary: #F5F0EB;
+  --color-bg-secondary: #EDE4DB;
+  --color-bg-tertiary: #E0D5C7;
+  --color-bg-card: rgba(255, 255, 255, 0.65);
+
+  --color-text-primary: #3D3229;
+  --color-text-secondary: #6B5D4F;
+  --color-text-muted: #8B7355;
+
+  --color-accent: #8B7355;
+  --color-accent-hover: #6B5D4F;
+  --color-accent-soft: #D4C4B0;
+
+  --color-border: rgba(139, 115, 85, 0.2);
+  --color-border-hover: rgba(139, 115, 85, 0.4);
+
+  --glass-bg: rgba(255, 255, 255, 0.2);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 8px 32px rgba(139, 115, 85, 0.08);
+
+  --font-family: 'Noto Sans SC', 'Quicksand', sans-serif;
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-xl: 1rem;
+}

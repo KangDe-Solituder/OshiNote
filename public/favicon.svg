@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F472B6"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="128" ry="128" fill="url(#bg)"/>
+  <rect x="96" y="80" width="320" height="380" rx="32" ry="32" fill="white" opacity="0.95"/>
+  <rect x="96" y="80" width="320" height="120" rx="32" ry="32" fill="#FCE7F3"/>
+  <rect x="96" y="168" width="320" height="32" fill="#FCE7F3"/>
+  <g transform="translate(256, 270)">
+    <path d="M0,-55 C-14,-76 -55,-62 -55,-34 C-55,-7 -28,14 0,35 C28,14 55,-7 55,-34 C55,-62 14,-76 0,-55 Z" fill="#EC4899"/>
+  </g>
+  <line x1="146" y1="340" x2="366" y2="340" stroke="#F9A8D4" stroke-width="4" stroke-linecap="round"/>
+  <line x1="146" y1="370" x2="330" y2="370" stroke="#F9A8D4" stroke-width="4" stroke-linecap="round"/>
+  <line x1="146" y1="400" x2="300" y2="400" stroke="#F9A8D4" stroke-width="4" stroke-linecap="round"/>
+  <g transform="translate(340 160) rotate(20)">
+    <rect x="-8" width="16" height="120" rx="8" fill="#BE185D"/>
+    <polygon points="-10,120 10,120 0,150" fill="#831843"/>
+  </g>
+</svg>
