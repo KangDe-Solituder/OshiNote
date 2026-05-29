@@ -2,7 +2,7 @@ import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { useThemeStore } from '../stores/themeStore'
 import { useAiStore } from '../stores/aiStore'
-import type { ThemeId } from '../types'
+import type { ThemeId, UiMotionDuration } from '../types'
 import type { AiProviderId } from '../services/ai'
 import { getProviderName } from '../services/ai'
 import clsx from 'clsx'
@@ -17,8 +17,15 @@ const THEMES: { id: ThemeId; label: string; description: string }[] = [
 
 const AI_PROVIDERS: AiProviderId[] = ['openai', 'claude', 'gemini', 'local']
 
+const UI_MOTION_OPTIONS: { value: UiMotionDuration; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'fast', label: 'Fast' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'slow', label: 'Slow' },
+]
+
 export function SettingsPage() {
-  const { currentTheme, setTheme, fontSize, setFontSize } = useThemeStore()
+  const { currentTheme, setTheme, fontSize, setFontSize, uiMotionDuration, setUiMotionDuration } = useThemeStore()
   const { config, setProvider, setEnabled, setProviderConfig } = useAiStore()
 
   return (
@@ -67,6 +74,21 @@ export function SettingsPage() {
               <option value="small">Small</option>
               <option value="medium">Medium</option>
               <option value="large">Large</option>
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text-primary">Page Transition</p>
+              <p className="text-xs text-text-muted">Adjust page fade movement.</p>
+            </div>
+            <select
+              value={uiMotionDuration}
+              onChange={(e) => setUiMotionDuration(e.target.value as UiMotionDuration)}
+              className="px-3 py-1.5 rounded-lg border border-border-color bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-soft"
+            >
+              {UI_MOTION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
         </Card>
@@ -141,7 +163,7 @@ export function SettingsPage() {
               />
               <Input
                 label="Base URL"
-                placeholder="https://api.openai.com/v1"
+                placeholder={id === 'local' ? 'http://127.0.0.1:1234/v1 or /api/v1' : 'https://api.openai.com/v1'}
                 value={config[id].baseUrl}
                 onChange={(e) => setProviderConfig(id, 'baseUrl', e.target.value)}
               />
@@ -151,6 +173,7 @@ export function SettingsPage() {
 
         <p className="text-xs text-text-muted mt-3">
           Your API keys are stored locally in SQLite and never sent anywhere except to the configured API endpoint.
+          For LM Studio, use either OpenAI-compatible <span className="font-mono">http://127.0.0.1:1234/v1</span> or native <span className="font-mono">http://127.0.0.1:1234/api/v1</span>.
         </p>
       </section>
     </div>

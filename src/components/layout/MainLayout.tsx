@@ -1,27 +1,28 @@
 import { Outlet } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
-import { useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { useThemeStore } from '../../stores/themeStore'
+
+const ROUTE_TRANSITION_SECONDS = {
+  off: 0,
+  fast: 0.08,
+  normal: 0.16,
+  slow: 0.28,
+}
 
 export function MainLayout() {
-  const location = useLocation()
+  const uiMotionDuration = useThemeStore((s) => s.uiMotionDuration)
+  const duration = ROUTE_TRANSITION_SECONDS[uiMotionDuration]
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-hidden bg-bg-primary/60">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="h-full overflow-y-auto overflow-x-hidden"
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <div
+          className="h-full overflow-y-auto overflow-x-hidden"
+          style={{ transitionDuration: `${duration}s` }}
+        >
+          <Outlet />
+        </div>
       </main>
     </div>
   )

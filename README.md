@@ -152,6 +152,12 @@ OshiNote/
 
 这个项目也使用 Vibe Coding 的方式持续生长：创意与情感体验由人来决定方向，AI 协助探索和实现，最终仍通过人工检查、构建验证与真实使用来判断结果。
 
+## Search Notes
+
+Current note search matches the literal text stored in note titles, rich text content, plain text, and tags. It does not yet perform Japanese reading normalization or kana/kanji expansion. For example, a note containing `お疲れ様` will not currently match a search for `おつ`.
+
+Future search improvements may add kana reading dictionaries or custom aliases so common forms such as `おつ` / `お疲れ様` can be matched together.
+
 ## License
 
 本项目使用 [MIT License](./LICENSE)。

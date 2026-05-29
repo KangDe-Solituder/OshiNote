@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Trash2, Star, Loader2 } from 'lucide-react'
+import { ArrowLeft, CalendarClock, FolderOpen, Save, Trash2, Star, Loader2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { useNoteStore } from '../stores/noteStore'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useEditorStore } from '../stores/editorStore'
 import { fetchNoteById } from '../features/notes/noteService'
+import { TipTapEditor } from '../components/editor/TipTapEditor'
 import type { Note } from '../types'
 
 export function NoteEditorPage() {
@@ -17,11 +18,14 @@ export function NoteEditorPage() {
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [note, setNote] = useState<Note | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [favorite, setFavorite] = useState(false)
+  const [archiveId, setArchiveId] = useState('')
+  const [createdAt, setCreatedAt] = useState(toDateTimeLocalValue(new Date()))
+  const [editorContent, setEditorContent] = useState<object | undefined>(undefined)
 
-  const editorRef = useRef<{ json: object; text: string }>({ json: {}, text: '' })
+  const editorRef = useRef<{ json: object; text: string }>({ json: createEmptyDoc(), text: '' })
   const { createNote, updateNote, deleteNote, toggleFavorite } = useNoteStore()
   const { archives, fetchByOshi } = useArchiveStore()
   const isDirty = useEditorStore((s) => s.isDirty)
@@ -33,17 +37,20 @@ export function NoteEditorPage() {
 
   useEffect(() => {
     if (isNew) {
-      setLoading(false)
       return
     }
     if (!noteId) return
-    setLoading(true)
     fetchNoteById(noteId).then((n) => {
       if (n) {
+        const parsedContent = parseNoteContent(n.content)
         setNote(n)
         setTitle(n.title)
         setTags(n.tags)
         setFavorite(n.favorite)
+        setArchiveId(n.archive_id)
+        setCreatedAt(toDateTimeLocalValue(n.created_at))
+        setEditorContent(parsedContent)
+        editorRef.current = { json: parsedContent, text: n.plain_text }
       }
       setLoading(false)
     }).catch(() => setLoading(false))
@@ -54,17 +61,19 @@ export function NoteEditorPage() {
     setSaving(true)
     try {
       const { json, text } = editorRef.current
-      const firstArchiveId = archives[0]?.id || ''
-      if (!firstArchiveId) return
+      const selectedArchiveId = archiveId || archives[0]?.id || ''
+      if (!selectedArchiveId) return
+      const noteDate = fromDateTimeLocalValue(createdAt)
 
       if (isNew) {
         const newNote = await createNote({
           oshi_id: oshiId,
-          archive_id: firstArchiveId,
+          archive_id: selectedArchiveId,
           title: title || 'Untitled',
           content: JSON.stringify(json),
           plain_text: text,
           tags,
+          created_at: noteDate,
         })
         markSaved()
         navigate(`/oshis/${oshiId}/notes/${newNote.id}`, { replace: true })
@@ -74,9 +83,11 @@ export function NoteEditorPage() {
           content: JSON.stringify(json),
           plain_text: text,
           tags,
+          archive_id: selectedArchiveId,
+          created_at: noteDate,
         })
         markSaved()
-        setNote({ ...note, title, content: JSON.stringify(json), plain_text: text, tags })
+        setNote({ ...note, title, content: JSON.stringify(json), plain_text: text, tags, archive_id: selectedArchiveId, created_at: noteDate })
       }
     } finally {
       setSaving(false)
@@ -119,7 +130,8 @@ export function NoteEditorPage() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [oshiId, title, tags, note, isNew])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oshiId, title, tags, note, isNew, archiveId, createdAt])
 
   if (loading) {
     return (
@@ -170,6 +182,27 @@ export function NoteEditorPage() {
 
       {/* Tags row */}
       <div className="px-4 py-2 border-b border-border-color bg-bg-secondary/10 flex items-center gap-2 flex-wrap shrink-0">
+        <label className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+          <FolderOpen size={14} />
+          <select
+            value={archiveId || archives[0]?.id || ''}
+            onChange={(e) => setArchiveId(e.target.value)}
+            className="px-2 py-1 rounded-lg border border-border-color bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft"
+          >
+            {archives.map((archive) => (
+              <option key={archive.id} value={archive.id}>{archive.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+          <CalendarClock size={14} />
+          <input
+            type="datetime-local"
+            value={createdAt}
+            onChange={(e) => setCreatedAt(e.target.value)}
+            className="px-2 py-1 rounded-lg border border-border-color bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft"
+          />
+        </label>
         {tags.map((tag) => (
           <span
             key={tag}
@@ -191,12 +224,41 @@ export function NoteEditorPage() {
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden">
-        <textarea
-          className="w-full h-full bg-transparent text-text-primary placeholder:text-text-muted focus:outline-none resize-none p-4 text-base leading-relaxed"
-          placeholder="Write your thoughts about your oshi..."
-          onChange={(e) => editorRef.current = { json: {}, text: e.target.value }}
+        <TipTapEditor
+          key={isNew ? 'new' : note?.id}
+          content={editorContent}
+          onUpdate={(json, text) => {
+            editorRef.current = { json, text }
+          }}
         />
       </div>
     </div>
   )
+}
+
+function createEmptyDoc(): object {
+  return { type: 'doc', content: [{ type: 'paragraph' }] }
+}
+
+function parseNoteContent(content: string): object {
+  try {
+    const parsed = JSON.parse(content)
+    if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) return parsed
+  } catch {
+    // Old drafts may have invalid content; keep a blank editor instead.
+  }
+  return createEmptyDoc()
+}
+
+function toDateTimeLocalValue(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value.replace(' ', 'T'))
+  if (Number.isNaN(date.getTime())) return toDateTimeLocalValue(new Date())
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function fromDateTimeLocalValue(value: string): string {
+  if (!value) return fromDateTimeLocalValue(toDateTimeLocalValue(new Date()))
+  const [date, time = '00:00'] = value.split('T')
+  return `${date} ${time.length === 5 ? `${time}:00` : time}`
 }

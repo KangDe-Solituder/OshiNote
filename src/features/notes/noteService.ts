@@ -35,9 +35,19 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
   const db = await getDb()
   const id = generateId()
   await db.execute(
-    `INSERT INTO notes (id, oshi_id, archive_id, title, content, plain_text, tags, favorite)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-    [id, input.oshi_id, input.archive_id, input.title, input.content, input.plain_text, JSON.stringify(input.tags)]
+    `INSERT INTO notes (id, oshi_id, archive_id, title, content, plain_text, tags, favorite, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, COALESCE(?, datetime('now', 'localtime')), COALESCE(?, datetime('now', 'localtime')))`,
+    [
+      id,
+      input.oshi_id,
+      input.archive_id,
+      input.title,
+      input.content,
+      input.plain_text,
+      JSON.stringify(input.tags),
+      input.created_at,
+      input.created_at,
+    ]
   )
   return (await fetchNoteById(id))!
 }
@@ -53,6 +63,7 @@ export async function updateNote(id: string, input: UpdateNoteInput): Promise<vo
   if (input.tags !== undefined) { sets.push('tags = ?'); params.push(JSON.stringify(input.tags)) }
   if (input.archive_id !== undefined) { sets.push('archive_id = ?'); params.push(input.archive_id) }
   if (input.favorite !== undefined) { sets.push('favorite = ?'); params.push(input.favorite ? 1 : 0) }
+  if (input.created_at !== undefined) { sets.push('created_at = ?'); params.push(input.created_at) }
 
   sets.push("updated_at = datetime('now', 'localtime')")
 
@@ -93,8 +104,14 @@ export async function searchNotes(oshiId: string, params: SearchParams): Promise
   const bindings: unknown[] = [oshiId]
 
   if (params.query) {
-    conditions.push('n.id IN (SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?)')
-    bindings.push(`${params.query}*`)
+    const query = `%${escapeLike(params.query.trim())}%`
+    conditions.push(`(
+      n.title LIKE ? ESCAPE '\\' OR
+      n.plain_text LIKE ? ESCAPE '\\' OR
+      n.content LIKE ? ESCAPE '\\' OR
+      n.tags LIKE ? ESCAPE '\\'
+    )`)
+    bindings.push(query, query, query, query)
   }
 
   if (params.tag) {
@@ -129,6 +146,15 @@ export async function searchNotes(oshiId: string, params: SearchParams): Promise
   }
 }
 
+export async function fetchNotesByTag(tag: string): Promise<Note[]> {
+  const db = await getDb()
+  const rows = await db.select<NoteRow[]>(
+    'SELECT * FROM notes WHERE tags LIKE ? ORDER BY created_at DESC',
+    [`%"${tag}"%`]
+  )
+  return rows.map(deserializeNote).filter((note) => note.tags.includes(tag))
+}
+
 export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
   const db = await getDb()
   const rows = await db.select<NoteRow[]>('SELECT tags FROM notes')
@@ -159,4 +185,8 @@ export async function getTotalOshiCount(): Promise<number> {
 export async function getTotalTagCount(): Promise<number> {
   const tags = await getAllTags()
   return tags.length
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
 }

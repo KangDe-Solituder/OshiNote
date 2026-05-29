@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ThemeId, BackgroundFilters } from '../types'
+import type { ThemeId, BackgroundFilters, UiMotionDuration } from '../types'
 import { getDb } from '../database'
 
 export type FontSize = 'small' | 'medium' | 'large'
@@ -16,12 +16,14 @@ interface ThemeState {
   backgroundFilters: BackgroundFilters
   themeHotkeys: Record<string, ThemeId>
   fontSize: FontSize
+  uiMotionDuration: UiMotionDuration
 
   setTheme: (id: ThemeId) => void
   setCustomBackground: (path: string | null) => void
   setFilter: (key: keyof BackgroundFilters, value: number) => void
   setThemeHotkey: (key: string, themeId: ThemeId) => void
   setFontSize: (size: FontSize) => void
+  setUiMotionDuration: (duration: UiMotionDuration) => void
 
   loadFromDB: () => Promise<void>
   persistToDB: () => Promise<void>
@@ -45,6 +47,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   backgroundFilters: { blur: 0, brightness: 100, opacity: 100, saturation: 100 },
   themeHotkeys: { ...DEFAULT_HOTKEYS },
   fontSize: 'medium',
+  uiMotionDuration: 'normal',
 
   setTheme: (id) => {
     set({ currentTheme: id })
@@ -77,11 +80,16 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     get().persistToDB()
   },
 
+  setUiMotionDuration: (duration) => {
+    set({ uiMotionDuration: duration })
+    get().persistToDB()
+  },
+
   loadFromDB: async () => {
     try {
       const db = await getDb()
       const rows = await db.select<{ key: string; value: string }[]>(
-        "SELECT key, value FROM settings WHERE key IN ('theme', 'customBg', 'bgFilters', 'hotkeys', 'fontSize')"
+        "SELECT key, value FROM settings WHERE key IN ('theme', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration')"
       )
       for (const row of rows) {
         switch (row.key) {
@@ -93,15 +101,24 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
             set({ customBackground: row.value || null })
             break
           case 'bgFilters':
-            try { set({ backgroundFilters: JSON.parse(row.value) }) } catch {}
+            try { set({ backgroundFilters: JSON.parse(row.value) }) } catch {
+              // Ignore invalid saved settings.
+            }
             break
           case 'hotkeys':
-            try { set({ themeHotkeys: JSON.parse(row.value) }) } catch {}
+            try { set({ themeHotkeys: JSON.parse(row.value) }) } catch {
+              // Ignore invalid saved settings.
+            }
             break
           case 'fontSize':
             if (row.value === 'small' || row.value === 'medium' || row.value === 'large') {
               set({ fontSize: row.value })
               applyFontSize(row.value)
+            }
+            break
+          case 'uiMotionDuration':
+            if (row.value === 'off' || row.value === 'fast' || row.value === 'normal' || row.value === 'slow') {
+              set({ uiMotionDuration: row.value })
             }
             break
         }
@@ -120,6 +137,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('bgFilters', ?)", [JSON.stringify(state.backgroundFilters)])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('hotkeys', ?)", [JSON.stringify(state.themeHotkeys)])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('fontSize', ?)", [state.fontSize])
+      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('uiMotionDuration', ?)", [state.uiMotionDuration])
     } catch {
       // Silently fail
     }

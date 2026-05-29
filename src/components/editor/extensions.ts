@@ -7,6 +7,16 @@ import FontFamily from '@tiptap/extension-font-family'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Extension } from '@tiptap/core'
 
+type FontSizeChain = {
+  setMark: (name: string, attrs: Record<string, unknown>) => FontSizeChain
+  removeEmptyTextStyle: () => FontSizeChain
+  run: () => boolean
+}
+
+type FontSizeCommandProps = {
+  chain: () => FontSizeChain
+}
+
 const FontSize = Extension.create({
   name: 'fontSize',
   addOptions() {
@@ -29,8 +39,8 @@ const FontSize = Extension.create({
   },
   addCommands() {
     return {
-      setFontSize: (fontSize: string) => ({ chain }: any) => chain().setMark('textStyle', { fontSize }).run(),
-      unsetFontSize: () => ({ chain }: any) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+      setFontSize: (fontSize: string) => ({ chain }: FontSizeCommandProps) => chain().setMark('textStyle', { fontSize }).run(),
+      unsetFontSize: () => ({ chain }: FontSizeCommandProps) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
     }
   },
 })

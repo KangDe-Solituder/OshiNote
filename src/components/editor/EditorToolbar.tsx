@@ -2,6 +2,7 @@ import type { Editor } from '@tiptap/react'
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Palette } from 'lucide-react'
 import { EmojiPicker } from '../ui/EmojiPicker'
 import { useState, useRef, useEffect } from 'react'
+import type { ReactNode } from 'react'
 
 interface EditorToolbarProps {
   editor: Editor | null
@@ -11,6 +12,21 @@ interface EditorToolbarProps {
 const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px']
 const COLORS = ['#EC4899', '#8B5CF6', '#60A5FA', '#34D399', '#FBBF24', '#F87171', '#4A1942', '#3B82F6', '#000000', '#FFFFFF']
 const HIGHLIGHTS = ['#FEF08A', '#FBCFE8', '#BFDBFE', '#BBF7D0', '#FED7AA', '#E9D5FF', 'transparent']
+
+function ToolBtn({ active, onClick, children, title }: { active?: boolean; onClick: () => void; children: ReactNode; title: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`px-2.5 py-1.5 rounded text-sm transition-colors ${
+        active ? 'bg-accent-soft text-accent' : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
 
 export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
   const [showColor, setShowColor] = useState(false)
@@ -28,19 +44,6 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
   }, [])
 
   if (!editor) return null
-
-  const ToolBtn = ({ active, onClick, children, title }: { active?: boolean; onClick: () => void; children: React.ReactNode; title: string }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`px-2.5 py-1.5 rounded text-sm transition-colors ${
-        active ? 'bg-accent-soft text-accent' : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-      }`}
-    >
-      {children}
-    </button>
-  )
 
   return (
     <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border-color bg-bg-secondary/30 flex-wrap">

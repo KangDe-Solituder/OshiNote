@@ -3,8 +3,8 @@ export type AiProviderId = 'openai' | 'claude' | 'gemini' | 'local'
 export type Language = 'ja' | 'zh' | 'en'
 
 export const LANGUAGE_LABELS: Record<Language, string> = {
-  ja: '日本語',
-  zh: '中文',
+  ja: 'Japanese',
+  zh: 'Chinese',
   en: 'English',
 }
 
@@ -35,6 +35,6 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
   openai: { apiKey: '', model: 'gpt-4o', baseUrl: 'https://api.openai.com/v1' },
   claude: { apiKey: '', model: 'claude-sonnet-4-6', baseUrl: 'https://api.anthropic.com/v1' },
   gemini: { apiKey: '', model: 'gemini-2.0-flash', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
-  local: { apiKey: '', model: 'local-model', baseUrl: 'http://localhost:11434/v1' },
+  local: { apiKey: '', model: 'local-model', baseUrl: 'http://localhost:1234/v1' },
   enabled: false,
 }

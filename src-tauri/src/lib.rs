@@ -1,4 +1,104 @@
 use tauri::Manager;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+
+#[tauri::command]
+fn post_local_ai_chat(url: String, api_key: String, body: serde_json::Value) -> Result<serde_json::Value, String> {
+    let endpoint = parse_http_endpoint(&url)?;
+    let payload = serde_json::to_string(&body).map_err(|error| error.to_string())?;
+    let mut stream = TcpStream::connect((&endpoint.host[..], endpoint.port)).map_err(|error| error.to_string())?;
+
+    let mut request = format!(
+        "POST {} HTTP/1.1\r\nHost: {}:{}\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
+        endpoint.path,
+        endpoint.host,
+        endpoint.port,
+        payload.as_bytes().len()
+    );
+    if !api_key.trim().is_empty() {
+        request.push_str(&format!("Authorization: Bearer {}\r\n", api_key.trim()));
+    }
+    request.push_str("\r\n");
+    request.push_str(&payload);
+
+    stream.write_all(request.as_bytes()).map_err(|error| error.to_string())?;
+
+    let mut response = String::new();
+    stream.read_to_string(&mut response).map_err(|error| error.to_string())?;
+    let (headers, response_body) = response
+        .split_once("\r\n\r\n")
+        .ok_or_else(|| "Invalid Local API response".to_string())?;
+
+    let status_code = headers
+        .lines()
+        .next()
+        .and_then(|status_line| status_line.split_whitespace().nth(1))
+        .and_then(|code| code.parse::<u16>().ok())
+        .ok_or_else(|| "Invalid Local API status line".to_string())?;
+
+    let decoded_body = if headers.to_ascii_lowercase().contains("transfer-encoding: chunked") {
+        decode_chunked_body(response_body)?
+    } else {
+        response_body.to_string()
+    };
+
+    if !(200..300).contains(&status_code) {
+        return Err(format!("Local API error {}: {}", status_code, decoded_body));
+    }
+
+    serde_json::from_str(&decoded_body)
+        .map_err(|error| format!("Invalid Local API response: {error}; body: {decoded_body}"))
+}
+
+struct HttpEndpoint {
+    host: String,
+    port: u16,
+    path: String,
+}
+
+fn parse_http_endpoint(url: &str) -> Result<HttpEndpoint, String> {
+    let rest = url
+        .strip_prefix("http://")
+        .ok_or_else(|| "Local API currently supports http:// URLs only.".to_string())?;
+    let (authority, path) = match rest.split_once('/') {
+        Some((authority, path)) => (authority, format!("/{}", path)),
+        None => (rest, "/".to_string()),
+    };
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((host, port)) => {
+            let parsed_port = port.parse::<u16>().map_err(|_| "Invalid Local API port".to_string())?;
+            (host.to_string(), parsed_port)
+        }
+        None => (authority.to_string(), 80),
+    };
+    if host.is_empty() {
+        return Err("Invalid Local API host".to_string());
+    }
+    Ok(HttpEndpoint { host, port, path })
+}
+
+fn decode_chunked_body(body: &str) -> Result<String, String> {
+    let mut rest = body;
+    let mut decoded = String::new();
+
+    loop {
+        let (size_line, after_size) = rest
+            .split_once("\r\n")
+            .ok_or_else(|| "Invalid chunked response".to_string())?;
+        let size = usize::from_str_radix(size_line.trim(), 16)
+            .map_err(|_| "Invalid chunk size".to_string())?;
+        if size == 0 {
+            break;
+        }
+        if after_size.len() < size + 2 {
+            return Err("Invalid chunk payload".to_string());
+        }
+        decoded.push_str(&after_size[..size]);
+        rest = &after_size[size + 2..];
+    }
+
+    Ok(decoded)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -10,6 +110,7 @@ pub fn run() {
             let _window = app.get_webview_window("main").unwrap();
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![post_local_ai_chat])
         .run(tauri::generate_context!())
         .expect("error while running OshiNote");
 }

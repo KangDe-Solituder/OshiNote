@@ -15,7 +15,9 @@ export function HomePage() {
           getTotalOshiCount(), getTotalNoteCount(), getTotalTagCount()
         ])
         setStats({ oshis, notes, tags })
-      } catch {}
+      } catch {
+        // Keep the home page usable if local stats are temporarily unavailable.
+      }
     }
     load()
   }, [])

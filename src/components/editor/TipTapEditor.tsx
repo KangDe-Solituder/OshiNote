@@ -2,7 +2,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import { editorExtensions } from './extensions'
 import { EditorToolbar } from './EditorToolbar'
 import { useEditorStore } from '../../stores/editorStore'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 
 interface TipTapEditorProps {
   content?: object
@@ -34,7 +34,6 @@ function FallbackEditor({ onUpdate }: { onUpdate?: (json: object, text: string) 
 export function TipTapEditor({ content, onUpdate }: TipTapEditorProps) {
   const setEditorInstance = useEditorStore((s) => s.setEditorInstance)
   const markDirty = useEditorStore((s) => s.markDirty)
-  const [hasError, setHasError] = useState(false)
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -56,7 +55,6 @@ export function TipTapEditor({ content, onUpdate }: TipTapEditorProps) {
   useEffect(() => {
     if (editor) {
       setEditorInstance(editor)
-      setHasError(false)
     }
     return () => setEditorInstance(null)
   }, [editor, setEditorInstance])
@@ -69,7 +67,7 @@ export function TipTapEditor({ content, onUpdate }: TipTapEditorProps) {
     }
   }, [editor])
 
-  if (hasError || (!editor && content === undefined)) {
+  if (!editor && content === undefined) {
     return <FallbackEditor onUpdate={onUpdate} />
   }
 

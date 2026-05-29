@@ -7,9 +7,10 @@ export function createOpenAiProvider(config: {
   baseUrl: string
 }): AiProvider {
   const { apiKey, model, baseUrl } = config
+  const chatCompletionsUrl = normalizeChatCompletionsUrl(baseUrl, 'https://api.openai.com/v1')
 
   async function callApi(messages: { role: string; content: string }[]): Promise<string> {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetch(chatCompletionsUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,4 +54,11 @@ export function createOpenAiProvider(config: {
       return callApi(messages)
     },
   }
+}
+
+function normalizeChatCompletionsUrl(baseUrl: string, fallbackBaseUrl: string): string {
+  const trimmed = (baseUrl || fallbackBaseUrl).trim().replace(/\/+$/, '')
+  if (trimmed.endsWith('/chat/completions')) return trimmed
+  if (trimmed.endsWith('/v1')) return `${trimmed}/chat/completions`
+  return `${trimmed}/v1/chat/completions`
 }

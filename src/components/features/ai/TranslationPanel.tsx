@@ -53,13 +53,13 @@ export function TranslationPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4">
-      <div className="flex items-center justify-between shrink-0">
+    <div className="min-h-full flex flex-col gap-4 p-4">
+      <div className="flex items-start justify-between gap-3 shrink-0 flex-wrap">
         <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
           <Languages size={20} className="text-accent" />
           Translation
         </h2>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm flex-wrap">
           <select
             value={fromLang}
             onChange={(e) => setFromLang(e.target.value as Language)}
@@ -87,7 +87,7 @@ export function TranslationPanel() {
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[320px]">
         <Card className="flex flex-col" padding="none">
           <div className="px-3 py-2 border-b border-border-color text-xs font-medium text-text-muted">
             Original
@@ -139,7 +139,7 @@ export function TranslationPanel() {
         </Card>
       </div>
 
-      <div className="shrink-0">
+      <div className="shrink-0 pb-1">
         <Button onClick={handleTranslate} disabled={loading || !sourceText.trim()} className="w-full">
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Languages size={16} />}
           {loading ? 'Translating...' : 'Translate'}

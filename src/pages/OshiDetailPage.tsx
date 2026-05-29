@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Mail, Loader2, Link2, X } from 'lucide-react'
+import { ArrowLeft, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Mail, Loader2, Link2, X, Trash2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
@@ -14,7 +14,7 @@ export function OshiDetailPage() {
   const [newArchiveName, setNewArchiveName] = useState('')
   const [showAddArchive, setShowAddArchive] = useState(false)
 
-  const { archives, activeArchiveId, fetchByOshi, createArchive, setActiveArchive } = useArchiveStore()
+  const { archives, activeArchiveId, fetchByOshi, createArchive, deleteArchive, setActiveArchive } = useArchiveStore()
   const {
     notes, totalNotes, currentPage, viewMode, cardStyle, searchQuery, loading: notesLoading,
     fetchByArchive, search, setViewMode, setCardStyle, setSearchQuery, setPage,
@@ -22,7 +22,6 @@ export function OshiDetailPage() {
 
   useEffect(() => {
     if (!oshiId) return
-    setLoading(true)
     fetchOshiById(oshiId).then((o) => { setOshi(o); setLoading(false) })
     fetchByOshi(oshiId)
   }, [oshiId, fetchByOshi])
@@ -49,6 +48,13 @@ export function OshiDetailPage() {
     createArchive(oshiId, newArchiveName.trim())
     setNewArchiveName('')
     setShowAddArchive(false)
+  }
+
+  async function handleDeleteArchive(archiveId: string, archiveName: string) {
+    if (!oshiId) return
+    if (!confirm(`Delete archive "${archiveName}" and all notes inside it?`)) return
+    await deleteArchive(archiveId)
+    await fetchByOshi(oshiId)
   }
 
   if (loading) {
@@ -127,13 +133,36 @@ export function OshiDetailPage() {
             <button
               key={archive.id}
               onClick={() => setActiveArchive(archive.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors shrink-0 ${
+              className={`group inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-colors shrink-0 ${
                 activeArchiveId === archive.id
                   ? 'bg-accent text-white'
                   : 'bg-bg-tertiary text-text-secondary hover:bg-accent-soft hover:text-accent'
               }`}
             >
-              {archive.name}
+              <span>{archive.name}</span>
+              <span
+                role="button"
+                tabIndex={0}
+                title="Delete archive"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeleteArchive(archive.id, archive.name)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleDeleteArchive(archive.id, archive.name)
+                  }
+                }}
+                className={`rounded-full p-0.5 transition-colors ${
+                  activeArchiveId === archive.id
+                    ? 'text-white/70 hover:text-white hover:bg-white/15'
+                    : 'text-text-muted hover:text-red-500 hover:bg-bg-primary'
+                }`}
+              >
+                <Trash2 size={12} />
+              </span>
             </button>
           ))}
           {showAddArchive ? (
@@ -301,7 +330,10 @@ export function OshiDetailPage() {
                   variant="ghost"
                   size="sm"
                   disabled={currentPage <= 1}
-                  onClick={() => { setPage(currentPage - 1); activeArchiveId && fetchByArchive(activeArchiveId, currentPage - 1) }}
+                  onClick={() => {
+                    setPage(currentPage - 1)
+                    if (activeArchiveId) fetchByArchive(activeArchiveId, currentPage - 1)
+                  }}
                 >
                   Prev
                 </Button>
@@ -312,7 +344,10 @@ export function OshiDetailPage() {
                   variant="ghost"
                   size="sm"
                   disabled={currentPage >= totalPages}
-                  onClick={() => { setPage(currentPage + 1); activeArchiveId && fetchByArchive(activeArchiveId, currentPage + 1) }}
+                  onClick={() => {
+                    setPage(currentPage + 1)
+                    if (activeArchiveId) fetchByArchive(activeArchiveId, currentPage + 1)
+                  }}
                 >
                   Next
                 </Button>

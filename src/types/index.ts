@@ -53,6 +53,7 @@ export interface NoteRow {
 }
 
 export type ThemeId = 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'
+export type UiMotionDuration = 'off' | 'fast' | 'normal' | 'slow'
 
 export type ViewMode = 'card' | 'list' | 'graph'
 export type CardStyle = 'sticky' | 'bookshelf' | 'postcard'
@@ -87,6 +88,7 @@ export interface CreateNoteInput {
   content: string
   plain_text: string
   tags: string[]
+  created_at?: string
 }
 
 export interface UpdateNoteInput {
@@ -96,6 +98,7 @@ export interface UpdateNoteInput {
   tags?: string[]
   archive_id?: string
   favorite?: boolean
+  created_at?: string
 }
 
 export interface SearchParams {

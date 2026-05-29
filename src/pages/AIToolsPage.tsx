@@ -14,7 +14,7 @@ export function AIToolsPage() {
   const needsApiKey = config.provider !== 'local' && !config[config.provider].apiKey
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="min-h-full flex flex-col">
       <div className="p-6 border-b border-border-color bg-bg-secondary/20 shrink-0">
         <h1 className="text-3xl font-bold text-text-primary mb-1">AI Tools</h1>
         <p className="text-text-secondary">AI-assisted translation and writing refinement.</p>
@@ -40,7 +40,7 @@ export function AIToolsPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {!config.enabled || needsApiKey ? (
           <div className="flex items-center justify-center h-full p-8">
             <Card className="text-center py-16 max-w-md">
@@ -53,14 +53,14 @@ export function AIToolsPage() {
             </Card>
           </div>
         ) : (
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={tab}
-              initial={{ opacity: 0, y: 8 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.15 }}
-              className="h-full"
+              className="min-h-full"
             >
               {tab === 'translate' ? <TranslationPanel /> : <RefinementPanel />}
             </motion.div>

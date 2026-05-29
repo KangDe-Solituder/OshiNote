@@ -58,7 +58,7 @@ export function RefinementPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4">
+    <div className="min-h-full flex flex-col gap-4 p-4">
       <div className="shrink-0">
         <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2 mb-3">
           <Wand2 size={20} className="text-accent" />
@@ -127,7 +127,7 @@ export function RefinementPanel() {
         )}
       </div>
 
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[320px]">
         <Card className="flex flex-col" padding="none">
           <div className="px-3 py-2 border-b border-border-color text-xs font-medium text-text-muted">
             Your Draft
@@ -175,7 +175,7 @@ export function RefinementPanel() {
         </Card>
       </div>
 
-      <div className="shrink-0">
+      <div className="shrink-0 pb-1">
         <Button onClick={handleRefine} disabled={loading || !draft.trim()} className="w-full">
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
           {loading ? 'Refining...' : 'Refine Writing'}
