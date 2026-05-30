@@ -15,6 +15,7 @@ async function runMigrations(db: Database): Promise<void> {
     await db.execute(sql)
   }
   await ensureOshiProfileColumns(db)
+  await rebuildNoteSearchIndex(db)
 }
 
 async function ensureOshiProfileColumns(db: Database): Promise<void> {
@@ -26,6 +27,17 @@ async function ensureOshiProfileColumns(db: Database): Promise<void> {
   }
   if (!columnNames.has('activity_links')) {
     await db.execute("ALTER TABLE oshis ADD COLUMN activity_links TEXT NOT NULL DEFAULT '[]'")
+  }
+}
+
+async function rebuildNoteSearchIndex(db: Database): Promise<void> {
+  const rows = await db.select<{ value: string }[]>(
+    "SELECT value FROM settings WHERE key = 'ftsIndexRebuilt'"
+  )
+
+  if (rows[0]?.value !== '1') {
+    await db.execute("INSERT INTO notes_fts(notes_fts) VALUES ('rebuild')")
+    await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ftsIndexRebuilt', '1')")
   }
 }
 

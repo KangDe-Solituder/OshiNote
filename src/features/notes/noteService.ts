@@ -100,10 +100,80 @@ export async function fetchRecentNotes(limit = 6): Promise<Note[]> {
 
 export async function searchNotes(oshiId: string, params: SearchParams): Promise<{ notes: Note[]; total: number }> {
   const db = await getDb()
+
+  // Use FTS5 when a text query is provided for better ranking and performance.
+  const ftsQuery = params.query ? buildFts5Query(params.query.trim()) : ''
+  const hasFullTextQuery = ftsQuery.length > 0
+
+  if (hasFullTextQuery) {
+    const conditions: string[] = ['n.oshi_id = ?']
+    const bindings: unknown[] = [oshiId]
+
+    if (params.tag) {
+      conditions.push("n.tags LIKE ? ESCAPE '\\'")
+      bindings.push(buildTagLikePattern(params.tag))
+    }
+
+    if (params.dateFrom) {
+      conditions.push('n.created_at >= ?')
+      bindings.push(params.dateFrom)
+    }
+
+    if (params.dateTo) {
+      conditions.push('n.created_at <= ?')
+      bindings.push(params.dateTo)
+    }
+
+    const ftsWhere = [...conditions, 'notes_fts MATCH ?'].join(' AND ')
+    const ftsRows = await db.select<NoteRow[]>(
+      `SELECT n.* FROM notes n
+       JOIN notes_fts ON n.rowid = notes_fts.rowid
+       WHERE ${ftsWhere}
+       ORDER BY rank`,
+      [...bindings, ftsQuery]
+    )
+
+    const query = `%${escapeLike(params.query!.trim())}%`
+    const likeWhere = [
+      ...conditions,
+      `(
+        n.title LIKE ? ESCAPE '\\' OR
+        n.plain_text LIKE ? ESCAPE '\\' OR
+        n.content LIKE ? ESCAPE '\\' OR
+        n.tags LIKE ? ESCAPE '\\'
+      )`,
+    ].join(' AND ')
+    const likeRows = await db.select<NoteRow[]>(
+      `SELECT n.* FROM notes n
+       WHERE ${likeWhere}
+       ORDER BY n.created_at DESC`,
+      [...bindings, query, query, query, query]
+    )
+
+    const merged = new Map<string, Note>()
+    for (const row of ftsRows) {
+      merged.set(row.id, deserializeNote(row))
+    }
+    for (const row of likeRows) {
+      if (!merged.has(row.id)) {
+        merged.set(row.id, deserializeNote(row))
+      }
+    }
+
+    const offset = (params.page - 1) * params.pageSize
+    const notes = Array.from(merged.values())
+
+    return {
+      notes: notes.slice(offset, offset + params.pageSize),
+      total: notes.length,
+    }
+  }
+
+  // Fallback: no text query — use existing simple filters (tag, date range only).
   const conditions: string[] = ['n.oshi_id = ?']
   const bindings: unknown[] = [oshiId]
 
-  if (params.query) {
+  if (params.query?.trim()) {
     const query = `%${escapeLike(params.query.trim())}%`
     conditions.push(`(
       n.title LIKE ? ESCAPE '\\' OR
@@ -115,8 +185,8 @@ export async function searchNotes(oshiId: string, params: SearchParams): Promise
   }
 
   if (params.tag) {
-    conditions.push('n.tags LIKE ?')
-    bindings.push(`%"${params.tag}"%`)
+    conditions.push("n.tags LIKE ? ESCAPE '\\'")
+    bindings.push(buildTagLikePattern(params.tag))
   }
 
   if (params.dateFrom) {
@@ -146,13 +216,45 @@ export async function searchNotes(oshiId: string, params: SearchParams): Promise
   }
 }
 
+/**
+ * Build a safe FTS5 query string from raw user input.
+ * Each token gets a * suffix for prefix matching (e.g. "stream" matches "streaming").
+ * Special FTS5 query characters are stripped from each token.
+ */
+function buildFts5Query(raw: string): string {
+  return raw
+    .replace(/[*"()^~:@]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => `"${token}"*`)
+    .join(' ')
+}
+
 export async function fetchNotesByTag(tag: string): Promise<Note[]> {
   const db = await getDb()
   const rows = await db.select<NoteRow[]>(
-    'SELECT * FROM notes WHERE tags LIKE ? ORDER BY created_at DESC',
-    [`%"${tag}"%`]
+    "SELECT * FROM notes WHERE tags LIKE ? ESCAPE '\\' ORDER BY created_at DESC",
+    [buildTagLikePattern(tag)]
   )
   return rows.map(deserializeNote).filter((note) => note.tags.includes(tag))
+}
+
+export async function fetchNotesByTagPaginated(
+  tag: string,
+  options: { page: number; pageSize: number; sort: 'newest' | 'oldest' }
+): Promise<{ notes: Note[]; total: number }> {
+  const db = await getDb()
+  const order = options.sort === 'oldest' ? 'ASC' : 'DESC'
+  const offset = (options.page - 1) * options.pageSize
+  const rows = await db.select<NoteRow[]>(
+    `SELECT * FROM notes WHERE tags LIKE ? ESCAPE '\\' ORDER BY created_at ${order}`,
+    [buildTagLikePattern(tag)]
+  )
+  const matchingNotes = rows.map(deserializeNote).filter((note) => note.tags.includes(tag))
+  return {
+    notes: matchingNotes.slice(offset, offset + options.pageSize),
+    total: matchingNotes.length,
+  }
 }
 
 export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
@@ -185,6 +287,10 @@ export async function getTotalOshiCount(): Promise<number> {
 export async function getTotalTagCount(): Promise<number> {
   const tags = await getAllTags()
   return tags.length
+}
+
+function buildTagLikePattern(tag: string): string {
+  return `%${escapeLike(JSON.stringify(tag))}%`
 }
 
 function escapeLike(value: string): string {

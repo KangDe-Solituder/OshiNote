@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Mail, Loader2, Link2, X, Trash2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
+import { TagGraphView } from '../components/features/notes/TagGraphView'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
@@ -275,7 +276,13 @@ export function OshiDetailPage() {
           </div>
         )}
 
-        {!notesLoading && notes.length > 0 && (
+        {!notesLoading && notes.length > 0 && viewMode === 'graph' && (
+          <div className="h-full">
+            <TagGraphView notes={notes} />
+          </div>
+        )}
+
+        {!notesLoading && notes.length > 0 && viewMode !== 'graph' && (
           <>
             <div className={viewMode === 'card' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-1'}>
               {notes.map((note) => (
