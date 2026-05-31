@@ -22,9 +22,9 @@ export function OshiCard({ oshi, noteCount, onEdit, onDelete }: OshiCardProps) {
     >
       <Link
         to={`/oshis/${oshi.id}`}
-        className="block p-6 rounded-2xl bg-bg-card backdrop-blur-md border border-white/20 shadow-glass hover:shadow-xl transition-all duration-300"
+        className="block overflow-hidden rounded-2xl border border-white/20 bg-bg-card p-6 shadow-glass backdrop-blur-md transition-all duration-300 hover:shadow-xl"
       >
-        <div className="flex flex-col items-center text-center gap-3">
+        <div className="flex min-w-0 flex-col items-center gap-3 overflow-hidden text-center">
           <div
             className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-2xl font-bold text-white shadow-lg"
             style={{ backgroundColor: oshi.color || '#EC4899' }}
@@ -35,12 +35,14 @@ export function OshiCard({ oshi, noteCount, onEdit, onDelete }: OshiCardProps) {
               oshi.name.charAt(0).toUpperCase()
             )}
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-text-primary">{oshi.name}</h3>
+          <div className="min-w-0 max-w-full">
+            <h3 className="truncate text-lg font-semibold text-text-primary">{oshi.name}</h3>
             <p className="text-sm text-text-muted">{noteCount} notes</p>
           </div>
           {oshi.description && (
-            <p className="text-xs text-text-secondary line-clamp-2">{oshi.description}</p>
+            <p className="w-full overflow-hidden break-words text-xs text-text-secondary [overflow-wrap:anywhere] line-clamp-2">
+              {oshi.description}
+            </p>
           )}
           {oshi.activity_links.length > 0 && (
             <p className="inline-flex items-center gap-1 text-xs text-text-muted">

@@ -34,8 +34,22 @@ export async function updateArchive(id: string, name: string): Promise<void> {
 
 export async function deleteArchive(id: string): Promise<void> {
   const db = await getDb()
-  await db.execute('DELETE FROM notes WHERE archive_id = ?', [id])
+  await db.execute("UPDATE notes SET archive_id = NULL, updated_at = datetime('now', 'localtime') WHERE archive_id = ?", [id])
   await db.execute('DELETE FROM archives WHERE id = ?', [id])
+}
+
+export async function fetchAllArchives(): Promise<Archive[]> {
+  const db = await getDb()
+  return db.select<Archive[]>('SELECT * FROM archives ORDER BY name ASC')
+}
+
+export async function getArchiveNoteCount(id: string): Promise<number> {
+  const db = await getDb()
+  const rows = await db.select<{ count: number }[]>(
+    'SELECT COUNT(*) as count FROM notes WHERE archive_id = ?',
+    [id]
+  )
+  return rows[0]?.count || 0
 }
 
 export async function createDefaultArchives(oshiId: string): Promise<void> {

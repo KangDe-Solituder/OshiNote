@@ -26,6 +26,11 @@ export function OshiListPage() {
   }
 
   function handleDelete(id: string) {
+    const noteCount = oshiNoteCounts[id] || 0
+    const message = noteCount > 0
+      ? `Delete this oshi? Its ${noteCount} note${noteCount === 1 ? '' : 's'} will be kept in All Notes as unassigned.`
+      : 'Delete this oshi?'
+    if (!confirm(message)) return
     deleteOshi(id)
   }
 

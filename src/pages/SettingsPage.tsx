@@ -192,8 +192,8 @@ export function SettingsPage() {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-primary">Page Transition</p>
-              <p className="text-xs text-text-muted">Adjust page fade movement.</p>
+              <p className="text-sm font-medium text-text-primary">Animation Speed</p>
+              <p className="text-xs text-text-muted">Adjust interface and page transition motion.</p>
             </div>
             <select
               value={uiMotionDuration}

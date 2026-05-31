@@ -127,7 +127,7 @@ export function TagDetailPage() {
             {filteredNotes.map((note) => (
               <Link
                 key={note.id}
-                to={`/oshis/${note.oshi_id}/notes/${note.id}`}
+                to={note.oshi_id ? `/oshis/${note.oshi_id}/notes/${note.id}` : `/notes/${note.id}`}
                 className="flex items-start gap-3 p-4 rounded-xl border border-border-color bg-bg-card hover:shadow-md transition-all"
               >
                 <StickyNote size={18} className="mt-0.5 text-accent shrink-0" />

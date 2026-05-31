@@ -30,14 +30,10 @@ export function HomePage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
+      <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2">Welcome back</h1>
         <p className="text-text-secondary">Your cozy memory space for your oshi.</p>
-      </motion.div>
+      </div>
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         {statCards.map((stat) => (

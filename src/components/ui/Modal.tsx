@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
+import { useUiMotionSeconds } from '../features/themes/uiMotion'
 
 interface ModalProps {
   open: boolean
@@ -10,6 +11,8 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children }: ModalProps) {
+  const motionSeconds = useUiMotionSeconds()
+
   useEffect(() => {
     if (open) {
       const handler = (e: KeyboardEvent) => {
@@ -36,7 +39,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            transition={{ duration: motionSeconds, ease: 'easeOut' }}
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-text-primary">{title}</h2>

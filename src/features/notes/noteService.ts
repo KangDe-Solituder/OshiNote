@@ -1,5 +1,20 @@
 import { getDb, generateId } from '../../database'
-import type { Note, NoteRow, CreateNoteInput, UpdateNoteInput, SearchParams } from '../../types'
+import type {
+  Note,
+  NoteLibraryItem,
+  NoteRow,
+  CreateNoteInput,
+  UpdateNoteInput,
+  SearchParams,
+  GlobalNoteSearchParams,
+} from '../../types'
+
+interface NoteLibraryRow extends NoteRow {
+  oshi_name: string | null
+  oshi_avatar: string | null
+  oshi_color: string | null
+  archive_name: string | null
+}
 
 function deserializeNote(row: NoteRow): Note {
   return {
@@ -39,8 +54,8 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
      VALUES (?, ?, ?, ?, ?, ?, ?, 0, COALESCE(?, datetime('now', 'localtime')), COALESCE(?, datetime('now', 'localtime')))`,
     [
       id,
-      input.oshi_id,
-      input.archive_id,
+      input.oshi_id || null,
+      input.archive_id || null,
       input.title,
       input.content,
       input.plain_text,
@@ -61,6 +76,7 @@ export async function updateNote(id: string, input: UpdateNoteInput): Promise<vo
   if (input.content !== undefined) { sets.push('content = ?'); params.push(input.content) }
   if (input.plain_text !== undefined) { sets.push('plain_text = ?'); params.push(input.plain_text) }
   if (input.tags !== undefined) { sets.push('tags = ?'); params.push(JSON.stringify(input.tags)) }
+  if (input.oshi_id !== undefined) { sets.push('oshi_id = ?'); params.push(input.oshi_id) }
   if (input.archive_id !== undefined) { sets.push('archive_id = ?'); params.push(input.archive_id) }
   if (input.favorite !== undefined) { sets.push('favorite = ?'); params.push(input.favorite ? 1 : 0) }
   if (input.created_at !== undefined) { sets.push('created_at = ?'); params.push(input.created_at) }
@@ -69,6 +85,82 @@ export async function updateNote(id: string, input: UpdateNoteInput): Promise<vo
 
   if (sets.length > 0) {
     await db.execute(`UPDATE notes SET ${sets.join(', ')} WHERE id = ?`, [...params, id])
+  }
+}
+
+export async function fetchAllNotes(params: GlobalNoteSearchParams): Promise<{ notes: NoteLibraryItem[]; total: number }> {
+  const db = await getDb()
+  const conditions: string[] = []
+  const bindings: unknown[] = []
+
+  if (params.query?.trim()) {
+    const query = `%${escapeLike(params.query.trim())}%`
+    conditions.push(`(
+      n.title LIKE ? ESCAPE '\\' OR
+      n.plain_text LIKE ? ESCAPE '\\' OR
+      n.content LIKE ? ESCAPE '\\' OR
+      n.tags LIKE ? ESCAPE '\\'
+    )`)
+    bindings.push(query, query, query, query)
+  }
+
+  if (params.oshiId) {
+    conditions.push('n.oshi_id = ?')
+    bindings.push(params.oshiId)
+  }
+
+  if (params.archiveId) {
+    conditions.push('n.archive_id = ?')
+    bindings.push(params.archiveId)
+  }
+
+  if (params.tag) {
+    conditions.push("n.tags LIKE ? ESCAPE '\\'")
+    bindings.push(buildTagLikePattern(params.tag))
+  }
+
+  if (params.favorite) {
+    conditions.push('n.favorite = 1')
+  }
+
+  if (params.ownership === 'unassigned') conditions.push('n.oshi_id IS NULL')
+  if (params.ownership === 'unfiled') conditions.push('n.archive_id IS NULL')
+  if (params.ownership === 'untagged') conditions.push("n.tags = '[]'")
+  if (params.ownership === 'needs-sorting') {
+    conditions.push("(n.oshi_id IS NULL OR n.archive_id IS NULL OR n.tags = '[]')")
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const orderBy = params.sort === 'oldest'
+    ? 'n.created_at ASC'
+    : params.sort === 'updated'
+      ? 'n.updated_at DESC'
+      : 'n.created_at DESC'
+  const offset = (params.page - 1) * params.pageSize
+
+  const countRows = await db.select<{ count: number }[]>(
+    `SELECT COUNT(*) as count FROM notes n ${where}`,
+    bindings
+  )
+  const rows = await db.select<NoteLibraryRow[]>(
+    `SELECT
+       n.*,
+       o.name as oshi_name,
+       o.avatar as oshi_avatar,
+       o.color as oshi_color,
+       a.name as archive_name
+     FROM notes n
+     LEFT JOIN oshis o ON o.id = n.oshi_id
+     LEFT JOIN archives a ON a.id = n.archive_id
+     ${where}
+     ORDER BY ${orderBy}
+     LIMIT ? OFFSET ?`,
+    [...bindings, params.pageSize, offset]
+  )
+
+  return {
+    notes: rows.map(deserializeLibraryNote),
+    total: countRows[0]?.count || 0,
   }
 }
 
@@ -295,4 +387,14 @@ function buildTagLikePattern(tag: string): string {
 
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
+function deserializeLibraryNote(row: NoteLibraryRow): NoteLibraryItem {
+  return {
+    ...deserializeNote(row),
+    oshi_name: row.oshi_name,
+    oshi_avatar: row.oshi_avatar,
+    oshi_color: row.oshi_color,
+    archive_name: row.archive_name,
+  }
 }

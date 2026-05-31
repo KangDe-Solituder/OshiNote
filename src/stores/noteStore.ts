@@ -34,7 +34,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   currentPage: 1,
   pageSize: 20,
   viewMode: 'card',
-  cardStyle: 'sticky',
+  cardStyle: 'basic',
   searchQuery: '',
   tagFilter: null,
   loading: false,

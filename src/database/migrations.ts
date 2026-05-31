@@ -20,8 +20,8 @@ export const MIGRATIONS = [
 
   `CREATE TABLE IF NOT EXISTS notes (
     id         TEXT PRIMARY KEY,
-    oshi_id    TEXT NOT NULL,
-    archive_id TEXT NOT NULL,
+    oshi_id    TEXT,
+    archive_id TEXT,
     title      TEXT NOT NULL DEFAULT '',
     content    TEXT NOT NULL DEFAULT '{}',
     plain_text TEXT NOT NULL DEFAULT '',
@@ -29,8 +29,8 @@ export const MIGRATIONS = [
     favorite   INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE,
-    FOREIGN KEY (archive_id) REFERENCES archives(id) ON DELETE CASCADE
+    FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE SET NULL,
+    FOREIGN KEY (archive_id) REFERENCES archives(id) ON DELETE SET NULL
   )`,
 
   `CREATE INDEX IF NOT EXISTS idx_notes_oshi ON notes(oshi_id)`,
@@ -66,4 +66,40 @@ export const MIGRATIONS = [
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
+
+  `CREATE TABLE IF NOT EXISTS journal_pages (
+    id         TEXT PRIMARY KEY,
+    archive_id TEXT NOT NULL,
+    title      TEXT NOT NULL DEFAULT '',
+    page_index INTEGER NOT NULL DEFAULT 0,
+    background TEXT NOT NULL DEFAULT 'paper',
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (archive_id) REFERENCES archives(id) ON DELETE CASCADE
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS journal_items (
+    id            TEXT PRIMARY KEY,
+    page_id       TEXT NOT NULL,
+    note_id       TEXT NOT NULL,
+    item_type     TEXT NOT NULL DEFAULT 'note',
+    x             REAL NOT NULL DEFAULT 0,
+    y             REAL NOT NULL DEFAULT 0,
+    width         REAL NOT NULL DEFAULT 240,
+    height        REAL NOT NULL DEFAULT 180,
+    rotation      REAL NOT NULL DEFAULT 0,
+    z_index       INTEGER NOT NULL DEFAULT 0,
+    sticker_style TEXT NOT NULL DEFAULT 'sticky',
+    color         TEXT,
+    border_style  TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (page_id) REFERENCES journal_pages(id) ON DELETE CASCADE,
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS idx_journal_pages_archive ON journal_pages(archive_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_journal_items_page ON journal_items(page_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_journal_items_note ON journal_items(note_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_items_page_note ON journal_items(page_id, note_id)`,
 ]

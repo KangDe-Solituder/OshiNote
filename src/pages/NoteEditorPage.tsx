@@ -1,13 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CalendarClock, FolderOpen, Save, Trash2, Star, Loader2 } from 'lucide-react'
+import { ArrowLeft, CalendarClock, FolderOpen, Save, Trash2, Star, Loader2, UserRound } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { useNoteStore } from '../stores/noteStore'
-import { useArchiveStore } from '../stores/archiveStore'
 import { useEditorStore } from '../stores/editorStore'
 import { fetchNoteById } from '../features/notes/noteService'
+import { fetchArchivesByOshi } from '../features/oshis/archiveService'
+import { fetchAllOshis } from '../features/oshis/oshiService'
 import { TipTapEditor } from '../components/editor/TipTapEditor'
-import type { Note } from '../types'
+import type { Archive, Note, Oshi } from '../types'
 
 export function NoteEditorPage() {
   const { oshiId, noteId } = useParams<{ oshiId: string; noteId: string }>()
@@ -21,19 +22,26 @@ export function NoteEditorPage() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [favorite, setFavorite] = useState(false)
+  const [selectedOshiId, setSelectedOshiId] = useState(oshiId || '')
   const [archiveId, setArchiveId] = useState('')
+  const [archives, setArchives] = useState<Archive[]>([])
+  const [oshis, setOshis] = useState<Oshi[]>([])
   const [createdAt, setCreatedAt] = useState(toDateTimeLocalValue(new Date()))
   const [editorContent, setEditorContent] = useState<object | undefined>(undefined)
 
   const editorRef = useRef<{ json: object; text: string }>({ json: createEmptyDoc(), text: '' })
   const { createNote, updateNote, deleteNote, toggleFavorite } = useNoteStore()
-  const { archives, fetchByOshi } = useArchiveStore()
   const isDirty = useEditorStore((s) => s.isDirty)
   const markSaved = useEditorStore((s) => s.markSaved)
 
   useEffect(() => {
-    if (oshiId) fetchByOshi(oshiId)
-  }, [oshiId, fetchByOshi])
+    fetchAllOshis().then(setOshis).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!selectedOshiId) return
+    fetchArchivesByOshi(selectedOshiId).then(setArchives).catch(() => setArchives([]))
+  }, [selectedOshiId])
 
   useEffect(() => {
     if (isNew) {
@@ -47,7 +55,8 @@ export function NoteEditorPage() {
         setTitle(n.title)
         setTags(n.tags)
         setFavorite(n.favorite)
-        setArchiveId(n.archive_id)
+        setSelectedOshiId(n.oshi_id || '')
+        setArchiveId(n.archive_id || '')
         setCreatedAt(toDateTimeLocalValue(n.created_at))
         setEditorContent(parsedContent)
         editorRef.current = { json: parsedContent, text: n.plain_text }
@@ -57,18 +66,15 @@ export function NoteEditorPage() {
   }, [noteId, isNew])
 
   async function handleSave() {
-    if (!oshiId) return
     setSaving(true)
     try {
       const { json, text } = editorRef.current
-      const selectedArchiveId = archiveId || archives[0]?.id || ''
-      if (!selectedArchiveId) return
       const noteDate = fromDateTimeLocalValue(createdAt)
 
       if (isNew) {
         const newNote = await createNote({
-          oshi_id: oshiId,
-          archive_id: selectedArchiveId,
+          oshi_id: selectedOshiId || null,
+          archive_id: archiveId || null,
           title: title || 'Untitled',
           content: JSON.stringify(json),
           plain_text: text,
@@ -76,18 +82,19 @@ export function NoteEditorPage() {
           created_at: noteDate,
         })
         markSaved()
-        navigate(`/oshis/${oshiId}/notes/${newNote.id}`, { replace: true })
+        navigate(`/notes/${newNote.id}`, { replace: true })
       } else if (note) {
         await updateNote(note.id, {
           title: title || 'Untitled',
           content: JSON.stringify(json),
           plain_text: text,
           tags,
-          archive_id: selectedArchiveId,
+          oshi_id: selectedOshiId || null,
+          archive_id: archiveId || null,
           created_at: noteDate,
         })
         markSaved()
-        setNote({ ...note, title, content: JSON.stringify(json), plain_text: text, tags, archive_id: selectedArchiveId, created_at: noteDate })
+        setNote({ ...note, title, content: JSON.stringify(json), plain_text: text, tags, oshi_id: selectedOshiId || null, archive_id: archiveId || null, created_at: noteDate })
       }
     } finally {
       setSaving(false)
@@ -95,10 +102,10 @@ export function NoteEditorPage() {
   }
 
   async function handleDelete() {
-    if (!note || !oshiId) return
+    if (!note) return
     if (!confirm('Delete this note?')) return
     await deleteNote(note.id)
-    navigate(`/oshis/${oshiId}`)
+    navigate(oshiId ? `/oshis/${oshiId}` : '/notes')
   }
 
   async function handleToggleFavorite() {
@@ -131,7 +138,7 @@ export function NoteEditorPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oshiId, title, tags, note, isNew, archiveId, createdAt])
+  }, [oshiId, title, tags, note, isNew, selectedOshiId, archiveId, createdAt])
 
   if (loading) {
     return (
@@ -145,7 +152,7 @@ export function NoteEditorPage() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-border-color bg-bg-secondary/30 flex items-center gap-4 shrink-0">
-        <Link to={`/oshis/${oshiId}`} className="text-text-muted hover:text-text-primary transition-colors">
+        <Link to={oshiId ? `/oshis/${oshiId}` : '/notes'} className="text-text-muted hover:text-text-primary transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <input
@@ -183,13 +190,31 @@ export function NoteEditorPage() {
       {/* Tags row */}
       <div className="px-4 py-2 border-b border-border-color bg-bg-secondary/10 flex items-center gap-2 flex-wrap shrink-0">
         <label className="inline-flex items-center gap-1.5 text-xs text-text-muted">
-          <FolderOpen size={14} />
+          <UserRound size={14} />
           <select
-            value={archiveId || archives[0]?.id || ''}
-            onChange={(e) => setArchiveId(e.target.value)}
+            value={selectedOshiId}
+            onChange={(e) => {
+              setSelectedOshiId(e.target.value)
+              setArchiveId('')
+            }}
             className="px-2 py-1 rounded-lg border border-border-color bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft"
           >
-            {archives.map((archive) => (
+            <option value="">No Oshi</option>
+            {oshis.map((oshi) => (
+              <option key={oshi.id} value={oshi.id}>{oshi.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+          <FolderOpen size={14} />
+          <select
+            value={archiveId}
+            onChange={(e) => setArchiveId(e.target.value)}
+            disabled={!selectedOshiId}
+            className="px-2 py-1 rounded-lg border border-border-color bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft"
+          >
+            <option value="">Unfiled</option>
+            {(selectedOshiId ? archives : []).map((archive) => (
               <option key={archive.id} value={archive.id}>{archive.name}</option>
             ))}
           </select>

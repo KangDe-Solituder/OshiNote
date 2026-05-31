@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Smile, X } from 'lucide-react'
 import { KAOMOJI_CATEGORIES, EMOJI_CATEGORIES } from '../../features/notes/kaomojiPresets'
+import { useUiMotionSeconds } from '../features/themes/uiMotion'
 
 interface EmojiPickerProps {
   onSelect: (text: string) => void
@@ -11,6 +12,7 @@ type Tab = 'emoji' | 'kaomoji' | 'custom'
 const CUSTOM_KAOMOJI_KEY = 'oshinote.customKaomoji'
 
 export function EmojiPicker({ onSelect }: EmojiPickerProps) {
+  const motionSeconds = useUiMotionSeconds()
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('emoji')
   const [customItems, setCustomItems] = useState<string[]>(loadCustomKaomoji)
@@ -42,7 +44,7 @@ export function EmojiPicker({ onSelect }: EmojiPickerProps) {
             initial={{ opacity: 0, y: 8, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: motionSeconds }}
             className="absolute top-full mt-2 left-0 w-80 bg-bg-primary border border-border-color rounded-2xl shadow-2xl z-50 overflow-hidden"
           >
             <div className="flex border-b border-border-color">

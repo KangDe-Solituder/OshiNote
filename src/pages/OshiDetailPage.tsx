@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Mail, Loader2, Link2, X, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, FolderArchive, Palette, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Loader2, Link2, X, Trash2 } from 'lucide-react'
+import clsx from 'clsx'
 import { Button } from '../components/ui/Button'
 import { TagGraphView } from '../components/features/notes/TagGraphView'
+import { JournalPageView } from '../components/features/journal/JournalPageView'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
+import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
-import type { Oshi } from '../types'
+import type { CardStyle, Oshi } from '../types'
 
 export function OshiDetailPage() {
   const { oshiId } = useParams<{ oshiId: string }>()
@@ -14,12 +17,16 @@ export function OshiDetailPage() {
   const [loading, setLoading] = useState(true)
   const [newArchiveName, setNewArchiveName] = useState('')
   const [showAddArchive, setShowAddArchive] = useState(false)
+  const [showArchiveMenu, setShowArchiveMenu] = useState(false)
+  const [showCardStyleMenu, setShowCardStyleMenu] = useState(false)
+  const [showFullDescription, setShowFullDescription] = useState(false)
 
-  const { archives, activeArchiveId, fetchByOshi, createArchive, deleteArchive, setActiveArchive } = useArchiveStore()
+  const { archives, activeArchiveId, fetchByOshi, createArchive, deleteArchive, getArchiveNoteCount, setActiveArchive } = useArchiveStore()
   const {
     notes, totalNotes, currentPage, viewMode, cardStyle, searchQuery, loading: notesLoading,
     fetchByArchive, search, setViewMode, setCardStyle, setSearchQuery, setPage,
   } = useNoteStore()
+  const refreshOshis = useOshiStore((s) => s.fetchAll)
 
   useEffect(() => {
     if (!oshiId) return
@@ -34,6 +41,8 @@ export function OshiDetailPage() {
   }, [activeArchiveId, fetchByArchive])
 
   const totalPages = Math.max(1, Math.ceil(totalNotes / useNoteStore.getState().pageSize))
+  const activeArchive = archives.find((archive) => archive.id === activeArchiveId)
+  const descriptionNeedsExpansion = Boolean(oshi && (oshi.description.length > 220 || oshi.description.split('\n').length > 4))
 
   function handleSearch() {
     if (!oshiId) return
@@ -53,9 +62,18 @@ export function OshiDetailPage() {
 
   async function handleDeleteArchive(archiveId: string, archiveName: string) {
     if (!oshiId) return
-    if (!confirm(`Delete archive "${archiveName}" and all notes inside it?`)) return
+    const noteCount = await getArchiveNoteCount(archiveId)
+    const message = noteCount > 0
+      ? `Delete archive "${archiveName}"? Its ${noteCount} note${noteCount === 1 ? '' : 's'} will be kept in All Notes as unfiled.`
+      : `Delete empty archive "${archiveName}"?`
+    if (!confirm(message)) return
     await deleteArchive(archiveId)
     await fetchByOshi(oshiId)
+    await refreshOshis()
+    const nextArchive = useArchiveStore.getState().activeArchiveId
+    if (nextArchive) {
+      await fetchByArchive(nextArchive, 1)
+    }
   }
 
   if (loading) {
@@ -82,114 +100,71 @@ export function OshiDetailPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b border-border-color bg-bg-secondary/30">
-        <div className="flex items-center gap-4 mb-4">
-          <Link to="/oshis" className="text-text-muted hover:text-text-primary transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <div
-            className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-xl font-bold text-white shadow-lg shrink-0"
-            style={{ backgroundColor: oshi.color || '#EC4899' }}
-          >
-            {oshi.avatar ? (
-              <img src={oshi.avatar} alt="" className="w-full h-full object-cover" />
-            ) : (
-              oshi.name.charAt(0).toUpperCase()
-            )}
-          </div>
+      <div className="border-b border-border-color bg-bg-secondary/30 p-6">
+        <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-text-primary truncate">{oshi.name}</h1>
-            <p className="text-sm text-text-muted">{totalNotes} notes</p>
-          </div>
-        </div>
+            <div className="flex items-center gap-3">
+              <Link to="/oshis" className="shrink-0 text-text-muted transition-colors hover:text-text-primary">
+                <ArrowLeft size={20} />
+              </Link>
+              <div
+                className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white shadow-lg"
+                style={{ backgroundColor: oshi.color || '#EC4899' }}
+              >
+                {oshi.avatar ? (
+                  <img src={oshi.avatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  oshi.name.charAt(0).toUpperCase()
+                )}
+              </div>
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-bold text-text-primary">{oshi.name}</h1>
+                <p className="text-sm text-text-muted">{totalNotes} notes</p>
+              </div>
+            </div>
 
-        {(oshi.description || oshi.activity_links.length > 0) && (
-          <div className="mb-4 pl-9 sm:pl-16">
-            {oshi.description && (
-              <p className="text-sm text-text-secondary mb-2 whitespace-pre-wrap">{oshi.description}</p>
-            )}
             {oshi.activity_links.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Link2 size={14} className="text-text-muted" />
+              <div className="mt-4 space-y-1.5 pl-8">
                 {oshi.activity_links.map((url) => (
                   <a
                     key={url}
                     href={url}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-2.5 py-1 rounded-full text-xs bg-accent-soft text-accent hover:bg-accent hover:text-white transition-colors"
+                    className="flex min-w-0 items-center gap-1.5 text-xs text-accent transition-colors hover:text-accent-hover"
                     title={url}
                   >
-                    {formatLinkLabel(url)}
+                    <Link2 size={13} className="shrink-0 text-text-muted" />
+                    <span className="truncate">{formatLinkLabel(url)}</span>
                   </a>
                 ))}
               </div>
             )}
           </div>
-        )}
 
-        {/* Archives */}
-        <div className="flex gap-2 overflow-x-auto pb-1 items-center">
-          {archives.map((archive) => (
-            <button
-              key={archive.id}
-              onClick={() => setActiveArchive(archive.id)}
-              className={`group inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-colors shrink-0 ${
-                activeArchiveId === archive.id
-                  ? 'bg-accent text-white'
-                  : 'bg-bg-tertiary text-text-secondary hover:bg-accent-soft hover:text-accent'
-              }`}
-            >
-              <span>{archive.name}</span>
-              <span
-                role="button"
-                tabIndex={0}
-                title="Delete archive"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDeleteArchive(archive.id, archive.name)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleDeleteArchive(archive.id, archive.name)
-                  }
-                }}
-                className={`rounded-full p-0.5 transition-colors ${
-                  activeArchiveId === archive.id
-                    ? 'text-white/70 hover:text-white hover:bg-white/15'
-                    : 'text-text-muted hover:text-red-500 hover:bg-bg-primary'
-                }`}
-              >
-                <Trash2 size={12} />
-              </span>
-            </button>
-          ))}
-          {showAddArchive ? (
-            <form
-              onSubmit={(e) => { e.preventDefault(); handleAddArchive() }}
-              className="flex items-center gap-1 shrink-0"
-            >
-              <input
-                autoFocus
-                value={newArchiveName}
-                onChange={(e) => setNewArchiveName(e.target.value)}
-                placeholder="Name..."
-                className="w-24 px-2 py-1 rounded-full text-sm border border-accent bg-bg-primary text-text-primary focus:outline-none"
-              />
-              <button type="submit" className="p-1 text-accent hover:text-accent-hover"><Plus size={14} /></button>
-              <button type="button" onClick={() => setShowAddArchive(false)} className="p-1 text-text-muted hover:text-text-primary"><X size={14} /></button>
-            </form>
-          ) : (
-            <button
-              onClick={() => setShowAddArchive(true)}
-              className="px-3 py-1.5 rounded-full text-sm border border-dashed border-border-hover text-text-muted hover:text-accent hover:border-accent transition-colors shrink-0 flex items-center gap-1"
-            >
-              <Plus size={14} />
-              Add
-            </button>
-          )}
+          <div className="min-w-0">
+            {oshi.description ? (
+              <>
+                <p className={clsx(
+                  'whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary [overflow-wrap:anywhere]',
+                  !showFullDescription && descriptionNeedsExpansion && 'line-clamp-4'
+                )}>
+                  {oshi.description}
+                </p>
+                {descriptionNeedsExpansion && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullDescription(!showFullDescription)}
+                    className="mt-2 text-xs font-medium text-accent hover:text-accent-hover"
+                  >
+                    {showFullDescription ? 'Show less' : 'Show more'}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-text-muted">No description yet.</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -211,6 +186,7 @@ export function OshiDetailPage() {
             { mode: 'card' as const, icon: LayoutGrid },
             { mode: 'list' as const, icon: List },
             { mode: 'graph' as const, icon: GitGraph },
+            { mode: 'journal' as const, icon: BookOpen },
           ].map(({ mode, icon: Icon }) => (
             <button
               key={mode}
@@ -225,24 +201,127 @@ export function OshiDetailPage() {
           ))}
         </div>
 
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowArchiveMenu(!showArchiveMenu)}
+            className={clsx(
+              'flex items-center gap-1.5 rounded-lg border border-border-color bg-bg-secondary px-2.5 py-2 text-sm transition-colors',
+              showArchiveMenu ? 'text-accent ring-2 ring-accent-soft' : 'text-text-secondary hover:text-text-primary'
+            )}
+            title="Archives"
+          >
+            <FolderArchive size={17} />
+            <span className="max-w-24 truncate">{activeArchive?.name || 'Archive'}</span>
+            <ChevronDown size={14} />
+          </button>
+
+          {showArchiveMenu && (
+            <div className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-border-color bg-bg-primary p-2 shadow-xl">
+              <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Archives</p>
+              <div className="max-h-56 overflow-y-auto">
+                {archives.length === 0 ? (
+                  <p className="px-2 py-3 text-xs text-text-muted">No archives yet.</p>
+                ) : (
+                  archives.map((archive) => (
+                    <div
+                      key={archive.id}
+                      className={clsx(
+                        'group flex items-center gap-1 rounded-lg',
+                        archive.id === activeArchiveId ? 'bg-accent-soft text-accent' : 'text-text-secondary hover:bg-bg-secondary'
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveArchive(archive.id)
+                          setShowArchiveMenu(false)
+                        }}
+                        className="min-w-0 flex-1 truncate px-2 py-2 text-left text-sm"
+                      >
+                        {archive.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteArchive(archive.id, archive.name)}
+                        className="mr-1 rounded-md p-1 text-text-muted opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                        title="Delete archive"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-2 border-t border-border-color pt-2">
+                {showAddArchive ? (
+                  <form onSubmit={(e) => { e.preventDefault(); handleAddArchive() }} className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      value={newArchiveName}
+                      onChange={(e) => setNewArchiveName(e.target.value)}
+                      placeholder="Archive name..."
+                      className="min-w-0 flex-1 rounded-lg border border-accent bg-bg-primary px-2 py-1.5 text-sm text-text-primary focus:outline-none"
+                    />
+                    <button type="submit" className="p-1.5 text-accent hover:text-accent-hover" title="Create archive"><Plus size={15} /></button>
+                    <button type="button" onClick={() => setShowAddArchive(false)} className="p-1.5 text-text-muted hover:text-text-primary" title="Cancel"><X size={15} /></button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddArchive(true)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-secondary hover:text-accent"
+                  >
+                    <Plus size={15} />
+                    New archive
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {viewMode === 'card' && (
-          <div className="flex gap-1 bg-bg-secondary rounded-xl p-1">
-            {[
-              { style: 'sticky' as const, icon: StickyNote },
-              { style: 'bookshelf' as const, icon: BookOpen },
-              { style: 'postcard' as const, icon: Mail },
-            ].map(({ style, icon: Icon }) => (
-              <button
-                key={style}
-                onClick={() => setCardStyle(style)}
-                className={`p-2 rounded-lg transition-colors ${
-                  cardStyle === style ? 'bg-bg-primary text-accent shadow-sm' : 'text-text-muted hover:text-text-primary'
-                }`}
-                title={style}
-              >
-                <Icon size={18} />
-              </button>
-            ))}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowCardStyleMenu(!showCardStyleMenu)}
+              className={clsx(
+                'flex items-center gap-1.5 rounded-lg border border-border-color bg-bg-secondary px-2.5 py-2 text-sm transition-colors',
+                showCardStyleMenu ? 'text-accent ring-2 ring-accent-soft' : 'text-text-secondary hover:text-text-primary'
+              )}
+              title="Card skin"
+            >
+              <Palette size={17} />
+              <span className="capitalize">{cardStyle}</span>
+              <ChevronDown size={14} />
+            </button>
+
+            {showCardStyleMenu && (
+              <div className="absolute right-0 top-12 z-50 w-48 rounded-xl border border-border-color bg-bg-primary p-2 shadow-xl">
+                <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Card skin</p>
+                {CARD_STYLES.map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => {
+                      setCardStyle(style.id)
+                      setShowCardStyleMenu(false)
+                    }}
+                    className={clsx(
+                      'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors',
+                      cardStyle === style.id
+                        ? 'bg-accent-soft text-accent'
+                        : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+                    )}
+                  >
+                    <style.icon size={15} />
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -252,6 +331,7 @@ export function OshiDetailPage() {
             New Note
           </Button>
         </Link>
+
       </div>
 
       {/* Content */}
@@ -262,7 +342,7 @@ export function OshiDetailPage() {
           </div>
         )}
 
-        {!notesLoading && notes.length === 0 && (
+        {!notesLoading && notes.length === 0 && viewMode !== 'journal' && (
           <div className="text-center py-20">
             <StickyNote size={48} className="mx-auto mb-4 text-accent-soft" />
             <h3 className="text-lg font-semibold text-text-primary mb-2">No notes yet</h3>
@@ -282,20 +362,20 @@ export function OshiDetailPage() {
           </div>
         )}
 
-        {!notesLoading && notes.length > 0 && viewMode !== 'graph' && (
+        {!notesLoading && viewMode === 'journal' && activeArchiveId && oshiId && (
+          <JournalPageView oshiId={oshiId} archiveId={activeArchiveId} />
+        )}
+
+        {!notesLoading && notes.length > 0 && viewMode !== 'graph' && viewMode !== 'journal' && (
           <>
             <div className={viewMode === 'card' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-1'}>
-              {notes.map((note) => (
+              {notes.map((note, index) => (
                 <Link
                   key={note.id}
                   to={`/oshis/${oshiId}/notes/${note.id}`}
-                  className={
-                    viewMode === 'card'
-                      ? `block p-4 rounded-xl border border-border-color bg-bg-card backdrop-blur-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 ${
-                          cardStyle === 'sticky' ? 'rotate-[-0.5deg]' : cardStyle === 'postcard' ? 'border-2' : ''
-                        }`
-                      : 'flex items-center gap-4 px-4 py-2.5 rounded-lg hover:bg-bg-secondary transition-colors'
-                  }
+                  className={viewMode === 'card'
+                    ? getNoteCardClass(cardStyle, index)
+                    : 'flex items-center gap-4 px-4 py-2.5 rounded-lg hover:bg-bg-secondary transition-colors'}
                 >
                   {viewMode === 'list' ? (
                     <>
@@ -313,9 +393,36 @@ export function OshiDetailPage() {
                     </>
                   ) : (
                     <>
-                      <h4 className="font-semibold text-text-primary mb-2 line-clamp-1">{note.title || 'Untitled'}</h4>
-                      <p className="text-xs text-text-muted mb-3 line-clamp-2">{note.plain_text || 'No content'}</p>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      {cardStyle === 'sticky' && (
+                        <span className="absolute left-1/2 top-0 h-5 w-20 -translate-x-1/2 -translate-y-1/2 rotate-[-4deg] rounded-sm bg-accent-soft/70 shadow-sm" />
+                      )}
+                      {cardStyle === 'bookshelf' && (
+                        <span className="absolute inset-y-0 left-0 w-3 rounded-l-lg bg-accent/70" />
+                      )}
+                      {cardStyle === 'postcard' && (
+                        <span className="absolute right-4 top-4 h-9 w-9 rounded-md border border-dashed border-accent/45 bg-bg-primary/60" />
+                      )}
+                      <h4 className={clsx(
+                        'font-semibold text-text-primary mb-2 line-clamp-1',
+                        cardStyle === 'bookshelf' && 'pl-2',
+                        cardStyle === 'postcard' && 'pr-12'
+                      )}>
+                        {note.title || 'Untitled'}
+                      </h4>
+                      <p className={clsx(
+                        'text-xs text-text-muted mb-3 line-clamp-2',
+                        cardStyle === 'bookshelf' && 'pl-2',
+                        cardStyle === 'postcard' && 'font-serif italic'
+                      )}>
+                        {note.plain_text || 'No content'}
+                      </p>
+                      {cardStyle === 'postcard' && (
+                        <div className="mb-3 space-y-1 pr-10">
+                          <span className="block h-px bg-border-color/70" />
+                          <span className="block h-px bg-border-color/50" />
+                        </div>
+                      )}
+                      <div className={clsx('flex items-center gap-2 flex-wrap', cardStyle === 'bookshelf' && 'pl-2')}>
                         {note.tags.slice(0, 3).map((tag) => (
                           <span key={tag} className="px-2 py-0.5 rounded-full text-xs bg-bg-tertiary text-text-muted">
                             {tag}
@@ -366,6 +473,35 @@ export function OshiDetailPage() {
     </div>
   )
 }
+
+function getNoteCardClass(cardStyle: CardStyle, index: number): string {
+  return clsx(
+    'relative block min-h-[150px] overflow-hidden p-4 border backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+    cardStyle === 'basic' && 'rounded-xl border-border-color bg-bg-card shadow-sm',
+    cardStyle === 'sticky' && [
+      'rounded-xl border-yellow-200/70 bg-[#fff7c7]/80 shadow-md',
+      index % 2 === 0 ? 'rotate-[-0.8deg]' : 'rotate-[0.7deg]',
+    ],
+    cardStyle === 'bookshelf' && [
+      'rounded-lg border-border-color bg-bg-card shadow-sm',
+      "before:absolute before:inset-x-4 before:bottom-3 before:h-px before:bg-border-color/70 before:content-['']",
+      index % 3 === 0 && 'bg-[#eef6ff]/85',
+      index % 3 === 1 && 'bg-[#f3f0ff]/85',
+      index % 3 === 2 && 'bg-[#fff1f5]/85',
+    ],
+    cardStyle === 'postcard' && [
+      'rounded-md border-2 border-dashed border-accent/35 bg-[#fffdf8]/90 shadow-sm',
+      "after:absolute after:bottom-3 after:right-4 after:h-px after:w-20 after:bg-border-color/70 after:content-['']",
+    ]
+  )
+}
+
+const CARD_STYLES: { id: CardStyle; label: string; icon: typeof Palette }[] = [
+  { id: 'basic', label: 'Basic', icon: LayoutGrid },
+  { id: 'sticky', label: 'Sticky', icon: StickyNote },
+  { id: 'bookshelf', label: 'Bookshelf', icon: BookOpen },
+  { id: 'postcard', label: 'Postcard', icon: Palette },
+]
 
 function formatLinkLabel(value: string): string {
   try {
