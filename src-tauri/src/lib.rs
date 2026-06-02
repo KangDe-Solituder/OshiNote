@@ -1,6 +1,26 @@
 use tauri::Manager;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::process::Command;
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let trimmed = url.trim();
+    if !(trimmed.starts_with("https://") || trimmed.starts_with("http://")) {
+        return Err("Only http:// and https:// links can be opened.".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    let status = Command::new("rundll32.exe").args(["url.dll,FileProtocolHandler", trimmed]).status();
+    #[cfg(target_os = "macos")]
+    let status = Command::new("open").arg(trimmed).status();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let status = Command::new("xdg-open").arg(trimmed).status();
+
+    status
+        .map_err(|error| error.to_string())
+        .and_then(|exit| if exit.success() { Ok(()) } else { Err("Could not open the system browser.".to_string()) })
+}
 
 #[tauri::command]
 fn post_local_ai_chat(url: String, api_key: String, body: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -110,7 +130,7 @@ pub fn run() {
             let _window = app.get_webview_window("main").unwrap();
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![post_local_ai_chat])
+        .invoke_handler(tauri::generate_handler![post_local_ai_chat, open_external_url])
         .run(tauri::generate_context!())
         .expect("error while running OshiNote");
 }

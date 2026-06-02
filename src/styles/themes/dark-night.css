@@ -19,6 +19,14 @@
   --glass-border: rgba(167, 139, 250, 0.2);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 
+  --journal-canvas-bg: #25202b;
+  --journal-canvas-dot: rgba(196, 181, 208, 0.14);
+  --journal-sticker-1: #493540;
+  --journal-sticker-2: #344252;
+  --journal-sticker-3: #4a4230;
+  --journal-sticker-4: #403852;
+  --journal-sticker-5: #35483d;
+
   --font-family: 'Nunito', sans-serif;
   --border-radius-sm: 0.5rem;
   --border-radius-md: 0.75rem;

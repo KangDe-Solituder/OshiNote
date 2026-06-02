@@ -82,6 +82,7 @@ export async function updateJournalPage(
 
 export async function deleteJournalPage(id: string): Promise<void> {
   const db = await getDb()
+  await db.execute('DELETE FROM journal_items WHERE page_id = ?', [id])
   await db.execute('DELETE FROM journal_pages WHERE id = ?', [id])
 }
 

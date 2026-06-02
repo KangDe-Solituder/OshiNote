@@ -52,6 +52,14 @@ export interface NoteRow {
   updated_at: string
 }
 
+export interface NoteImage {
+  id: string
+  note_id: string
+  data_url: string
+  sort_order: number
+  created_at: string
+}
+
 export type ThemeId = 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'
 export type UiMotionDuration = 'off' | 'fast' | 'normal' | 'slow'
 

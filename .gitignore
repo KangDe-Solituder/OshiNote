@@ -16,6 +16,10 @@ dist-ssr
 .env
 .env.*
 !.env.example
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
 coverage
 .eslintcache
 *.tsbuildinfo
@@ -30,6 +34,7 @@ src-tauri/gen/schemas/
 .vscode/*
 !.vscode/extensions.json
 .idea
+.claude/
 .DS_Store
 *.suo
 *.ntvs*

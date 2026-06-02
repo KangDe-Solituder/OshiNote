@@ -28,6 +28,7 @@ interface JournalState {
   loadArchiveJournal: (archiveId: string) => Promise<void>
   setActivePage: (pageId: string) => Promise<void>
   createPage: (archiveId: string) => Promise<void>
+  deletePage: (pageId: string, archiveId: string) => Promise<void>
   placeNote: (noteId: string, archiveId: string) => Promise<void>
   loadUnplacedNotes: (archiveId: string) => Promise<void>
   updateItemLayout: (itemId: string, layout: LayoutInput) => Promise<void>
@@ -78,6 +79,27 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       const page = await journalService.createJournalPage(archiveId)
       const pages = await journalService.fetchJournalPages(archiveId)
       set({ pages, activePageId: page.id, items: [], unplacedNotes: [], loading: false })
+    } catch (e) {
+      set({ error: String(e), loading: false })
+    }
+  },
+
+  deletePage: async (pageId, archiveId) => {
+    const pages = get().pages
+    if (pages.length <= 1) return
+    set({ loading: true, error: null })
+    try {
+      await journalService.deleteJournalPage(pageId)
+      const remainingPages = await journalService.fetchJournalPages(archiveId)
+      const nextPage = remainingPages[0]
+      const items = nextPage ? await journalService.fetchJournalItems(nextPage.id) : []
+      set({
+        pages: remainingPages,
+        activePageId: nextPage?.id || null,
+        items,
+        unplacedNotes: [],
+        loading: false,
+      })
     } catch (e) {
       set({ error: String(e), loading: false })
     }

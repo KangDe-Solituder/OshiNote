@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, FolderArchive, Palette, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Loader2, Link2, X, Trash2 } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowLeft, ChevronDown, FolderArchive, Palette, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Loader2, Link2, X, Trash2, Maximize2 } from 'lucide-react'
 import clsx from 'clsx'
 import { Button } from '../components/ui/Button'
 import { TagGraphView } from '../components/features/notes/TagGraphView'
@@ -10,6 +12,7 @@ import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
 import type { CardStyle, Oshi } from '../types'
+import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
 
 export function OshiDetailPage() {
   const { oshiId } = useParams<{ oshiId: string }>()
@@ -20,6 +23,8 @@ export function OshiDetailPage() {
   const [showArchiveMenu, setShowArchiveMenu] = useState(false)
   const [showCardStyleMenu, setShowCardStyleMenu] = useState(false)
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const uiMotionSeconds = useUiMotionSeconds()
 
   const { archives, activeArchiveId, fetchByOshi, createArchive, deleteArchive, getArchiveNoteCount, setActiveArchive } = useArchiveStore()
   const {
@@ -40,9 +45,22 @@ export function OshiDetailPage() {
     }
   }, [activeArchiveId, fetchByArchive])
 
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!toolbarRef.current?.contains(event.target as Node)) {
+        setShowArchiveMenu(false)
+        setShowCardStyleMenu(false)
+        setShowAddArchive(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
   const totalPages = Math.max(1, Math.ceil(totalNotes / useNoteStore.getState().pageSize))
   const activeArchive = archives.find((archive) => archive.id === activeArchiveId)
   const descriptionNeedsExpansion = Boolean(oshi && (oshi.description.length > 220 || oshi.description.split('\n').length > 4))
+  const isJournal = viewMode === 'journal'
 
   function handleSearch() {
     if (!oshiId) return
@@ -76,6 +94,16 @@ export function OshiDetailPage() {
     }
   }
 
+  async function handleOpenExternalLink(value: string) {
+    const url = normalizeWebUrl(value)
+    if (!url) return
+    try {
+      await invoke('open_external_url', { url })
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -100,8 +128,12 @@ export function OshiDetailPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="border-b border-border-color bg-bg-secondary/30 p-6">
-        <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+      <motion.div
+        layout
+        transition={{ duration: uiMotionSeconds, ease: 'easeOut' }}
+        className={clsx('relative border-b border-border-color bg-bg-secondary/30', isJournal ? 'px-4 py-2.5' : 'p-6')}
+      >
+        <div className={clsx('grid gap-6', !isJournal && 'md:grid-cols-[220px_minmax(0,1fr)]')}>
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <Link to="/oshis" className="shrink-0 text-text-muted transition-colors hover:text-text-primary">
@@ -123,26 +155,25 @@ export function OshiDetailPage() {
               </div>
             </div>
 
-            {oshi.activity_links.length > 0 && (
+            {!isJournal && oshi.activity_links.length > 0 && (
               <div className="mt-4 space-y-1.5 pl-8">
                 {oshi.activity_links.map((url) => (
-                  <a
+                  <button
+                    type="button"
                     key={url}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
+                    onClick={() => handleOpenExternalLink(url)}
                     className="flex min-w-0 items-center gap-1.5 text-xs text-accent transition-colors hover:text-accent-hover"
                     title={url}
                   >
                     <Link2 size={13} className="shrink-0 text-text-muted" />
                     <span className="truncate">{formatLinkLabel(url)}</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="min-w-0">
+          {!isJournal && <div className="min-w-0">
             {oshi.description ? (
               <>
                 <p className={clsx(
@@ -164,12 +195,31 @@ export function OshiDetailPage() {
             ) : (
               <p className="text-sm text-text-muted">No description yet.</p>
             )}
-          </div>
+          </div>}
+          {isJournal && (
+            <button
+              type="button"
+              onClick={() => setViewMode('card')}
+              className="absolute right-4 top-3 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+              title="Exit immersive journal"
+            >
+              <Maximize2 size={14} />
+              Exit journal
+            </button>
+          )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Toolbar */}
-      <div className="p-4 border-b border-border-color flex items-center gap-3 flex-wrap bg-bg-secondary/10">
+      <AnimatePresence initial={false}>
+      {!isJournal && <motion.div
+        ref={toolbarRef}
+        initial={{ opacity: 0, y: -14, height: 0 }}
+        animate={{ opacity: 1, y: 0, height: 'auto' }}
+        exit={{ opacity: 0, y: -14, height: 0 }}
+        transition={{ duration: uiMotionSeconds, ease: 'easeOut' }}
+        className="relative z-40 p-4 border-b border-border-color flex items-center gap-3 flex-wrap bg-bg-secondary/10 overflow-visible"
+      >
         <div className="relative flex-1 min-w-[180px] max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
@@ -204,7 +254,10 @@ export function OshiDetailPage() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => setShowArchiveMenu(!showArchiveMenu)}
+            onClick={() => {
+              setShowArchiveMenu(!showArchiveMenu)
+              setShowCardStyleMenu(false)
+            }}
             className={clsx(
               'flex items-center gap-1.5 rounded-lg border border-border-color bg-bg-secondary px-2.5 py-2 text-sm transition-colors',
               showArchiveMenu ? 'text-accent ring-2 ring-accent-soft' : 'text-text-secondary hover:text-text-primary'
@@ -286,7 +339,11 @@ export function OshiDetailPage() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => setShowCardStyleMenu(!showCardStyleMenu)}
+              onClick={() => {
+                setShowCardStyleMenu(!showCardStyleMenu)
+                setShowArchiveMenu(false)
+                setShowAddArchive(false)
+              }}
               className={clsx(
                 'flex items-center gap-1.5 rounded-lg border border-border-color bg-bg-secondary px-2.5 py-2 text-sm transition-colors',
                 showCardStyleMenu ? 'text-accent ring-2 ring-accent-soft' : 'text-text-secondary hover:text-text-primary'
@@ -332,10 +389,11 @@ export function OshiDetailPage() {
           </Button>
         </Link>
 
-      </div>
+      </motion.div>}
+      </AnimatePresence>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className={clsx('flex-1 min-h-0', isJournal ? 'overflow-y-auto overflow-x-hidden' : 'overflow-y-auto p-6')}>
         {notesLoading && (
           <div className="text-center py-12">
             <Loader2 size={24} className="mx-auto mb-3 text-accent animate-spin" />
@@ -509,5 +567,15 @@ function formatLinkLabel(value: string): string {
     return url.hostname.replace(/^www\./, '')
   } catch {
     return value
+  }
+}
+
+function normalizeWebUrl(value: string): string | null {
+  try {
+    const withProtocol = /^[a-z]+:\/\//i.test(value) ? value : `https://${value}`
+    const url = new URL(withProtocol)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null
+  } catch {
+    return null
   }
 }

@@ -94,7 +94,7 @@ export function JournalSticker({ item, selected, onSelect, onCommitLayout }: Jou
         height: item.height,
         zIndex: item.z_index,
         transform: `rotate(${item.rotation}deg)`,
-        backgroundColor: item.color || '#fff1f5',
+        backgroundColor: getStickerBackground(item.color),
         borderColor: selected ? 'var(--color-accent)' : 'rgba(120, 100, 120, 0.22)',
       }}
     >
@@ -128,3 +128,10 @@ export function JournalSticker({ item, selected, onSelect, onCommitLayout }: Jou
     </button>
   )
 }
+
+function getStickerBackground(color: string | null): string {
+  const paletteIndex = STICKER_PALETTE.indexOf(color || '#fff1f5')
+  return paletteIndex >= 0 ? `var(--journal-sticker-${paletteIndex + 1})` : color || 'var(--journal-sticker-1)'
+}
+
+const STICKER_PALETTE = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed']

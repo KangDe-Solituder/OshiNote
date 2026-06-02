@@ -21,14 +21,13 @@ export function JournalCanvas({
   onCommitLayout,
 }: JournalCanvasProps) {
   return (
-    <div className="flex min-w-0 flex-1 justify-center overflow-auto p-6">
+    <div className="flex min-h-[700px] min-w-0 flex-1 overflow-x-auto overflow-y-visible bg-[var(--journal-canvas-bg)]">
       <div
-        className="relative shrink-0 overflow-hidden rounded-2xl border border-border-color bg-[#fffdf8] shadow-xl"
+        className="relative min-h-[700px] shrink-0 overflow-hidden bg-[var(--journal-canvas-bg)]"
         style={{
-          width: JOURNAL_PAGE.width,
-          height: JOURNAL_PAGE.height,
+          width: `max(100%, ${JOURNAL_PAGE.width}px)`,
           backgroundImage:
-            'radial-gradient(rgba(160, 130, 120, 0.18) 1px, transparent 1px)',
+            'radial-gradient(var(--journal-canvas-dot) 1px, transparent 1px)',
           backgroundSize: '18px 18px',
         }}
         onClick={(e) => {

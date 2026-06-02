@@ -10,6 +10,13 @@
 
 :root {
   --ui-motion-duration: 0.18s;
+  --journal-canvas-bg: #fffdf8;
+  --journal-canvas-dot: rgba(160, 130, 120, 0.18);
+  --journal-sticker-1: #fff1f5;
+  --journal-sticker-2: #eef6ff;
+  --journal-sticker-3: #fff7d6;
+  --journal-sticker-4: #f3f0ff;
+  --journal-sticker-5: #edf7ed;
 }
 
 *,

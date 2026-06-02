@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutGrid, Loader2, Plus } from 'lucide-react'
+import { LayoutGrid, Loader2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { useJournalStore } from '../../../stores/journalStore'
 import { useNoteStore } from '../../../stores/noteStore'
@@ -27,6 +27,7 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
     loadArchiveJournal,
     setActivePage,
     createPage,
+    deletePage,
     placeNote,
     loadUnplacedNotes,
     updateItemLayout,
@@ -98,8 +99,15 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
     if (selectedItemId === itemId) setSelectedItemId(null)
   }
 
+  async function handleDeletePage() {
+    if (!activePage || pages.length <= 1) return
+    if (!confirm(`Delete "${activePage.title || `Page ${activePage.page_index + 1}`}"? Its placed stickers will be removed from this journal page.`)) return
+    setSelectedItemId(null)
+    await deletePage(activePage.id, archiveId)
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-full flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border-color bg-bg-secondary/10 px-4 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="text-sm font-semibold text-text-primary">{activePage?.title || 'Journal'}</span>
@@ -117,6 +125,16 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
         <Button variant="secondary" size="sm" onClick={() => createPage(archiveId)}>
           <Plus size={15} />
           Page
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleDeletePage}
+          disabled={pages.length <= 1}
+          title={pages.length <= 1 ? 'A journal needs at least one page' : 'Delete current page'}
+        >
+          <Trash2 size={15} />
+          Delete Page
         </Button>
       </div>
 

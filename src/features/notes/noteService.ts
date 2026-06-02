@@ -7,6 +7,7 @@ import type {
   UpdateNoteInput,
   SearchParams,
   GlobalNoteSearchParams,
+  NoteImage,
 } from '../../types'
 
 interface NoteLibraryRow extends NoteRow {
@@ -166,7 +167,27 @@ export async function fetchAllNotes(params: GlobalNoteSearchParams): Promise<{ n
 
 export async function deleteNote(id: string): Promise<void> {
   const db = await getDb()
+  await db.execute('DELETE FROM note_images WHERE note_id = ?', [id])
   await db.execute('DELETE FROM notes WHERE id = ?', [id])
+}
+
+export async function fetchNoteImages(noteId: string): Promise<NoteImage[]> {
+  const db = await getDb()
+  return db.select<NoteImage[]>(
+    'SELECT * FROM note_images WHERE note_id = ? ORDER BY sort_order ASC, created_at ASC',
+    [noteId]
+  )
+}
+
+export async function replaceNoteImages(noteId: string, dataUrls: string[]): Promise<void> {
+  const db = await getDb()
+  await db.execute('DELETE FROM note_images WHERE note_id = ?', [noteId])
+  for (const [sortOrder, dataUrl] of dataUrls.entries()) {
+    await db.execute(
+      'INSERT INTO note_images (id, note_id, data_url, sort_order) VALUES (?, ?, ?, ?)',
+      [generateId(), noteId, dataUrl, sortOrder]
+    )
+  }
 }
 
 export async function toggleFavorite(id: string): Promise<void> {

@@ -102,4 +102,15 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_journal_items_page ON journal_items(page_id)`,
   `CREATE INDEX IF NOT EXISTS idx_journal_items_note ON journal_items(note_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_items_page_note ON journal_items(page_id, note_id)`,
+
+  `CREATE TABLE IF NOT EXISTS note_images (
+    id         TEXT PRIMARY KEY,
+    note_id    TEXT NOT NULL,
+    data_url   TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS idx_note_images_note ON note_images(note_id, sort_order)`,
 ]
