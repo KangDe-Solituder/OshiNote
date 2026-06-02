@@ -3,6 +3,7 @@ import type {
   JournalItem,
   JournalItemRow,
   JournalItemWithNote,
+  JournalBook,
   JournalPage,
   JournalStickerStyle,
   Note,
@@ -37,32 +38,81 @@ export interface JournalStyleUpdate {
   border_style?: string | null
 }
 
-export async function fetchJournalPages(archiveId: string): Promise<JournalPage[]> {
+export async function fetchJournalBooks(oshiId: string): Promise<JournalBook[]> {
   const db = await getDb()
-  return db.select<JournalPage[]>(
-    'SELECT * FROM journal_pages WHERE archive_id = ? ORDER BY page_index ASC',
-    [archiveId]
+  return db.select<JournalBook[]>(
+    `SELECT jb.*, COUNT(jp.id) as page_count
+     FROM journal_books jb
+     LEFT JOIN journal_pages jp ON jp.book_id = jb.id
+     WHERE jb.oshi_id = ?
+     GROUP BY jb.id
+     ORDER BY jb.sort_order ASC, jb.created_at ASC`,
+    [oshiId]
   )
 }
 
-export async function ensureJournalPage(archiveId: string): Promise<JournalPage> {
-  const pages = await fetchJournalPages(archiveId)
-  if (pages[0]) return pages[0]
-  return createJournalPage(archiveId, 'Page 1')
+export async function createJournalBook(oshiId: string, title: string): Promise<JournalBook> {
+  const db = await getDb()
+  const id = generateId()
+  const rows = await db.select<{ next_order: number }[]>(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM journal_books WHERE oshi_id = ?',
+    [oshiId]
+  )
+  const colors = ['#8B5CF6', '#EC4899', '#3B82F6', '#10B981', '#F59E0B']
+  const sortOrder = rows[0]?.next_order ?? 0
+  await db.execute(
+    `INSERT INTO journal_books (id, oshi_id, title, cover_color, sort_order)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, oshiId, title, colors[sortOrder % colors.length], sortOrder]
+  )
+  await createJournalPage(id, 'Page 1')
+  return (await fetchJournalBookById(id))!
 }
 
-export async function createJournalPage(archiveId: string, title?: string): Promise<JournalPage> {
+export async function updateJournalBook(id: string, title: string): Promise<void> {
+  const db = await getDb()
+  await db.execute(
+    "UPDATE journal_books SET title = ?, updated_at = datetime('now', 'localtime') WHERE id = ?",
+    [title, id]
+  )
+}
+
+export async function deleteJournalBook(id: string): Promise<void> {
+  const db = await getDb()
+  const pages = await fetchJournalPages(id)
+  for (const page of pages) {
+    await db.execute('DELETE FROM journal_items WHERE page_id = ?', [page.id])
+  }
+  await db.execute('DELETE FROM journal_pages WHERE book_id = ?', [id])
+  await db.execute('DELETE FROM journal_books WHERE id = ?', [id])
+}
+
+export async function fetchJournalPages(bookId: string): Promise<JournalPage[]> {
+  const db = await getDb()
+  return db.select<JournalPage[]>(
+    'SELECT * FROM journal_pages WHERE book_id = ? ORDER BY page_index ASC',
+    [bookId]
+  )
+}
+
+export async function ensureJournalPage(bookId: string): Promise<JournalPage> {
+  const pages = await fetchJournalPages(bookId)
+  if (pages[0]) return pages[0]
+  return createJournalPage(bookId, 'Page 1')
+}
+
+export async function createJournalPage(bookId: string, title?: string): Promise<JournalPage> {
   const db = await getDb()
   const rows = await db.select<{ next_index: number }[]>(
-    'SELECT COALESCE(MAX(page_index), -1) + 1 as next_index FROM journal_pages WHERE archive_id = ?',
-    [archiveId]
+    'SELECT COALESCE(MAX(page_index), -1) + 1 as next_index FROM journal_pages WHERE book_id = ?',
+    [bookId]
   )
   const id = generateId()
   const pageIndex = rows[0]?.next_index ?? 0
   await db.execute(
-    `INSERT INTO journal_pages (id, archive_id, title, page_index, background)
+    `INSERT INTO journal_pages (id, book_id, title, page_index, background)
      VALUES (?, ?, ?, ?, 'paper')`,
-    [id, archiveId, title || `Page ${pageIndex + 1}`, pageIndex]
+    [id, bookId, title || `Page ${pageIndex + 1}`, pageIndex]
   )
   return (await fetchJournalPageById(id))!
 }
@@ -174,17 +224,17 @@ export async function createJournalItemForNote(pageId: string, noteId: string): 
   return (await fetchJournalItemById(id))!
 }
 
-export async function fetchUnplacedNotes(pageId: string, archiveId: string): Promise<Note[]> {
+export async function fetchUnplacedNotes(pageId: string, oshiId: string): Promise<Note[]> {
   const db = await getDb()
   const rows = await db.select<NoteRow[]>(
     `SELECT n.* FROM notes n
-     WHERE n.archive_id = ?
+     WHERE n.oshi_id = ?
        AND NOT EXISTS (
          SELECT 1 FROM journal_items ji
          WHERE ji.page_id = ? AND ji.note_id = n.id
        )
      ORDER BY n.created_at DESC`,
-    [archiveId, pageId]
+    [oshiId, pageId]
   )
   return rows.map(deserializeNote)
 }
@@ -220,6 +270,19 @@ export async function removeJournalItem(id: string): Promise<void> {
 async function fetchJournalPageById(id: string): Promise<JournalPage | null> {
   const db = await getDb()
   const rows = await db.select<JournalPage[]>('SELECT * FROM journal_pages WHERE id = ?', [id])
+  return rows[0] || null
+}
+
+async function fetchJournalBookById(id: string): Promise<JournalBook | null> {
+  const db = await getDb()
+  const rows = await db.select<JournalBook[]>(
+    `SELECT jb.*, COUNT(jp.id) as page_count
+     FROM journal_books jb
+     LEFT JOIN journal_pages jp ON jp.book_id = jb.id
+     WHERE jb.id = ?
+     GROUP BY jb.id`,
+    [id]
+  )
   return rows[0] || null
 }
 

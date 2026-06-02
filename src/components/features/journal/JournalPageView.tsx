@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutGrid, Loader2, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, LayoutGrid, Loader2, Plus, Trash2 } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { useJournalStore } from '../../../stores/journalStore'
 import { useNoteStore } from '../../../stores/noteStore'
@@ -11,10 +11,12 @@ import { JournalStickerPopover } from './JournalStickerPopover'
 
 interface JournalPageViewProps {
   oshiId: string
-  archiveId: string
+  bookId: string
+  bookTitle: string
+  onBack: () => void
 }
 
-export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
+export function JournalPageView({ oshiId, bookId, bookTitle, onBack }: JournalPageViewProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [showNotePicker, setShowNotePicker] = useState(false)
   const {
@@ -24,7 +26,7 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
     unplacedNotes,
     loading,
     error,
-    loadArchiveJournal,
+    openBook,
     setActivePage,
     createPage,
     deletePage,
@@ -39,8 +41,8 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
   const updateNote = useNoteStore((state) => state.updateNote)
 
   useEffect(() => {
-    loadArchiveJournal(archiveId)
-  }, [archiveId, loadArchiveJournal])
+    openBook(bookId, oshiId)
+  }, [bookId, openBook, oshiId])
 
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) || pages[0] || null,
@@ -81,12 +83,12 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
   }
 
   async function handleOpenNotePicker() {
-    await loadUnplacedNotes(archiveId)
+    await loadUnplacedNotes(oshiId)
     setShowNotePicker(true)
   }
 
   async function handlePlaceNote(noteId: string) {
-    await placeNote(noteId, archiveId)
+    await placeNote(noteId, oshiId)
   }
 
   async function handleUpdateNote(noteId: string, input: Parameters<typeof updateNote>[1]) {
@@ -103,14 +105,19 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
     if (!activePage || pages.length <= 1) return
     if (!confirm(`Delete "${activePage.title || `Page ${activePage.page_index + 1}`}"? Its placed stickers will be removed from this journal page.`)) return
     setSelectedItemId(null)
-    await deletePage(activePage.id, archiveId)
+    await deletePage(activePage.id, bookId)
   }
 
   return (
     <div className="flex min-h-full flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border-color bg-bg-secondary/10 px-4 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-sm font-semibold text-text-primary">{activePage?.title || 'Journal'}</span>
+          <button type="button" onClick={onBack} className="rounded-lg p-1.5 text-text-muted hover:bg-bg-tertiary hover:text-text-primary" title="Back to bookshelf">
+            <ArrowLeft size={17} />
+          </button>
+          <span className="truncate text-sm font-semibold text-text-primary">{bookTitle}</span>
+          <span className="text-xs text-text-muted">/</span>
+          <span className="truncate text-xs text-text-muted">{activePage?.title || 'Journal'}</span>
           {loading && <Loader2 size={15} className="animate-spin text-accent" />}
           {error && <span className="truncate text-xs text-red-500">{error}</span>}
         </div>
@@ -122,7 +129,7 @@ export function JournalPageView({ oshiId, archiveId }: JournalPageViewProps) {
           <LayoutGrid size={15} />
           Arrange
         </Button>
-        <Button variant="secondary" size="sm" onClick={() => createPage(archiveId)}>
+        <Button variant="secondary" size="sm" onClick={() => createPage(bookId)}>
           <Plus size={15} />
           Page
         </Button>

@@ -68,9 +68,22 @@ export type CardStyle = 'basic' | 'sticky' | 'bookshelf' | 'postcard'
 export type JournalStickerStyle = 'sticky' | 'memo' | 'ticket'
 export type JournalItemType = 'note'
 
+export interface JournalBook {
+  id: string
+  oshi_id: string
+  title: string
+  description: string
+  cover_style: string
+  cover_color: string
+  sort_order: number
+  page_count: number
+  updated_at: string
+  created_at: string
+}
+
 export interface JournalPage {
   id: string
-  archive_id: string
+  book_id: string
   title: string
   page_index: number
   background: string

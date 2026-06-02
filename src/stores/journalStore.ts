@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { JournalItemWithNote, JournalPage, JournalStickerStyle, Note } from '../types'
+import type { JournalBook, JournalItemWithNote, JournalPage, JournalStickerStyle, Note } from '../types'
 import * as journalService from '../features/journal/journalService'
 
 interface LayoutInput {
@@ -18,6 +18,8 @@ interface StyleInput {
 }
 
 interface JournalState {
+  books: JournalBook[]
+  activeBookId: string | null
   pages: JournalPage[]
   activePageId: string | null
   items: JournalItemWithNote[]
@@ -25,12 +27,17 @@ interface JournalState {
   loading: boolean
   error: string | null
 
-  loadArchiveJournal: (archiveId: string) => Promise<void>
+  loadBookshelf: (oshiId: string) => Promise<void>
+  createBook: (oshiId: string, title: string) => Promise<void>
+  renameBook: (bookId: string, title: string, oshiId: string) => Promise<void>
+  deleteBook: (bookId: string, oshiId: string) => Promise<void>
+  openBook: (bookId: string, oshiId: string) => Promise<void>
+  closeBook: () => void
   setActivePage: (pageId: string) => Promise<void>
-  createPage: (archiveId: string) => Promise<void>
-  deletePage: (pageId: string, archiveId: string) => Promise<void>
-  placeNote: (noteId: string, archiveId: string) => Promise<void>
-  loadUnplacedNotes: (archiveId: string) => Promise<void>
+  createPage: (bookId: string) => Promise<void>
+  deletePage: (pageId: string, bookId: string) => Promise<void>
+  placeNote: (noteId: string, oshiId: string) => Promise<void>
+  loadUnplacedNotes: (oshiId: string) => Promise<void>
   updateItemLayout: (itemId: string, layout: LayoutInput) => Promise<void>
   updateItemStyle: (itemId: string, style: StyleInput) => Promise<void>
   removeItem: (itemId: string) => Promise<void>
@@ -38,6 +45,8 @@ interface JournalState {
 }
 
 export const useJournalStore = create<JournalState>((set, get) => ({
+  books: [],
+  activeBookId: null,
   pages: [],
   activePageId: null,
   items: [],
@@ -45,23 +54,63 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   loading: false,
   error: null,
 
-  loadArchiveJournal: async (archiveId) => {
+  loadBookshelf: async (oshiId) => {
     set({ loading: true, error: null })
     try {
-      const firstPage = await journalService.ensureJournalPage(archiveId)
-      let pages = await journalService.fetchJournalPages(archiveId)
+      const books = await journalService.fetchJournalBooks(oshiId)
+      set({ books, activeBookId: null, pages: [], activePageId: null, items: [], unplacedNotes: [], loading: false })
+    } catch (e) {
+      set({ error: String(e), loading: false })
+    }
+  },
+
+  createBook: async (oshiId, title) => {
+    set({ loading: true, error: null })
+    try {
+      await journalService.createJournalBook(oshiId, title)
+      const books = await journalService.fetchJournalBooks(oshiId)
+      set({ books, loading: false })
+    } catch (e) {
+      set({ error: String(e), loading: false })
+    }
+  },
+
+  renameBook: async (bookId, title, oshiId) => {
+    await journalService.updateJournalBook(bookId, title)
+    const books = await journalService.fetchJournalBooks(oshiId)
+    set({ books })
+  },
+
+  deleteBook: async (bookId, oshiId) => {
+    set({ loading: true, error: null })
+    try {
+      await journalService.deleteJournalBook(bookId)
+      const books = await journalService.fetchJournalBooks(oshiId)
+      set({ books, activeBookId: null, pages: [], activePageId: null, items: [], unplacedNotes: [], loading: false })
+    } catch (e) {
+      set({ error: String(e), loading: false })
+    }
+  },
+
+  openBook: async (bookId, oshiId) => {
+    set({ loading: true, error: null })
+    try {
+      const firstPage = await journalService.ensureJournalPage(bookId)
+      let pages = await journalService.fetchJournalPages(bookId)
       const activePageId = get().activePageId && pages.some((page) => page.id === get().activePageId)
         ? get().activePageId!
         : firstPage.id
 
       const items = await journalService.fetchJournalItems(activePageId)
-      const unplacedNotes = await journalService.fetchUnplacedNotes(activePageId, archiveId)
-      pages = await journalService.fetchJournalPages(archiveId)
-      set({ pages, activePageId, items, unplacedNotes, loading: false })
+      const unplacedNotes = await journalService.fetchUnplacedNotes(activePageId, oshiId)
+      pages = await journalService.fetchJournalPages(bookId)
+      set({ activeBookId: bookId, pages, activePageId, items, unplacedNotes, loading: false })
     } catch (e) {
       set({ error: String(e), loading: false })
     }
   },
+
+  closeBook: () => set({ activeBookId: null, pages: [], activePageId: null, items: [], unplacedNotes: [] }),
 
   setActivePage: async (pageId) => {
     set({ activePageId: pageId, loading: true, error: null })
@@ -73,24 +122,24 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     }
   },
 
-  createPage: async (archiveId) => {
+  createPage: async (bookId) => {
     set({ loading: true, error: null })
     try {
-      const page = await journalService.createJournalPage(archiveId)
-      const pages = await journalService.fetchJournalPages(archiveId)
+      const page = await journalService.createJournalPage(bookId)
+      const pages = await journalService.fetchJournalPages(bookId)
       set({ pages, activePageId: page.id, items: [], unplacedNotes: [], loading: false })
     } catch (e) {
       set({ error: String(e), loading: false })
     }
   },
 
-  deletePage: async (pageId, archiveId) => {
+  deletePage: async (pageId, bookId) => {
     const pages = get().pages
     if (pages.length <= 1) return
     set({ loading: true, error: null })
     try {
       await journalService.deleteJournalPage(pageId)
-      const remainingPages = await journalService.fetchJournalPages(archiveId)
+      const remainingPages = await journalService.fetchJournalPages(bookId)
       const nextPage = remainingPages[0]
       const items = nextPage ? await journalService.fetchJournalItems(nextPage.id) : []
       set({
@@ -105,21 +154,21 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     }
   },
 
-  placeNote: async (noteId, archiveId) => {
+  placeNote: async (noteId, oshiId) => {
     const activePageId = get().activePageId
     if (!activePageId) return
     await journalService.createJournalItemForNote(activePageId, noteId)
     const [items, unplacedNotes] = await Promise.all([
       journalService.fetchJournalItems(activePageId),
-      journalService.fetchUnplacedNotes(activePageId, archiveId),
+      journalService.fetchUnplacedNotes(activePageId, oshiId),
     ])
     set({ items, unplacedNotes })
   },
 
-  loadUnplacedNotes: async (archiveId) => {
+  loadUnplacedNotes: async (oshiId) => {
     const activePageId = get().activePageId
     if (!activePageId) return
-    const unplacedNotes = await journalService.fetchUnplacedNotes(activePageId, archiveId)
+    const unplacedNotes = await journalService.fetchUnplacedNotes(activePageId, oshiId)
     set({ unplacedNotes })
   },
 

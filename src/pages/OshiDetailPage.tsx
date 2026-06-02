@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronDown, FolderArchive, Palette, Plus, Search, LayoutGri
 import clsx from 'clsx'
 import { Button } from '../components/ui/Button'
 import { TagGraphView } from '../components/features/notes/TagGraphView'
-import { JournalPageView } from '../components/features/journal/JournalPageView'
+import { JournalWorkspace } from '../components/features/journal/JournalWorkspace'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
@@ -420,8 +420,8 @@ export function OshiDetailPage() {
           </div>
         )}
 
-        {!notesLoading && viewMode === 'journal' && activeArchiveId && oshiId && (
-          <JournalPageView oshiId={oshiId} archiveId={activeArchiveId} />
+        {!notesLoading && viewMode === 'journal' && oshiId && (
+          <JournalWorkspace oshiId={oshiId} />
         )}
 
         {!notesLoading && notes.length > 0 && viewMode !== 'graph' && viewMode !== 'journal' && (

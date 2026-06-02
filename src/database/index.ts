@@ -31,6 +31,7 @@ async function runMigrations(db: Database): Promise<void> {
   }
   await ensureOshiProfileColumns(db)
   await ensureOptionalNoteOwnership(db)
+  await ensureJournalBooksSchema(db)
   await rebuildNoteSearchIndex(db)
 }
 
@@ -55,6 +56,55 @@ async function rebuildNoteSearchIndex(db: Database): Promise<void> {
     await db.execute("INSERT INTO notes_fts(notes_fts) VALUES ('rebuild')")
     await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('ftsIndexRebuilt', '1')")
   }
+}
+
+async function ensureJournalBooksSchema(db: Database): Promise<void> {
+  await db.execute(`CREATE TABLE IF NOT EXISTS journal_books (
+    id          TEXT PRIMARY KEY,
+    oshi_id     TEXT NOT NULL,
+    title       TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    cover_style TEXT NOT NULL DEFAULT 'classic',
+    cover_color TEXT NOT NULL DEFAULT '#8B5CF6',
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE
+  )`)
+
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_pages)')
+  if (columns.some((column) => column.name === 'archive_id')) {
+    await db.execute('PRAGMA foreign_keys = OFF')
+    try {
+      await db.execute(`INSERT OR IGNORE INTO journal_books
+        (id, oshi_id, title, sort_order, created_at, updated_at)
+        SELECT a.id, a.oshi_id, a.name, a.sort_order, a.created_at, datetime('now', 'localtime')
+        FROM archives a
+        WHERE EXISTS (SELECT 1 FROM journal_pages p WHERE p.archive_id = a.id)`)
+      await db.execute('DROP TABLE IF EXISTS journal_pages_v2')
+      await db.execute(`CREATE TABLE journal_pages_v2 (
+        id         TEXT PRIMARY KEY,
+        book_id    TEXT NOT NULL,
+        title      TEXT NOT NULL DEFAULT '',
+        page_index INTEGER NOT NULL DEFAULT 0,
+        background TEXT NOT NULL DEFAULT 'paper',
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        FOREIGN KEY (book_id) REFERENCES journal_books(id) ON DELETE CASCADE
+      )`)
+      await db.execute(`INSERT INTO journal_pages_v2
+        (id, book_id, title, page_index, background, created_at, updated_at)
+        SELECT id, archive_id, title, page_index, background, created_at, updated_at
+        FROM journal_pages`)
+      await db.execute('DROP TABLE journal_pages')
+      await db.execute('ALTER TABLE journal_pages_v2 RENAME TO journal_pages')
+    } finally {
+      await db.execute('PRAGMA foreign_keys = ON')
+    }
+  }
+
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_books_oshi ON journal_books(oshi_id, sort_order)')
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_pages_book ON journal_pages(book_id, page_index)')
 }
 
 async function ensureOptionalNoteOwnership(db: Database): Promise<void> {

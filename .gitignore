@@ -35,6 +35,7 @@ src-tauri/gen/schemas/
 !.vscode/extensions.json
 .idea
 .claude/
+local-dev-plan/
 .DS_Store
 *.suo
 *.ntvs*

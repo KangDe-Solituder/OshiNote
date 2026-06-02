@@ -49,7 +49,7 @@ export function JournalCanvas({
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
             <StickyNote size={44} className="mb-3 text-accent-soft" />
             <p className="text-sm font-medium text-text-primary">This page is waiting for memories</p>
-            <p className="mt-1 text-xs text-text-muted">Create notes or switch archives to place stickers here.</p>
+            <p className="mt-1 text-xs text-text-muted">Place notes from this oshi to start arranging your page.</p>
           </div>
         )}
 
