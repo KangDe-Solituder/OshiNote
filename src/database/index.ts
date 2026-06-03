@@ -66,11 +66,22 @@ async function ensureJournalBooksSchema(db: Database): Promise<void> {
     description TEXT NOT NULL DEFAULT '',
     cover_style TEXT NOT NULL DEFAULT 'classic',
     cover_color TEXT NOT NULL DEFAULT '#8B5CF6',
+    cover_decoration TEXT NOT NULL DEFAULT 'none',
+    date_label TEXT NOT NULL DEFAULT '',
     sort_order  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE
   )`)
+
+  const bookColumns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_books)')
+  const bookColumnNames = new Set(bookColumns.map((column) => column.name))
+  if (!bookColumnNames.has('cover_decoration')) {
+    await db.execute("ALTER TABLE journal_books ADD COLUMN cover_decoration TEXT NOT NULL DEFAULT 'none'")
+  }
+  if (!bookColumnNames.has('date_label')) {
+    await db.execute("ALTER TABLE journal_books ADD COLUMN date_label TEXT NOT NULL DEFAULT ''")
+  }
 
   const columns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_pages)')
   if (columns.some((column) => column.name === 'archive_id')) {

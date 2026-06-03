@@ -27,6 +27,7 @@ interface JournalInspectorProps {
   onRemove: (itemId: string) => void
   onToggleFavorite: (noteId: string) => void
   onUpdateNote: (noteId: string, input: UpdateNoteInput) => Promise<void>
+  onClose?: () => void
 }
 
 const COLORS = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed', '#fffdf8']
@@ -45,6 +46,7 @@ export function JournalInspector({
   onRemove,
   onToggleFavorite,
   onUpdateNote,
+  onClose,
   variant = 'side',
 }: JournalInspectorProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -107,10 +109,24 @@ export function JournalInspector({
       : 'w-72 shrink-0 overflow-y-auto border-l border-border-color bg-bg-secondary/20 p-4'}
     >
       <div className="mb-4">
-        <p className="text-xs uppercase tracking-wide text-text-muted">Selected sticker</p>
-        <h3 className="mt-1 line-clamp-2 text-base font-semibold text-text-primary">
-          {selectedItem.note.title || 'Untitled'}
-        </h3>
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs uppercase tracking-wide text-text-muted">Selected sticker</p>
+            <h3 className="mt-1 line-clamp-2 text-base font-semibold text-text-primary">
+              {selectedItem.note.title || 'Untitled'}
+            </h3>
+          </div>
+          {variant === 'popover' && onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1 text-text-muted hover:bg-bg-tertiary hover:text-text-primary"
+              title="Close"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
         <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-text-secondary">
           {selectedItem.note.plain_text || 'No content yet'}
         </p>

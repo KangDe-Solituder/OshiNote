@@ -67,14 +67,18 @@ export type ViewMode = 'card' | 'list' | 'graph' | 'journal'
 export type CardStyle = 'basic' | 'sticky' | 'bookshelf' | 'postcard'
 export type JournalStickerStyle = 'sticky' | 'memo' | 'ticket'
 export type JournalItemType = 'note'
+export type JournalCoverStyle = 'classic' | 'cloth' | 'paper' | 'night' | 'postcard' | 'minimal'
+export type JournalCoverDecoration = 'none' | 'flower' | 'moon' | 'heart' | 'camera' | 'ticket'
 
 export interface JournalBook {
   id: string
   oshi_id: string
   title: string
   description: string
-  cover_style: string
+  cover_style: JournalCoverStyle
   cover_color: string
+  cover_decoration: JournalCoverDecoration
+  date_label: string
   sort_order: number
   page_count: number
   updated_at: string

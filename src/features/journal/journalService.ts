@@ -4,6 +4,8 @@ import type {
   JournalItemRow,
   JournalItemWithNote,
   JournalBook,
+  JournalCoverDecoration,
+  JournalCoverStyle,
   JournalPage,
   JournalStickerStyle,
   Note,
@@ -40,7 +42,7 @@ export interface JournalStyleUpdate {
 
 export async function fetchJournalBooks(oshiId: string): Promise<JournalBook[]> {
   const db = await getDb()
-  return db.select<JournalBook[]>(
+  const rows = await db.select<JournalBook[]>(
     `SELECT jb.*, COUNT(jp.id) as page_count
      FROM journal_books jb
      LEFT JOIN journal_pages jp ON jp.book_id = jb.id
@@ -49,6 +51,7 @@ export async function fetchJournalBooks(oshiId: string): Promise<JournalBook[]> 
      ORDER BY jb.sort_order ASC, jb.created_at ASC`,
     [oshiId]
   )
+  return rows.map(deserializeBook)
 }
 
 export async function createJournalBook(oshiId: string, title: string): Promise<JournalBook> {
@@ -58,23 +61,45 @@ export async function createJournalBook(oshiId: string, title: string): Promise<
     'SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM journal_books WHERE oshi_id = ?',
     [oshiId]
   )
-  const colors = ['#8B5CF6', '#EC4899', '#3B82F6', '#10B981', '#F59E0B']
+  const colors = ['#c9c5f3', '#f2c4ce', '#d7e4f5', '#efe2cc', '#29314b', '#e8e5dd']
+  const styles: JournalCoverStyle[] = ['cloth', 'paper', 'minimal', 'classic', 'night', 'postcard']
+  const decorations: JournalCoverDecoration[] = ['ticket', 'flower', 'camera', 'heart', 'moon', 'none']
   const sortOrder = rows[0]?.next_order ?? 0
   await db.execute(
-    `INSERT INTO journal_books (id, oshi_id, title, cover_color, sort_order)
-     VALUES (?, ?, ?, ?, ?)`,
-    [id, oshiId, title, colors[sortOrder % colors.length], sortOrder]
+    `INSERT INTO journal_books
+     (id, oshi_id, title, cover_color, cover_style, cover_decoration, date_label, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      oshiId,
+      title,
+      colors[sortOrder % colors.length],
+      styles[sortOrder % styles.length],
+      decorations[sortOrder % decorations.length],
+      String(new Date().getFullYear()),
+      sortOrder,
+    ]
   )
   await createJournalPage(id, 'Page 1')
   return (await fetchJournalBookById(id))!
 }
 
-export async function updateJournalBook(id: string, title: string): Promise<void> {
+export async function updateJournalBook(
+  id: string,
+  input: Partial<Pick<JournalBook, 'title' | 'description' | 'cover_style' | 'cover_color' | 'cover_decoration' | 'date_label'>>
+): Promise<void> {
   const db = await getDb()
-  await db.execute(
-    "UPDATE journal_books SET title = ?, updated_at = datetime('now', 'localtime') WHERE id = ?",
-    [title, id]
-  )
+  const sets: string[] = []
+  const params: unknown[] = []
+  if (input.title !== undefined) { sets.push('title = ?'); params.push(input.title) }
+  if (input.description !== undefined) { sets.push('description = ?'); params.push(input.description) }
+  if (input.cover_style !== undefined) { sets.push('cover_style = ?'); params.push(input.cover_style) }
+  if (input.cover_color !== undefined) { sets.push('cover_color = ?'); params.push(input.cover_color) }
+  if (input.cover_decoration !== undefined) { sets.push('cover_decoration = ?'); params.push(input.cover_decoration) }
+  if (input.date_label !== undefined) { sets.push('date_label = ?'); params.push(input.date_label) }
+  if (sets.length === 0) return
+  sets.push("updated_at = datetime('now', 'localtime')")
+  await db.execute(`UPDATE journal_books SET ${sets.join(', ')} WHERE id = ?`, [...params, id])
 }
 
 export async function deleteJournalBook(id: string): Promise<void> {
@@ -283,7 +308,7 @@ async function fetchJournalBookById(id: string): Promise<JournalBook | null> {
      GROUP BY jb.id`,
     [id]
   )
-  return rows[0] || null
+  return rows[0] ? deserializeBook(rows[0]) : null
 }
 
 async function fetchJournalItemById(id: string): Promise<JournalItem | null> {
@@ -335,6 +360,33 @@ function deserializeNote(row: NoteRow): Note {
   }
 }
 
+function deserializeBook(row: JournalBook): JournalBook {
+  return {
+    ...row,
+    cover_style: isCoverStyle(row.cover_style) ? row.cover_style : 'cloth',
+    cover_decoration: isCoverDecoration(row.cover_decoration) ? row.cover_decoration : 'none',
+    date_label: row.date_label || '',
+  }
+}
+
 function isStickerStyle(value: string): value is JournalStickerStyle {
   return value === 'sticky' || value === 'memo' || value === 'ticket'
+}
+
+function isCoverStyle(value: string): value is JournalCoverStyle {
+  return value === 'classic' ||
+    value === 'cloth' ||
+    value === 'paper' ||
+    value === 'night' ||
+    value === 'postcard' ||
+    value === 'minimal'
+}
+
+function isCoverDecoration(value: string): value is JournalCoverDecoration {
+  return value === 'none' ||
+    value === 'flower' ||
+    value === 'moon' ||
+    value === 'heart' ||
+    value === 'camera' ||
+    value === 'ticket'
 }

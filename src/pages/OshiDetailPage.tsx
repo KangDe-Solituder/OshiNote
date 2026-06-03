@@ -12,7 +12,7 @@ import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
 import type { CardStyle, Oshi } from '../types'
-import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
+import { usePageTransition, useUiMotionSeconds } from '../components/features/themes/uiMotion'
 
 export function OshiDetailPage() {
   const { oshiId } = useParams<{ oshiId: string }>()
@@ -25,6 +25,7 @@ export function OshiDetailPage() {
   const [showFullDescription, setShowFullDescription] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const uiMotionSeconds = useUiMotionSeconds()
+  const pageTransition = usePageTransition()
 
   const { archives, activeArchiveId, fetchByOshi, createArchive, deleteArchive, getArchiveNoteCount, setActiveArchive } = useArchiveStore()
   const {
@@ -393,39 +394,45 @@ export function OshiDetailPage() {
       </AnimatePresence>
 
       {/* Content */}
-      <div className={clsx('flex-1 min-h-0', isJournal ? 'overflow-y-auto overflow-x-hidden' : 'overflow-y-auto p-6')}>
-        {notesLoading && (
-          <div className="text-center py-12">
-            <Loader2 size={24} className="mx-auto mb-3 text-accent animate-spin" />
-          </div>
-        )}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={notesLoading ? 'loading' : viewMode}
+            {...pageTransition}
+            className={clsx('absolute inset-0', isJournal ? 'overflow-y-auto overflow-x-hidden' : 'overflow-y-auto p-6')}
+          >
+            {notesLoading && (
+              <div className="text-center py-12">
+                <Loader2 size={24} className="mx-auto mb-3 text-accent animate-spin" />
+              </div>
+            )}
 
-        {!notesLoading && notes.length === 0 && viewMode !== 'journal' && (
-          <div className="text-center py-20">
-            <StickyNote size={48} className="mx-auto mb-4 text-accent-soft" />
-            <h3 className="text-lg font-semibold text-text-primary mb-2">No notes yet</h3>
-            <p className="text-text-muted mb-6">Write your first impression of this oshi.</p>
-            <Link to={`/oshis/${oshiId}/notes/new`}>
-              <Button size="lg">
-                <Plus size={18} />
-                Write a Note
-              </Button>
-            </Link>
-          </div>
-        )}
+            {!notesLoading && notes.length === 0 && viewMode !== 'journal' && (
+              <div className="text-center py-20">
+                <StickyNote size={48} className="mx-auto mb-4 text-accent-soft" />
+                <h3 className="text-lg font-semibold text-text-primary mb-2">No notes yet</h3>
+                <p className="text-text-muted mb-6">Write your first impression of this oshi.</p>
+                <Link to={`/oshis/${oshiId}/notes/new`}>
+                  <Button size="lg">
+                    <Plus size={18} />
+                    Write a Note
+                  </Button>
+                </Link>
+              </div>
+            )}
 
-        {!notesLoading && notes.length > 0 && viewMode === 'graph' && (
-          <div className="h-full">
-            <TagGraphView notes={notes} />
-          </div>
-        )}
+            {!notesLoading && notes.length > 0 && viewMode === 'graph' && (
+              <div className="h-full">
+                <TagGraphView notes={notes} />
+              </div>
+            )}
 
-        {!notesLoading && viewMode === 'journal' && oshiId && (
-          <JournalWorkspace oshiId={oshiId} />
-        )}
+            {!notesLoading && viewMode === 'journal' && oshiId && (
+              <JournalWorkspace oshiId={oshiId} />
+            )}
 
-        {!notesLoading && notes.length > 0 && viewMode !== 'graph' && viewMode !== 'journal' && (
-          <>
+            {!notesLoading && notes.length > 0 && viewMode !== 'graph' && viewMode !== 'journal' && (
+              <>
             <div className={viewMode === 'card' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-1'}>
               {notes.map((note, index) => (
                 <Link
@@ -525,8 +532,10 @@ export function OshiDetailPage() {
                 </Button>
               </div>
             )}
-          </>
-        )}
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   )

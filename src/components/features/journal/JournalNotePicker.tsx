@@ -1,7 +1,9 @@
 import { Search, StickyNote, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Button } from '../../ui/Button'
 import type { Note } from '../../../types'
+import { usePopoverTransition } from '../themes/uiMotion'
 
 interface JournalNotePickerProps {
   notes: Note[]
@@ -10,6 +12,7 @@ interface JournalNotePickerProps {
 }
 
 export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePickerProps) {
+  const popoverTransition = usePopoverTransition()
   const [query, setQuery] = useState('')
   const filteredNotes = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -22,7 +25,10 @@ export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePi
   }, [notes, query])
 
   return (
-    <div className="absolute right-5 top-16 z-50 flex max-h-[520px] w-96 flex-col overflow-hidden rounded-2xl border border-border-color bg-bg-primary shadow-xl">
+    <motion.div
+      {...popoverTransition}
+      className="absolute right-5 top-16 z-50 flex max-h-[520px] w-96 origin-top-right flex-col overflow-hidden rounded-2xl border border-border-color bg-bg-primary shadow-xl"
+    >
       <div className="flex items-center gap-2 border-b border-border-color p-3">
         <StickyNote size={18} className="text-accent" />
         <h3 className="flex-1 text-sm font-semibold text-text-primary">Place a note</h3>
@@ -76,6 +82,6 @@ export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePi
       <div className="border-t border-border-color p-3">
         <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>Done</Button>
       </div>
-    </div>
+    </motion.div>
   )
 }

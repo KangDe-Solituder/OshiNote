@@ -74,6 +74,8 @@ export const MIGRATIONS = [
     description TEXT NOT NULL DEFAULT '',
     cover_style TEXT NOT NULL DEFAULT 'classic',
     cover_color TEXT NOT NULL DEFAULT '#8B5CF6',
+    cover_decoration TEXT NOT NULL DEFAULT 'none',
+    date_label TEXT NOT NULL DEFAULT '',
     sort_order  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),

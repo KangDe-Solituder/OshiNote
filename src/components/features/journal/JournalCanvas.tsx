@@ -1,4 +1,5 @@
 import { Loader2, StickyNote } from 'lucide-react'
+import type { CSSProperties } from 'react'
 import type { JournalItemWithNote, JournalPage } from '../../../types'
 import { JOURNAL_PAGE, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { JournalSticker } from './JournalSticker'
@@ -26,9 +27,7 @@ export function JournalCanvas({
         className="relative min-h-[700px] shrink-0 overflow-hidden bg-[var(--journal-canvas-bg)]"
         style={{
           width: `max(100%, ${JOURNAL_PAGE.width}px)`,
-          backgroundImage:
-            'radial-gradient(var(--journal-canvas-dot) 1px, transparent 1px)',
-          backgroundSize: '18px 18px',
+          ...getPageBackground(page?.background || 'paper'),
         }}
         onClick={(e) => {
           if (e.currentTarget === e.target) onSelectItem(null)
@@ -65,4 +64,41 @@ export function JournalCanvas({
       </div>
     </div>
   )
+}
+
+function getPageBackground(background: string): CSSProperties {
+  const dotLayer = 'radial-gradient(var(--journal-canvas-dot) 1px, transparent 1px)'
+  if (background === 'grid') {
+    return {
+      backgroundColor: 'var(--journal-canvas-bg)',
+      backgroundImage: 'linear-gradient(var(--journal-canvas-dot) 1px, transparent 1px), linear-gradient(90deg, var(--journal-canvas-dot) 1px, transparent 1px)',
+      backgroundSize: '24px 24px',
+    }
+  }
+  if (background === 'blush') {
+    return {
+      backgroundColor: '#fff1f5',
+      backgroundImage: dotLayer,
+      backgroundSize: '18px 18px',
+    }
+  }
+  if (background === 'blue') {
+    return {
+      backgroundColor: '#eef6ff',
+      backgroundImage: dotLayer,
+      backgroundSize: '18px 18px',
+    }
+  }
+  if (background === 'mint') {
+    return {
+      backgroundColor: '#edf7ed',
+      backgroundImage: dotLayer,
+      backgroundSize: '18px 18px',
+    }
+  }
+  return {
+    backgroundColor: 'var(--journal-canvas-bg)',
+    backgroundImage: dotLayer,
+    backgroundSize: '18px 18px',
+  }
 }

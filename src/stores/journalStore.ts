@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { JournalBook, JournalItemWithNote, JournalPage, JournalStickerStyle, Note } from '../types'
+import type { JournalBook, JournalCoverDecoration, JournalCoverStyle, JournalItemWithNote, JournalPage, JournalStickerStyle, Note } from '../types'
 import * as journalService from '../features/journal/journalService'
 
 interface LayoutInput {
@@ -17,6 +17,20 @@ interface StyleInput {
   border_style?: string | null
 }
 
+interface BookInput {
+  title?: string
+  description?: string
+  cover_style?: JournalCoverStyle
+  cover_color?: string
+  cover_decoration?: JournalCoverDecoration
+  date_label?: string
+}
+
+interface PageInput {
+  title?: string
+  background?: string
+}
+
 interface JournalState {
   books: JournalBook[]
   activeBookId: string | null
@@ -30,10 +44,12 @@ interface JournalState {
   loadBookshelf: (oshiId: string) => Promise<void>
   createBook: (oshiId: string, title: string) => Promise<void>
   renameBook: (bookId: string, title: string, oshiId: string) => Promise<void>
+  updateBook: (bookId: string, input: BookInput, oshiId: string) => Promise<void>
   deleteBook: (bookId: string, oshiId: string) => Promise<void>
   openBook: (bookId: string, oshiId: string) => Promise<void>
   closeBook: () => void
-  setActivePage: (pageId: string) => Promise<void>
+  setActivePage: (pageId: string, oshiId?: string) => Promise<void>
+  updatePage: (pageId: string, input: PageInput) => Promise<void>
   createPage: (bookId: string) => Promise<void>
   deletePage: (pageId: string, bookId: string) => Promise<void>
   placeNote: (noteId: string, oshiId: string) => Promise<void>
@@ -76,7 +92,13 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   renameBook: async (bookId, title, oshiId) => {
-    await journalService.updateJournalBook(bookId, title)
+    await journalService.updateJournalBook(bookId, { title })
+    const books = await journalService.fetchJournalBooks(oshiId)
+    set({ books })
+  },
+
+  updateBook: async (bookId, input, oshiId) => {
+    await journalService.updateJournalBook(bookId, input)
     const books = await journalService.fetchJournalBooks(oshiId)
     set({ books })
   },
@@ -112,14 +134,24 @@ export const useJournalStore = create<JournalState>((set, get) => ({
 
   closeBook: () => set({ activeBookId: null, pages: [], activePageId: null, items: [], unplacedNotes: [] }),
 
-  setActivePage: async (pageId) => {
+  setActivePage: async (pageId, oshiId) => {
     set({ activePageId: pageId, loading: true, error: null })
     try {
       const items = await journalService.fetchJournalItems(pageId)
-      set({ items, unplacedNotes: [], loading: false })
+      const unplacedNotes = oshiId ? await journalService.fetchUnplacedNotes(pageId, oshiId) : []
+      set({ items, unplacedNotes, loading: false })
     } catch (e) {
       set({ error: String(e), loading: false })
     }
+  },
+
+  updatePage: async (pageId, input) => {
+    await journalService.updateJournalPage(pageId, input)
+    set((state) => ({
+      pages: state.pages.map((page) =>
+        page.id === pageId ? { ...page, ...input } : page
+      ),
+    }))
   },
 
   createPage: async (bookId) => {
