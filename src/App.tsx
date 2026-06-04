@@ -8,7 +8,6 @@ import { OshiDetailPage } from './pages/OshiDetailPage'
 import { NoteEditorPage } from './pages/NoteEditorPage'
 import { TagsPage } from './pages/TagsPage'
 import { TagDetailPage } from './pages/TagDetailPage'
-import { AIToolsPage } from './pages/AIToolsPage'
 import { ExportPage } from './pages/ExportPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { NotesPage } from './pages/NotesPage'
@@ -30,7 +29,6 @@ export default function App() {
               <Route path="notes/:noteId" element={<NoteEditorPage />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="tags/:tagName" element={<TagDetailPage />} />
-              <Route path="ai" element={<AIToolsPage />} />
               <Route path="export" element={<ExportPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

@@ -1,16 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { NavLink, useLocation, useParams } from 'react-router-dom'
 import {
   BookOpen,
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Download,
   FileText,
   Home,
   Plus,
   Settings,
   Tag,
-  Wand2,
 } from 'lucide-react'
 import { useSidebarStore } from '../../stores/sidebarStore'
 import { useOshiStore } from '../../stores/oshiStore'
@@ -19,6 +20,7 @@ import appIconUrl from '../../assets/app-icon.svg'
 import clsx from 'clsx'
 import type { ViewMode } from '../../types'
 import { useUiMotionSeconds } from '../features/themes/uiMotion'
+import { PAGE_HEADER_CLASS } from './pageShell'
 
 interface OshiSpaceItem {
   to: string
@@ -30,7 +32,6 @@ interface OshiSpaceItem {
 const globalNavItems = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/notes', icon: FileText, label: 'All Notes' },
-  { to: '/ai', icon: Wand2, label: 'AI Tools' },
   { to: '/export', icon: Download, label: 'Export' },
 ]
 
@@ -44,6 +45,11 @@ export function Sidebar() {
   const setViewMode = useNoteStore((s) => s.setViewMode)
   const activeOshi = oshis.find((oshi) => oshi.id === oshiId) || oshis[0]
   const activeOshiId = oshiId || activeOshi?.id
+  const [openSections, setOpenSections] = useState({
+    oshis: true,
+    space: true,
+    tools: false,
+  })
 
   useEffect(() => {
     fetchAll()
@@ -61,7 +67,13 @@ export function Sidebar() {
       transition={{ duration: motionSeconds, ease: 'easeOut' }}
       className="h-full flex flex-col border-r border-border-color bg-bg-secondary/50 backdrop-blur-md shrink-0 overflow-hidden"
     >
-      <div className="flex items-center h-14 px-4 border-b border-border-color shrink-0">
+      <div
+        className={clsx(
+          PAGE_HEADER_CLASS,
+          'gap-3',
+          collapsed ? 'justify-center px-0' : 'px-6'
+        )}
+      >
         {collapsed ? (
           <button
             type="button"
@@ -95,7 +107,13 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
-        <SidebarSection title="My Oshis" collapsed={collapsed}>
+        <SidebarSection
+          title="My Oshis"
+          collapsed={collapsed}
+          open={openSections.oshis}
+          motionSeconds={motionSeconds}
+          onToggle={() => setOpenSections((sections) => ({ ...sections, oshis: !sections.oshis }))}
+        >
           {oshis.map((oshi) => (
             <NavLink
               key={oshi.id}
@@ -133,7 +151,13 @@ export function Sidebar() {
           </NavLink>
         </SidebarSection>
 
-        <SidebarSection title="Oshi Space" collapsed={collapsed}>
+        <SidebarSection
+          title="Oshi Space"
+          collapsed={collapsed}
+          open={openSections.space}
+          motionSeconds={motionSeconds}
+          onToggle={() => setOpenSections((sections) => ({ ...sections, space: !sections.space }))}
+        >
           {oshiSpaceItems.map((item) => {
             const isViewModeItem = item.mode !== undefined
             const isActive = isViewModeItem
@@ -162,7 +186,13 @@ export function Sidebar() {
           })}
         </SidebarSection>
 
-        <SidebarSection title="Tools" collapsed={collapsed}>
+        <SidebarSection
+          title="Tools"
+          collapsed={collapsed}
+          open={openSections.tools}
+          motionSeconds={motionSeconds}
+          onToggle={() => setOpenSections((sections) => ({ ...sections, tools: !sections.tools }))}
+        >
           {globalNavItems.map((item) => (
             <NavLink
               key={item.to}
@@ -233,27 +263,59 @@ export function Sidebar() {
 function SidebarSection({
   title,
   collapsed,
+  open,
+  motionSeconds,
+  onToggle,
   children,
 }: {
   title: string
   collapsed: boolean
+  open: boolean
+  motionSeconds: number
+  onToggle: () => void
   children: React.ReactNode
 }) {
   return (
     <section className="mb-5 space-y-1">
       <AnimatePresence>
         {!collapsed && (
-          <motion.p
+          <motion.button
+            type="button"
+            onClick={onToggle}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
-            className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted"
+            className="flex w-full items-center justify-between rounded-lg px-3 pb-1 pt-1 text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-secondary"
           >
-            {title}
-          </motion.p>
+            <span>{title}</span>
+            {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </motion.button>
         )}
       </AnimatePresence>
-      {children}
+      <div
+        className="grid overflow-hidden"
+        style={{
+          gridTemplateRows: collapsed || open ? '1fr' : '0fr',
+          transitionProperty: 'grid-template-rows',
+          transitionDuration: `${motionSeconds}s`,
+          transitionDelay: collapsed || open || motionSeconds === 0 ? '0s' : `${motionSeconds * 0.65}s`,
+          transitionTimingFunction: 'ease-out',
+        }}
+      >
+        <div
+          className="min-h-0 overflow-hidden"
+          style={{
+            opacity: collapsed || open ? 1 : 0,
+            transform: collapsed || open ? 'translateX(0)' : 'translateX(-8px)',
+            transitionProperty: 'opacity, transform',
+            transitionDuration: `${motionSeconds === 0 ? 0 : Math.max(0.08, motionSeconds * 0.55)}s`,
+            transitionDelay: collapsed || open ? `${motionSeconds}s` : '0s',
+            transitionTimingFunction: 'ease-out',
+          }}
+        >
+          {children}
+        </div>
+      </div>
     </section>
   )
 }

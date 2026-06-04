@@ -51,8 +51,8 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
   const db = await getDb()
   const id = generateId()
   await db.execute(
-    `INSERT INTO notes (id, oshi_id, archive_id, title, content, plain_text, tags, favorite, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, COALESCE(?, datetime('now', 'localtime')), COALESCE(?, datetime('now', 'localtime')))`,
+    `INSERT INTO notes (id, oshi_id, archive_id, title, content, plain_text, source_url, tags, favorite, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, COALESCE(?, datetime('now', 'localtime')), COALESCE(?, datetime('now', 'localtime')))`,
     [
       id,
       input.oshi_id || null,
@@ -60,6 +60,7 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
       input.title,
       input.content,
       input.plain_text,
+      input.source_url || '',
       JSON.stringify(input.tags),
       input.created_at,
       input.created_at,
@@ -76,6 +77,7 @@ export async function updateNote(id: string, input: UpdateNoteInput): Promise<vo
   if (input.title !== undefined) { sets.push('title = ?'); params.push(input.title) }
   if (input.content !== undefined) { sets.push('content = ?'); params.push(input.content) }
   if (input.plain_text !== undefined) { sets.push('plain_text = ?'); params.push(input.plain_text) }
+  if (input.source_url !== undefined) { sets.push('source_url = ?'); params.push(input.source_url) }
   if (input.tags !== undefined) { sets.push('tags = ?'); params.push(JSON.stringify(input.tags)) }
   if (input.oshi_id !== undefined) { sets.push('oshi_id = ?'); params.push(input.oshi_id) }
   if (input.archive_id !== undefined) { sets.push('archive_id = ?'); params.push(input.archive_id) }

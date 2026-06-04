@@ -13,6 +13,7 @@ import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
 import type { CardStyle, Oshi } from '../types'
 import { usePageTransition, useUiMotionSeconds } from '../components/features/themes/uiMotion'
+import { PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 
 export function OshiDetailPage() {
   const { oshiId } = useParams<{ oshiId: string }>()
@@ -22,7 +23,6 @@ export function OshiDetailPage() {
   const [showAddArchive, setShowAddArchive] = useState(false)
   const [showArchiveMenu, setShowArchiveMenu] = useState(false)
   const [showCardStyleMenu, setShowCardStyleMenu] = useState(false)
-  const [showFullDescription, setShowFullDescription] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const uiMotionSeconds = useUiMotionSeconds()
   const pageTransition = usePageTransition()
@@ -60,7 +60,6 @@ export function OshiDetailPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalNotes / useNoteStore.getState().pageSize))
   const activeArchive = archives.find((archive) => archive.id === activeArchiveId)
-  const descriptionNeedsExpansion = Boolean(oshi && (oshi.description.length > 220 || oshi.description.split('\n').length > 4))
   const isJournal = viewMode === 'journal'
 
   function handleSearch() {
@@ -132,13 +131,13 @@ export function OshiDetailPage() {
       <motion.div
         layout
         transition={{ duration: uiMotionSeconds, ease: 'easeOut' }}
-        className={clsx('relative border-b border-border-color bg-bg-secondary/30', isJournal ? 'px-4 py-2.5' : 'p-6')}
+        className={clsx('relative border-b border-border-color bg-bg-primary/95', isJournal ? 'px-4 py-2.5' : PAGE_HEADER_CLASS)}
       >
-        <div className={clsx('grid gap-6', !isJournal && 'md:grid-cols-[220px_minmax(0,1fr)]')}>
+        <div className={clsx(isJournal ? 'grid gap-6' : 'flex w-full min-w-0 items-center gap-4')}>
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <Link to="/oshis" className="shrink-0 text-text-muted transition-colors hover:text-text-primary">
-                <ArrowLeft size={20} />
+              <Link to="/oshis" className="shrink-0 rounded-lg p-2 text-text-muted transition-colors hover:bg-bg-secondary hover:text-text-primary">
+                <ArrowLeft size={22} />
               </Link>
               <div
                 className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white shadow-lg"
@@ -151,52 +150,35 @@ export function OshiDetailPage() {
                 )}
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-bold text-text-primary">{oshi.name}</h1>
+                <h1 className="truncate text-2xl font-bold text-text-primary">{oshi.name}</h1>
                 <p className="text-sm text-text-muted">{totalNotes} notes</p>
               </div>
             </div>
-
-            {!isJournal && oshi.activity_links.length > 0 && (
-              <div className="mt-4 space-y-1.5 pl-8">
-                {oshi.activity_links.map((url) => (
-                  <button
-                    type="button"
-                    key={url}
-                    onClick={() => handleOpenExternalLink(url)}
-                    className="flex min-w-0 items-center gap-1.5 text-xs text-accent transition-colors hover:text-accent-hover"
-                    title={url}
-                  >
-                    <Link2 size={13} className="shrink-0 text-text-muted" />
-                    <span className="truncate">{formatLinkLabel(url)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
-          {!isJournal && <div className="min-w-0">
+          {!isJournal && <div className="min-w-0 flex-1">
             {oshi.description ? (
-              <>
-                <p className={clsx(
-                  'whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary [overflow-wrap:anywhere]',
-                  !showFullDescription && descriptionNeedsExpansion && 'line-clamp-4'
-                )}>
-                  {oshi.description}
-                </p>
-                {descriptionNeedsExpansion && (
-                  <button
-                    type="button"
-                    onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="mt-2 text-xs font-medium text-accent hover:text-accent-hover"
-                  >
-                    {showFullDescription ? 'Show less' : 'Show more'}
-                  </button>
-                )}
-              </>
+              <p className="truncate text-sm text-text-secondary">{oshi.description}</p>
             ) : (
               <p className="text-sm text-text-muted">No description yet.</p>
             )}
           </div>}
+          {!isJournal && oshi.activity_links.length > 0 && (
+            <div className="ml-auto hidden max-w-[220px] shrink-0 flex-col gap-1 md:flex">
+              {oshi.activity_links.slice(0, 2).map((url) => (
+                <button
+                  type="button"
+                  key={url}
+                  onClick={() => handleOpenExternalLink(url)}
+                  className="flex min-w-0 items-center gap-1.5 text-xs text-accent transition-colors hover:text-accent-hover"
+                  title={url}
+                >
+                  <Link2 size={13} className="shrink-0 text-text-muted" />
+                  <span className="truncate">{formatLinkLabel(url)}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {isJournal && (
             <button
               type="button"

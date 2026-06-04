@@ -30,6 +30,7 @@ async function runMigrations(db: Database): Promise<void> {
     await db.execute(sql)
   }
   await ensureOshiProfileColumns(db)
+  await ensureNoteSourceUrl(db)
   await ensureOptionalNoteOwnership(db)
   await ensureJournalBooksSchema(db)
   await rebuildNoteSearchIndex(db)
@@ -44,6 +45,15 @@ async function ensureOshiProfileColumns(db: Database): Promise<void> {
   }
   if (!columnNames.has('activity_links')) {
     await db.execute("ALTER TABLE oshis ADD COLUMN activity_links TEXT NOT NULL DEFAULT '[]'")
+  }
+}
+
+async function ensureNoteSourceUrl(db: Database): Promise<void> {
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(notes)')
+  const columnNames = new Set(columns.map((column) => column.name))
+
+  if (!columnNames.has('source_url')) {
+    await db.execute("ALTER TABLE notes ADD COLUMN source_url TEXT NOT NULL DEFAULT ''")
   }
 }
 
@@ -136,6 +146,7 @@ async function ensureOptionalNoteOwnership(db: Database): Promise<void> {
       title      TEXT NOT NULL DEFAULT '',
       content    TEXT NOT NULL DEFAULT '{}',
       plain_text TEXT NOT NULL DEFAULT '',
+      source_url TEXT NOT NULL DEFAULT '',
       tags       TEXT NOT NULL DEFAULT '[]',
       favorite   INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
@@ -144,8 +155,8 @@ async function ensureOptionalNoteOwnership(db: Database): Promise<void> {
       FOREIGN KEY (archive_id) REFERENCES archives(id) ON DELETE SET NULL
     )`)
     await db.execute(`INSERT INTO notes_v2
-      (id, oshi_id, archive_id, title, content, plain_text, tags, favorite, created_at, updated_at)
-      SELECT id, oshi_id, archive_id, title, content, plain_text, tags, favorite, created_at, updated_at
+      (id, oshi_id, archive_id, title, content, plain_text, source_url, tags, favorite, created_at, updated_at)
+      SELECT id, oshi_id, archive_id, title, content, plain_text, source_url, tags, favorite, created_at, updated_at
       FROM notes`)
     await db.execute('DROP TABLE notes')
     await db.execute('ALTER TABLE notes_v2 RENAME TO notes')

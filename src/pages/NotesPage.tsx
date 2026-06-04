@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { FileText, Heart, LayoutGrid, List, Loader2, Plus, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 import { fetchAllNotes, getAllTags } from '../features/notes/noteService'
 import { fetchAllArchives } from '../features/oshis/archiveService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
@@ -70,8 +71,9 @@ export function NotesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
-      <div className="mb-6 flex items-start justify-between gap-4">
+    <div className="flex h-full min-h-0 flex-col bg-bg-primary">
+      <header className={PAGE_HEADER_CLASS}>
+        <div className="flex w-full items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-text-primary">All Notes</h1>
           <p className="mt-1 text-text-secondary">Your full memory library, including notes that still need sorting.</p>
@@ -82,7 +84,11 @@ export function NotesPage() {
             New Note
           </Button>
         </Link>
-      </div>
+        </div>
+      </header>
+
+      <main className={PAGE_CONTENT_CLASS}>
+        <div className="mx-auto max-w-6xl">
 
       <div className="mb-5 space-y-3 border-y border-border-color py-4">
         <div className="flex items-center gap-3">
@@ -158,6 +164,8 @@ export function NotesPage() {
           <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
         </div>
       )}
+        </div>
+      </main>
     </div>
   )
 }

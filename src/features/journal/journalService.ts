@@ -19,6 +19,7 @@ interface JoinedJournalItemRow extends JournalItemRow {
   note_title: string
   note_content: string
   note_plain_text: string
+  note_source_url: string
   note_tags: string
   note_favorite: number
   note_created_at: string
@@ -171,6 +172,7 @@ export async function fetchJournalItems(pageId: string): Promise<JournalItemWith
        n.title as note_title,
        n.content as note_content,
        n.plain_text as note_plain_text,
+       n.source_url as note_source_url,
        n.tags as note_tags,
        n.favorite as note_favorite,
        n.created_at as note_created_at,
@@ -336,6 +338,7 @@ function deserializeJoinedItem(row: JoinedJournalItemRow): JournalItemWithNote {
       title: row.note_title,
       content: row.note_content,
       plain_text: row.note_plain_text,
+      source_url: row.note_source_url,
       tags: row.note_tags,
       favorite: row.note_favorite,
       created_at: row.note_created_at,

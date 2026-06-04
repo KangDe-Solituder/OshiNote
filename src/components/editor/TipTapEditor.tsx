@@ -2,11 +2,12 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import { editorExtensions } from './extensions'
 import { EditorToolbar } from './EditorToolbar'
 import { useEditorStore } from '../../stores/editorStore'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 
 interface TipTapEditorProps {
   content?: object
   onUpdate?: (json: object, text: string) => void
+  afterToolbar?: ReactNode
 }
 
 function FallbackEditor({ onUpdate }: { onUpdate?: (json: object, text: string) => void }) {
@@ -31,7 +32,7 @@ function FallbackEditor({ onUpdate }: { onUpdate?: (json: object, text: string) 
   )
 }
 
-export function TipTapEditor({ content, onUpdate }: TipTapEditorProps) {
+export function TipTapEditor({ content, onUpdate, afterToolbar }: TipTapEditorProps) {
   const setEditorInstance = useEditorStore((s) => s.setEditorInstance)
   const markDirty = useEditorStore((s) => s.markDirty)
 
@@ -74,6 +75,7 @@ export function TipTapEditor({ content, onUpdate }: TipTapEditorProps) {
   return (
     <div className="flex flex-col h-full">
       <EditorToolbar editor={editor} onInsertEmoji={insertText} />
+      {afterToolbar}
       <div className="flex-1 overflow-y-auto">
         <EditorContent editor={editor} className="h-full" />
       </div>

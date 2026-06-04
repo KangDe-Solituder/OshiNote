@@ -6,7 +6,7 @@ import { useAiStore } from '../stores/aiStore'
 import type { ThemeId, UiMotionDuration } from '../types'
 import type { AiProviderId } from '../services/ai'
 import { getProviderName } from '../services/ai'
-import { Trash2, Upload } from 'lucide-react'
+import { Sparkles, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
 
 const THEMES: { id: ThemeId; label: string; description: string }[] = [
@@ -29,6 +29,7 @@ const UI_MOTION_OPTIONS: { value: UiMotionDuration; label: string }[] = [
 export function SettingsPage() {
   const {
     currentTheme, setTheme,
+    glassEnabled, setGlassEnabled,
     customBackground, setCustomBackground,
     backgroundFilters, setFilter,
     fontSize, setFontSize,
@@ -64,6 +65,43 @@ export function SettingsPage() {
         <p className="text-xs text-text-muted mt-3">
           Ctrl+1 ~ Ctrl+5 to quickly switch themes.
         </p>
+      </section>
+
+      {/* Appearance */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Appearance</h2>
+        <button
+          onClick={() => setGlassEnabled(!glassEnabled)}
+          className={clsx(
+            'w-full rounded-2xl border p-5 text-left transition-all flex items-center justify-between gap-4',
+            glassEnabled
+              ? 'border-accent bg-accent/5 text-accent'
+              : 'border-border-color bg-bg-secondary text-text-secondary hover:border-border-hover hover:text-accent'
+          )}
+        >
+          <span className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border-color bg-bg-primary">
+              <Sparkles size={22} />
+            </span>
+            <span>
+              <span className="block font-medium text-text-primary">Glass Effect</span>
+              <span className="block text-sm text-text-muted">Apply frosted blur to cards and rounded surfaces.</span>
+            </span>
+          </span>
+          <span
+            className={clsx(
+              'relative h-7 w-12 shrink-0 rounded-full transition-colors',
+              glassEnabled ? 'bg-accent' : 'bg-bg-tertiary'
+            )}
+          >
+            <span
+              className={clsx(
+                'absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                glassEnabled ? 'translate-x-6' : 'translate-x-1'
+              )}
+            />
+          </span>
+        </button>
       </section>
 
       {/* Background */}
@@ -216,8 +254,8 @@ export function SettingsPage() {
           {/* Enable toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-primary">Enable AI Features</p>
-              <p className="text-xs text-text-muted">Turn on translation and writing refinement.</p>
+              <p className="text-sm font-medium text-text-primary">Enable LLM Interface</p>
+              <p className="text-xs text-text-muted">Keep provider settings available for future local or private workflows.</p>
             </div>
             <button
               onClick={() => setEnabled(!config.enabled)}
@@ -286,7 +324,7 @@ export function SettingsPage() {
         </Card>
 
         <p className="text-xs text-text-muted mt-3">
-          Your API keys are stored locally in SQLite and never sent anywhere except to the configured API endpoint.
+          These settings are stored locally in SQLite and are not used unless an LLM feature is added or enabled later.
           For LM Studio, use either OpenAI-compatible <span className="font-mono">http://127.0.0.1:1234/v1</span> or native <span className="font-mono">http://127.0.0.1:1234/api/v1</span>.
         </p>
       </section>

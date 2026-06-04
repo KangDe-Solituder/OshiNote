@@ -33,6 +33,7 @@ export interface Note {
   title: string
   content: string // Tiptap JSON string
   plain_text: string
+  source_url: string
   tags: string[] // parsed from JSON string
   favorite: boolean
   created_at: string
@@ -46,6 +47,7 @@ export interface NoteRow {
   title: string
   content: string
   plain_text: string
+  source_url: string
   tags: string // JSON string from DB
   favorite: number // 0 or 1 from SQLite
   created_at: string
@@ -151,6 +153,7 @@ export interface CreateNoteInput {
   title: string
   content: string
   plain_text: string
+  source_url?: string
   tags: string[]
   created_at?: string
 }
@@ -159,6 +162,7 @@ export interface UpdateNoteInput {
   title?: string
   content?: string
   plain_text?: string
+  source_url?: string
   tags?: string[]
   oshi_id?: string | null
   archive_id?: string | null

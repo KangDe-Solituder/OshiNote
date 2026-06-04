@@ -12,6 +12,7 @@ const FONT_SIZE_MAP: Record<FontSize, string> = {
 
 interface ThemeState {
   currentTheme: ThemeId
+  glassEnabled: boolean
   customBackground: string | null
   backgroundFilters: BackgroundFilters
   themeHotkeys: Record<string, ThemeId>
@@ -19,6 +20,7 @@ interface ThemeState {
   uiMotionDuration: UiMotionDuration
 
   setTheme: (id: ThemeId) => void
+  setGlassEnabled: (enabled: boolean) => void
   setCustomBackground: (path: string | null) => void
   setFilter: (key: keyof BackgroundFilters, value: number) => void
   setThemeHotkey: (key: string, themeId: ThemeId) => void
@@ -37,12 +39,36 @@ const DEFAULT_HOTKEYS: Record<string, ThemeId> = {
   'ctrl+5': 'rainy-cafe',
 }
 
+const VALID_THEMES: ThemeId[] = ['pink-cozy', 'dark-night', 'soft-blue', 'sakura', 'rainy-cafe']
+
 function applyFontSize(size: FontSize) {
   document.documentElement.style.fontSize = FONT_SIZE_MAP[size]
 }
 
+function applyGlass(enabled: boolean) {
+  document.documentElement.setAttribute('data-glass', enabled ? 'true' : 'false')
+}
+
+function coerceTheme(value: string): { theme: ThemeId; glassEnabled?: boolean } {
+  if (value === 'frosted-blue') return { theme: 'soft-blue', glassEnabled: true }
+  if (VALID_THEMES.includes(value as ThemeId)) return { theme: value as ThemeId }
+  return { theme: 'pink-cozy' }
+}
+
+function sanitizeHotkeys(value: unknown): Record<string, ThemeId> {
+  if (!value || typeof value !== 'object') return { ...DEFAULT_HOTKEYS }
+  const parsed = value as Record<string, string>
+  const hotkeys: Record<string, ThemeId> = { ...DEFAULT_HOTKEYS }
+  for (const [key, theme] of Object.entries(parsed)) {
+    const coerced = coerceTheme(theme)
+    hotkeys[key] = coerced.theme
+  }
+  return hotkeys
+}
+
 export const useThemeStore = create<ThemeState>((set, get) => ({
   currentTheme: 'pink-cozy',
+  glassEnabled: false,
   customBackground: null,
   backgroundFilters: { blur: 0, brightness: 100, opacity: 100, saturation: 100 },
   themeHotkeys: { ...DEFAULT_HOTKEYS },
@@ -52,6 +78,12 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   setTheme: (id) => {
     set({ currentTheme: id })
     document.documentElement.setAttribute('data-theme', id)
+    get().persistToDB()
+  },
+
+  setGlassEnabled: (enabled) => {
+    set({ glassEnabled: enabled })
+    applyGlass(enabled)
     get().persistToDB()
   },
 
@@ -89,13 +121,28 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     try {
       const db = await getDb()
       const rows = await db.select<{ key: string; value: string }[]>(
-        "SELECT key, value FROM settings WHERE key IN ('theme', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration')"
+        "SELECT key, value FROM settings WHERE key IN ('theme', 'glassEnabled', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration')"
       )
       for (const row of rows) {
         switch (row.key) {
           case 'theme':
-            set({ currentTheme: row.value as ThemeId })
-            document.documentElement.setAttribute('data-theme', row.value)
+            {
+              const coerced = coerceTheme(row.value)
+              const update: Partial<ThemeState> = { currentTheme: coerced.theme }
+              if (coerced.glassEnabled !== undefined) {
+                update.glassEnabled = coerced.glassEnabled
+                applyGlass(coerced.glassEnabled)
+              }
+              set(update)
+              document.documentElement.setAttribute('data-theme', coerced.theme)
+            }
+            break
+          case 'glassEnabled':
+            {
+              const enabled = row.value === 'true'
+              set({ glassEnabled: enabled })
+              applyGlass(enabled)
+            }
             break
           case 'customBg':
             set({ customBackground: row.value || null })
@@ -106,7 +153,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
             }
             break
           case 'hotkeys':
-            try { set({ themeHotkeys: JSON.parse(row.value) }) } catch {
+            try { set({ themeHotkeys: sanitizeHotkeys(JSON.parse(row.value)) }) } catch {
               // Ignore invalid saved settings.
             }
             break
@@ -133,6 +180,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       const db = await getDb()
       const state = get()
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)", [state.currentTheme])
+      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('glassEnabled', ?)", [String(state.glassEnabled)])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('customBg', ?)", [state.customBackground || ''])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('bgFilters', ?)", [JSON.stringify(state.backgroundFilters)])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('hotkeys', ?)", [JSON.stringify(state.themeHotkeys)])

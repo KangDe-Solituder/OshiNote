@@ -25,6 +25,7 @@ export const MIGRATIONS = [
     title      TEXT NOT NULL DEFAULT '',
     content    TEXT NOT NULL DEFAULT '{}',
     plain_text TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
     tags       TEXT NOT NULL DEFAULT '[]',
     favorite   INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
