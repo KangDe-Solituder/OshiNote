@@ -9,24 +9,22 @@ import {
   Download,
   FileText,
   Home,
+  ImageIcon,
   Plus,
   Settings,
   Tag,
 } from 'lucide-react'
 import { useSidebarStore } from '../../stores/sidebarStore'
 import { useOshiStore } from '../../stores/oshiStore'
-import { useNoteStore } from '../../stores/noteStore'
 import appIconUrl from '../../assets/app-icon.svg'
 import clsx from 'clsx'
-import type { ViewMode } from '../../types'
+import type { Oshi } from '../../types'
 import { useUiMotionSeconds } from '../features/themes/uiMotion'
-import { PAGE_HEADER_CLASS } from './pageShell'
 
 interface OshiSpaceItem {
   to: string
   icon: typeof BookOpen
   label: string
-  mode?: ViewMode
 }
 
 const globalNavItems = [
@@ -41,13 +39,8 @@ export function Sidebar() {
   const { oshiId } = useParams<{ oshiId: string }>()
   const location = useLocation()
   const { oshis, fetchAll } = useOshiStore()
-  const viewMode = useNoteStore((s) => s.viewMode)
-  const setViewMode = useNoteStore((s) => s.setViewMode)
-  const activeOshi = oshis.find((oshi) => oshi.id === oshiId) || oshis[0]
-  const activeOshiId = oshiId || activeOshi?.id
   const [openSections, setOpenSections] = useState({
     oshis: true,
-    space: true,
     tools: false,
   })
 
@@ -55,11 +48,13 @@ export function Sidebar() {
     fetchAll()
   }, [fetchAll])
 
-  const oshiSpaceItems: OshiSpaceItem[] = activeOshiId ? [
-    { to: `/oshis/${activeOshiId}`, icon: BookOpen, label: 'Journal', mode: 'journal' as const },
-    { to: `/oshis/${activeOshiId}`, icon: FileText, label: 'Notes', mode: 'card' as const },
-    { to: '/tags', icon: Tag, label: 'Tags' },
-  ] : []
+  const createOshiSpaceItems = (id: string): OshiSpaceItem[] => [
+    { to: `/oshis/${id}`, icon: Home, label: 'Overview' },
+    { to: `/oshis/${id}/notes`, icon: FileText, label: 'Notes' },
+    { to: `/oshis/${id}/journal`, icon: BookOpen, label: 'Journal' },
+    { to: `/oshis/${id}/illustrations`, icon: ImageIcon, label: 'Illustrations' },
+    { to: `/oshis/${id}/tags`, icon: Tag, label: 'Tags' },
+  ]
 
   return (
     <motion.aside
@@ -69,19 +64,18 @@ export function Sidebar() {
     >
       <div
         className={clsx(
-          PAGE_HEADER_CLASS,
-          'gap-3',
-          collapsed ? 'justify-center px-0' : 'px-6'
+          'flex h-20 shrink-0 items-center border-b border-border-color bg-bg-primary/95',
+          collapsed ? 'justify-center px-0' : 'gap-3 px-6'
         )}
       >
         {collapsed ? (
           <button
             type="button"
             onClick={toggle}
-            className="mx-auto rounded-xl p-1 hover:bg-bg-tertiary focus:outline-none focus:ring-2 focus:ring-accent-soft"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl hover:bg-bg-tertiary focus:outline-none focus:ring-2 focus:ring-accent-soft"
             title="Expand sidebar"
           >
-            <img src={appIconUrl} alt="OshiNote" className="w-8 h-8 shrink-0" />
+            <img src={appIconUrl} alt="OshiNote" className="block h-8 w-8 min-w-8 shrink-0 object-contain" />
           </button>
         ) : (
           <motion.div
@@ -91,7 +85,7 @@ export function Sidebar() {
             exit={{ opacity: 0, x: -10 }}
             className="flex items-center gap-2.5"
           >
-            <img src={appIconUrl} alt="OshiNote" className="w-7 h-7 shrink-0" />
+            <img src={appIconUrl} alt="OshiNote" className="block h-7 w-7 min-w-7 shrink-0 object-contain" />
             <span className="text-lg font-bold text-accent truncate">OshiNote</span>
           </motion.div>
         )}
@@ -106,7 +100,7 @@ export function Sidebar() {
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-4">
+      <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-4">
         <SidebarSection
           title="My Oshis"
           collapsed={collapsed}
@@ -115,23 +109,14 @@ export function Sidebar() {
           onToggle={() => setOpenSections((sections) => ({ ...sections, oshis: !sections.oshis }))}
         >
           {oshis.map((oshi) => (
-            <NavLink
+            <OshiNavGroup
               key={oshi.id}
-              to={`/oshis/${oshi.id}`}
-              className={({ isActive }) =>
-                clsx(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
-                  collapsed && 'justify-center px-2',
-                  isActive
-                    ? 'bg-accent/10 text-accent font-semibold'
-                    : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-                )
-              }
-              title={oshi.name}
-            >
-              <OshiAvatar name={oshi.name} avatar={oshi.avatar} color={oshi.color} />
-              <SidebarLabel collapsed={collapsed}>{oshi.name}</SidebarLabel>
-            </NavLink>
+              oshi={oshi}
+              collapsed={collapsed}
+              expanded={oshi.id === oshiId}
+              items={createOshiSpaceItems(oshi.id)}
+              pathname={location.pathname}
+            />
           ))}
 
           <NavLink
@@ -152,46 +137,12 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection
-          title="Oshi Space"
-          collapsed={collapsed}
-          open={openSections.space}
-          motionSeconds={motionSeconds}
-          onToggle={() => setOpenSections((sections) => ({ ...sections, space: !sections.space }))}
-        >
-          {oshiSpaceItems.map((item) => {
-            const isViewModeItem = item.mode !== undefined
-            const isActive = isViewModeItem
-              ? location.pathname === item.to && viewMode === item.mode
-              : location.pathname.startsWith(item.to)
-
-            return (
-              <NavLink
-                key={`${item.to}-${item.label}`}
-                to={item.to}
-                onClick={() => {
-                  if (item.mode) setViewMode(item.mode)
-                }}
-                className={clsx(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
-                  collapsed && 'justify-center px-2',
-                  isActive
-                    ? 'bg-accent/10 text-accent font-semibold'
-                    : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-                )}
-              >
-                <item.icon size={20} className="shrink-0" />
-                <SidebarLabel collapsed={collapsed}>{item.label}</SidebarLabel>
-              </NavLink>
-            )
-          })}
-        </SidebarSection>
-
-        <SidebarSection
           title="Tools"
           collapsed={collapsed}
           open={openSections.tools}
           motionSeconds={motionSeconds}
           onToggle={() => setOpenSections((sections) => ({ ...sections, tools: !sections.tools }))}
+          className="mt-auto"
         >
           {globalNavItems.map((item) => (
             <NavLink
@@ -266,6 +217,7 @@ function SidebarSection({
   open,
   motionSeconds,
   onToggle,
+  className,
   children,
 }: {
   title: string
@@ -273,10 +225,11 @@ function SidebarSection({
   open: boolean
   motionSeconds: number
   onToggle: () => void
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <section className="mb-5 space-y-1">
+    <section className={clsx('mb-5 space-y-1', className)}>
       <AnimatePresence>
         {!collapsed && (
           <motion.button
@@ -317,6 +270,71 @@ function SidebarSection({
         </div>
       </div>
     </section>
+  )
+}
+
+function OshiNavGroup({
+  oshi,
+  collapsed,
+  expanded,
+  items,
+  pathname,
+}: {
+  oshi: Oshi
+  collapsed: boolean
+  expanded: boolean
+  items: OshiSpaceItem[]
+  pathname: string
+}) {
+  return (
+    <div className={clsx('rounded-2xl', expanded && !collapsed && 'bg-bg-tertiary/40 p-1')}>
+      <NavLink
+        to={`/oshis/${oshi.id}`}
+        className={({ isActive }) =>
+          clsx(
+            'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
+            collapsed && 'justify-center px-2',
+            isActive && pathname === `/oshis/${oshi.id}`
+              ? 'bg-accent/10 text-accent font-semibold'
+              : expanded
+                ? 'text-text-primary hover:bg-bg-secondary'
+                : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+          )
+        }
+        title={oshi.name}
+      >
+        <OshiAvatar name={oshi.name} avatar={oshi.avatar} color={oshi.color} />
+        <SidebarLabel collapsed={collapsed}>{oshi.name}</SidebarLabel>
+        {!collapsed && (
+          <ChevronDown size={14} className={clsx('ml-auto shrink-0 text-text-muted transition-transform', !expanded && '-rotate-90')} />
+        )}
+      </NavLink>
+
+      {expanded && (
+        <div className={clsx('mt-1 grid gap-1', collapsed ? '' : 'pl-3')}>
+          {items.map((item) => {
+            const isActive = pathname === item.to || (item.to !== `/oshis/${oshi.id}` && pathname.startsWith(item.to))
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={clsx(
+                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200',
+                  collapsed && 'justify-center px-2',
+                  isActive
+                    ? 'bg-accent/10 text-accent font-semibold'
+                    : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+                )}
+                title={item.label}
+              >
+                <item.icon size={collapsed ? 20 : 18} className="shrink-0" />
+                <SidebarLabel collapsed={collapsed}>{item.label}</SidebarLabel>
+              </NavLink>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -124,7 +124,7 @@ export function NoteEditorPage() {
         })
         await replaceNoteImages(newNote.id, images)
         markSaved()
-        navigate(`/notes/${newNote.id}`, { replace: true })
+        navigate(selectedOshiId ? `/oshis/${selectedOshiId}/notes/${newNote.id}` : `/notes/${newNote.id}`, { replace: true })
       } else if (note) {
         await updateNote(note.id, {
           title: title || 'Untitled',
@@ -159,7 +159,7 @@ export function NoteEditorPage() {
     if (!note) return
     if (!confirm('Delete this note?')) return
     await deleteNote(note.id)
-    navigate(oshiId ? `/oshis/${oshiId}` : '/notes')
+    navigate(oshiId ? `/oshis/${oshiId}/notes` : '/notes')
   }
 
   async function handleToggleFavorite() {
@@ -288,7 +288,7 @@ export function NoteEditorPage() {
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
       <header className={`${PAGE_HEADER_CLASS} gap-4`}>
         <Link
-          to={oshiId ? `/oshis/${oshiId}` : '/notes'}
+          to={oshiId ? `/oshis/${oshiId}/notes` : '/notes'}
           className="rounded-lg p-2 text-text-muted transition-colors hover:bg-bg-secondary hover:text-text-primary"
           title="Back"
         >

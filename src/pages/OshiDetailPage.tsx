@@ -2,18 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ChevronDown, FolderArchive, Palette, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Loader2, Link2, X, Trash2, Maximize2 } from 'lucide-react'
+import { ChevronDown, FileText, FolderArchive, Palette, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Loader2, Link2, X, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import { Button } from '../components/ui/Button'
 import { TagGraphView } from '../components/features/notes/TagGraphView'
-import { JournalWorkspace } from '../components/features/journal/JournalWorkspace'
+import { OshiModuleHeader } from '../components/layout/OshiModuleHeader'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
 import type { CardStyle, Oshi } from '../types'
 import { usePageTransition, useUiMotionSeconds } from '../components/features/themes/uiMotion'
-import { PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 
 export function OshiDetailPage() {
   const { oshiId } = useParams<{ oshiId: string }>()
@@ -60,7 +59,10 @@ export function OshiDetailPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalNotes / useNoteStore.getState().pageSize))
   const activeArchive = archives.find((archive) => archive.id === activeArchiveId)
-  const isJournal = viewMode === 'journal'
+
+  useEffect(() => {
+    if (viewMode === 'journal') setViewMode('card')
+  }, [setViewMode, viewMode])
 
   function handleSearch() {
     if (!oshiId) return
@@ -127,75 +129,32 @@ export function OshiDetailPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <motion.div
-        layout
-        transition={{ duration: uiMotionSeconds, ease: 'easeOut' }}
-        className={clsx('relative border-b border-border-color bg-bg-primary/95', isJournal ? 'px-4 py-2.5' : PAGE_HEADER_CLASS)}
-      >
-        <div className={clsx(isJournal ? 'grid gap-6' : 'flex w-full min-w-0 items-center gap-4')}>
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <Link to="/oshis" className="shrink-0 rounded-lg p-2 text-text-muted transition-colors hover:bg-bg-secondary hover:text-text-primary">
-                <ArrowLeft size={22} />
-              </Link>
-              <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-bold text-white shadow-lg"
-                style={{ backgroundColor: oshi.color || '#EC4899' }}
+      <OshiModuleHeader
+        oshiId={oshiId!}
+        title="Notes"
+        subtitle={`${totalNotes} notes for ${oshi.name}`}
+        icon={FileText}
+        actions={oshi.activity_links.length > 0 && (
+          <div className="hidden max-w-[220px] shrink-0 flex-col gap-1 md:flex">
+            {oshi.activity_links.slice(0, 2).map((url) => (
+              <button
+                type="button"
+                key={url}
+                onClick={() => handleOpenExternalLink(url)}
+                className="flex min-w-0 items-center gap-1.5 text-xs text-accent transition-colors hover:text-accent-hover"
+                title={url}
               >
-                {oshi.avatar ? (
-                  <img src={oshi.avatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  oshi.name.charAt(0).toUpperCase()
-                )}
-              </div>
-              <div className="min-w-0">
-                <h1 className="truncate text-2xl font-bold text-text-primary">{oshi.name}</h1>
-                <p className="text-sm text-text-muted">{totalNotes} notes</p>
-              </div>
-            </div>
+                <Link2 size={13} className="shrink-0 text-text-muted" />
+                <span className="truncate">{formatLinkLabel(url)}</span>
+              </button>
+            ))}
           </div>
-
-          {!isJournal && <div className="min-w-0 flex-1">
-            {oshi.description ? (
-              <p className="truncate text-sm text-text-secondary">{oshi.description}</p>
-            ) : (
-              <p className="text-sm text-text-muted">No description yet.</p>
-            )}
-          </div>}
-          {!isJournal && oshi.activity_links.length > 0 && (
-            <div className="ml-auto hidden max-w-[220px] shrink-0 flex-col gap-1 md:flex">
-              {oshi.activity_links.slice(0, 2).map((url) => (
-                <button
-                  type="button"
-                  key={url}
-                  onClick={() => handleOpenExternalLink(url)}
-                  className="flex min-w-0 items-center gap-1.5 text-xs text-accent transition-colors hover:text-accent-hover"
-                  title={url}
-                >
-                  <Link2 size={13} className="shrink-0 text-text-muted" />
-                  <span className="truncate">{formatLinkLabel(url)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          {isJournal && (
-            <button
-              type="button"
-              onClick={() => setViewMode('card')}
-              className="absolute right-4 top-3 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
-              title="Exit immersive journal"
-            >
-              <Maximize2 size={14} />
-              Exit journal
-            </button>
-          )}
-        </div>
-      </motion.div>
+        )}
+      />
 
       {/* Toolbar */}
       <AnimatePresence initial={false}>
-      {!isJournal && <motion.div
+      <motion.div
         ref={toolbarRef}
         initial={{ opacity: 0, y: -14, height: 0 }}
         animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -219,7 +178,6 @@ export function OshiDetailPage() {
             { mode: 'card' as const, icon: LayoutGrid },
             { mode: 'list' as const, icon: List },
             { mode: 'graph' as const, icon: GitGraph },
-            { mode: 'journal' as const, icon: BookOpen },
           ].map(({ mode, icon: Icon }) => (
             <button
               key={mode}
@@ -372,7 +330,7 @@ export function OshiDetailPage() {
           </Button>
         </Link>
 
-      </motion.div>}
+      </motion.div>
       </AnimatePresence>
 
       {/* Content */}
@@ -381,7 +339,7 @@ export function OshiDetailPage() {
           <motion.div
             key={notesLoading ? 'loading' : viewMode}
             {...pageTransition}
-            className={clsx('absolute inset-0', isJournal ? 'overflow-y-auto overflow-x-hidden' : 'overflow-y-auto p-6')}
+            className="absolute inset-0 overflow-y-auto p-6"
           >
             {notesLoading && (
               <div className="text-center py-12">
@@ -389,7 +347,7 @@ export function OshiDetailPage() {
               </div>
             )}
 
-            {!notesLoading && notes.length === 0 && viewMode !== 'journal' && (
+            {!notesLoading && notes.length === 0 && (
               <div className="text-center py-20">
                 <StickyNote size={48} className="mx-auto mb-4 text-accent-soft" />
                 <h3 className="text-lg font-semibold text-text-primary mb-2">No notes yet</h3>
@@ -409,11 +367,7 @@ export function OshiDetailPage() {
               </div>
             )}
 
-            {!notesLoading && viewMode === 'journal' && oshiId && (
-              <JournalWorkspace oshiId={oshiId} />
-            )}
-
-            {!notesLoading && notes.length > 0 && viewMode !== 'graph' && viewMode !== 'journal' && (
+            {!notesLoading && notes.length > 0 && viewMode !== 'graph' && (
               <>
             <div className={viewMode === 'card' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-1'}>
               {notes.map((note, index) => (

@@ -120,31 +120,9 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
   return (
     <div className="min-h-full bg-bg-primary px-6 py-7 text-text-primary">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-8 flex flex-wrap items-start gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent-soft/20 text-accent">
-                <BookOpen size={22} />
-              </span>
-              <div>
-                <h2 className="text-2xl font-bold tracking-normal text-text-primary">Journal</h2>
-                <p className="mt-1 text-sm text-text-muted">Collect your memories into quiet, personal books.</p>
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-colors hover:bg-accent-hover"
-          >
-            <Plus size={16} />
-            New Book
-          </button>
-        </div>
-
         <div className="mb-5 flex items-center gap-7 border-b border-border-color">
-          <button type="button" className="border-b-2 border-accent px-1 pb-3 text-sm font-semibold text-accent">My Books</button>
-          <button type="button" className="px-1 pb-3 text-sm font-medium text-text-muted">Templates</button>
+          <button type="button" className="min-w-24 border-b-2 border-accent px-1 pb-3 text-sm font-semibold text-accent">Books</button>
+          <button type="button" className="min-w-24 px-1 pb-3 text-sm font-medium text-text-muted transition-colors hover:text-text-primary">Templates</button>
         </div>
 
         <div className="mb-8 flex flex-wrap items-center gap-3">

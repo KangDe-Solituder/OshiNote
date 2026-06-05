@@ -6,6 +6,7 @@ import { useOshiStore } from '../stores/oshiStore'
 import { OshiCard } from '../features/oshis/OshiCard'
 import { OshiForm } from '../features/oshis/OshiForm'
 import type { Oshi, CreateOshiInput } from '../types'
+import { PAGE_CONTENT_CLASS } from '../components/layout/pageShell'
 
 export function OshiListPage() {
   const { oshis, oshiNoteCounts, loading, error, fetchAll, createOshi, updateOshi, deleteOshi } = useOshiStore()
@@ -35,13 +36,13 @@ export function OshiListPage() {
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className={`${PAGE_CONTENT_CLASS} mx-auto max-w-6xl`}>
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary mb-1">My Oshis</h1>
-          <p className="text-text-secondary">Manage your favorite streamers and creators.</p>
+          <h1 className="mb-1 text-2xl font-bold text-text-primary">My Oshis</h1>
+          <p className="text-sm text-text-secondary">Manage your favorite streamers and creators.</p>
         </div>
-        <Button onClick={() => { setEditingOshi(null); setFormOpen(true) }}>
+        <Button className="rounded-2xl px-5" onClick={() => { setEditingOshi(null); setFormOpen(true) }}>
           <Plus size={18} />
           Add Oshi
         </Button>
@@ -79,7 +80,7 @@ export function OshiListPage() {
       )}
 
       {!loading && !error && oshis.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence>
             {oshis.map((oshi) => (
               <OshiCard
@@ -95,10 +96,10 @@ export function OshiListPage() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               onClick={() => { setEditingOshi(null); setFormOpen(true) }}
-              className="p-6 rounded-2xl border-2 border-dashed border-border-hover hover:border-accent text-text-muted hover:text-accent transition-colors flex flex-col items-center justify-center gap-2 min-h-[200px]"
+              className="flex min-h-[164px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-hover p-5 text-text-muted transition-colors hover:border-accent hover:text-accent"
             >
-              <Plus size={32} />
-              <span className="text-sm font-medium">Add Oshi</span>
+              <Plus size={28} />
+              <span className="text-sm font-semibold">Add Oshi</span>
             </motion.button>
           </AnimatePresence>
         </div>

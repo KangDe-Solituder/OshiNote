@@ -26,6 +26,13 @@ coverage
 .pnpm-store
 .vite
 
+# Local media library structure is tracked, media files are not.
+media/**
+!media/
+!media/**/
+!media/**/.gitkeep
+!media/README.md
+
 # Rust and Tauri generated output
 src-tauri/target/
 src-tauri/gen/schemas/

@@ -62,6 +62,85 @@ export interface NoteImage {
   created_at: string
 }
 
+export type IllustrationCategory = 'official' | 'fanart'
+export type IllustrationSort = 'newest' | 'oldest' | 'title'
+export type IllustrationTab = 'all' | 'official' | 'fanart' | 'favorites'
+
+export interface Illustration {
+  id: string
+  oshi_id: string | null
+  category: IllustrationCategory
+  title: string
+  original_path: string
+  thumbnail_path: string | null
+  original_filename: string
+  mime_type: string
+  file_size: number
+  width: number | null
+  height: number | null
+  date: string | null
+  owner: string
+  artist: string
+  source_url: string
+  tags: string[]
+  description: string
+  favorite: boolean
+  archived: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface IllustrationRow extends Omit<Illustration, 'category' | 'tags' | 'favorite' | 'archived'> {
+  category: string
+  tags: string
+  favorite: number
+  archived: number
+}
+
+export interface CreateIllustrationInput {
+  id?: string
+  oshi_id?: string | null
+  category: IllustrationCategory
+  title: string
+  original_path: string
+  thumbnail_path?: string | null
+  original_filename: string
+  mime_type: string
+  file_size: number
+  width?: number | null
+  height?: number | null
+  date?: string | null
+  owner?: string
+  artist?: string
+  source_url?: string
+  tags?: string[]
+  description?: string
+}
+
+export interface UpdateIllustrationInput {
+  oshi_id?: string | null
+  category?: IllustrationCategory
+  title?: string
+  date?: string | null
+  owner?: string
+  artist?: string
+  source_url?: string
+  tags?: string[]
+  description?: string
+  favorite?: boolean
+  archived?: boolean
+}
+
+export interface IllustrationSearchParams {
+  oshiId?: string
+  category?: IllustrationCategory
+  favorite?: boolean
+  query?: string
+  tag?: string
+  includeArchived?: boolean
+  sort: IllustrationSort
+}
+
 export type ThemeId = 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'
 export type UiMotionDuration = 'off' | 'fast' | 'normal' | 'slow'
 

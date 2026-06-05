@@ -213,6 +213,15 @@ export async function fetchRecentNotes(limit = 6): Promise<Note[]> {
   return rows.map(deserializeNote)
 }
 
+export async function fetchRecentNotesByOshi(oshiId: string, limit = 6): Promise<Note[]> {
+  const db = await getDb()
+  const rows = await db.select<NoteRow[]>(
+    'SELECT * FROM notes WHERE oshi_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT ?',
+    [oshiId, limit]
+  )
+  return rows.map(deserializeNote)
+}
+
 export async function searchNotes(oshiId: string, params: SearchParams): Promise<{ notes: Note[]; total: number }> {
   const db = await getDb()
 
@@ -375,6 +384,21 @@ export async function fetchNotesByTagPaginated(
 export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
   const db = await getDb()
   const rows = await db.select<NoteRow[]>('SELECT tags FROM notes')
+  const tagCounts: Record<string, number> = {}
+  for (const row of rows) {
+    const tags: string[] = JSON.parse(row.tags || '[]')
+    for (const tag of tags) {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1
+    }
+  }
+  return Object.entries(tagCounts)
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export async function getTagsByOshi(oshiId: string): Promise<{ tag: string; count: number }[]> {
+  const db = await getDb()
+  const rows = await db.select<NoteRow[]>('SELECT tags FROM notes WHERE oshi_id = ?', [oshiId])
   const tagCounts: Record<string, number> = {}
   for (const row of rows) {
     const tags: string[] = JSON.parse(row.tags || '[]')

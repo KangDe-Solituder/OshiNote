@@ -55,6 +55,15 @@ export async function fetchJournalBooks(oshiId: string): Promise<JournalBook[]> 
   return rows.map(deserializeBook)
 }
 
+export async function getJournalBookCountByOshi(oshiId: string): Promise<number> {
+  const db = await getDb()
+  const rows = await db.select<{ count: number }[]>(
+    'SELECT COUNT(*) as count FROM journal_books WHERE oshi_id = ?',
+    [oshiId]
+  )
+  return rows[0]?.count || 0
+}
+
 export async function createJournalBook(oshiId: string, title: string): Promise<JournalBook> {
   const db = await getDb()
   const id = generateId()

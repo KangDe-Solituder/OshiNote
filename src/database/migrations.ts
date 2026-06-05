@@ -128,4 +128,32 @@ export const MIGRATIONS = [
   )`,
 
   `CREATE INDEX IF NOT EXISTS idx_note_images_note ON note_images(note_id, sort_order)`,
+
+  `CREATE TABLE IF NOT EXISTS illustrations (
+    id                TEXT PRIMARY KEY,
+    oshi_id           TEXT,
+    category          TEXT NOT NULL DEFAULT 'official',
+    title             TEXT NOT NULL DEFAULT '',
+    original_path     TEXT NOT NULL,
+    thumbnail_path    TEXT,
+    original_filename TEXT NOT NULL DEFAULT '',
+    mime_type         TEXT NOT NULL DEFAULT '',
+    file_size         INTEGER NOT NULL DEFAULT 0,
+    width             INTEGER,
+    height            INTEGER,
+    date              TEXT,
+    owner             TEXT NOT NULL DEFAULT '',
+    artist            TEXT NOT NULL DEFAULT '',
+    source_url        TEXT NOT NULL DEFAULT '',
+    tags              TEXT NOT NULL DEFAULT '[]',
+    description       TEXT NOT NULL DEFAULT '',
+    favorite          INTEGER NOT NULL DEFAULT 0,
+    archived          INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE SET NULL
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS idx_illustrations_oshi ON illustrations(oshi_id, category, favorite)`,
+  `CREATE INDEX IF NOT EXISTS idx_illustrations_date ON illustrations(date)`,
 ]
