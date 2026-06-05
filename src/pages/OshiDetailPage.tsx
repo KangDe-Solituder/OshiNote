@@ -12,7 +12,7 @@ import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
 import type { CardStyle, Oshi } from '../types'
-import { usePageTransition, useUiMotionSeconds } from '../components/features/themes/uiMotion'
+import { usePageTransition } from '../components/features/themes/uiMotion'
 
 export function OshiDetailPage() {
   const { oshiId } = useParams<{ oshiId: string }>()
@@ -23,7 +23,6 @@ export function OshiDetailPage() {
   const [showArchiveMenu, setShowArchiveMenu] = useState(false)
   const [showCardStyleMenu, setShowCardStyleMenu] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
-  const uiMotionSeconds = useUiMotionSeconds()
   const pageTransition = usePageTransition()
 
   const { archives, activeArchiveId, fetchByOshi, createArchive, deleteArchive, getArchiveNoteCount, setActiveArchive } = useArchiveStore()
@@ -153,13 +152,8 @@ export function OshiDetailPage() {
       />
 
       {/* Toolbar */}
-      <AnimatePresence initial={false}>
-      <motion.div
+      <div
         ref={toolbarRef}
-        initial={{ opacity: 0, y: -14, height: 0 }}
-        animate={{ opacity: 1, y: 0, height: 'auto' }}
-        exit={{ opacity: 0, y: -14, height: 0 }}
-        transition={{ duration: uiMotionSeconds, ease: 'easeOut' }}
         className="relative z-40 p-4 border-b border-border-color flex items-center gap-3 flex-wrap bg-bg-secondary/10 overflow-visible"
       >
         <div className="relative flex-1 min-w-[180px] max-w-md">
@@ -330,8 +324,7 @@ export function OshiDetailPage() {
           </Button>
         </Link>
 
-      </motion.div>
-      </AnimatePresence>
+      </div>
 
       {/* Content */}
       <div className="relative flex-1 min-h-0 overflow-hidden">

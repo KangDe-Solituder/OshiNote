@@ -93,8 +93,9 @@ export function OshiListPage() {
             ))}
             <motion.button
               layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
               onClick={() => { setEditingOshi(null); setFormOpen(true) }}
               className="flex min-h-[164px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-hover p-5 text-text-muted transition-colors hover:border-accent hover:text-accent"
             >

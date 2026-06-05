@@ -16,9 +16,9 @@ export function useUiMotionSeconds(): number {
 export function usePageTransition() {
   const duration = useUiMotionSeconds()
   return {
-    initial: { opacity: 0, y: duration === 0 ? 0 : 4 },
+    initial: { opacity: 0, y: duration === 0 ? 0 : 3 },
     animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: duration === 0 ? 0 : -4 },
+    exit: { opacity: 0, y: duration === 0 ? 0 : -2 },
     transition: { duration, ease: 'easeOut' as const },
   }
 }
