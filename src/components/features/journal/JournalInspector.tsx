@@ -65,13 +65,122 @@ export function JournalInspector({
   }
 
   const editing = editingItemId === selectedItem.id
+  const activeItem = selectedItem
+
+  function patchLayout(change: Partial<Pick<JournalItemWithNote, 'width' | 'height' | 'rotation'>>) {
+    onUpdateLayout(activeItem, clampLayout({
+      x: activeItem.x,
+      y: activeItem.y,
+      width: change.width ?? activeItem.width,
+      height: change.height ?? activeItem.height,
+      rotation: change.rotation ?? activeItem.rotation,
+    }))
+  }
+
+  if (selectedItem.item_type === 'illustration') {
+    return (
+      <aside className={variant === 'popover'
+        ? 'max-h-[560px] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-4 shadow-xl'
+        : 'w-72 shrink-0 overflow-y-auto border-l border-border-color bg-bg-secondary/20 p-4'}
+      >
+        <div className="mb-4">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-wide text-text-muted">Selected illustration</p>
+              <h3 className="mt-1 line-clamp-2 text-base font-semibold text-text-primary">
+                {selectedItem.illustration?.title || 'Untitled'}
+              </h3>
+            </div>
+            {variant === 'popover' && onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg p-1 text-text-muted hover:bg-bg-tertiary hover:text-text-primary"
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-text-secondary">
+            {selectedItem.illustration?.artist ? `by ${selectedItem.illustration.artist}` : 'Unknown artist'}
+          </p>
+        </div>
+
+        <section className="mb-5">
+          <h4 className="mb-2 text-xs font-semibold text-text-muted">Size</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" size="sm" onClick={() => patchLayout({ width: selectedItem.width - 24 })}>
+              <Minus size={14} />
+              Width
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => patchLayout({ width: selectedItem.width + 24 })}>
+              <Plus size={14} />
+              Width
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => patchLayout({ height: selectedItem.height - 18 })}>
+              <Minus size={14} />
+              Height
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => patchLayout({ height: selectedItem.height + 18 })}>
+              <Plus size={14} />
+              Height
+            </Button>
+          </div>
+        </section>
+
+        <section className="mb-5">
+          <h4 className="mb-2 text-xs font-semibold text-text-muted">Rotation</h4>
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="secondary" size="sm" onClick={() => patchLayout({ rotation: selectedItem.rotation - 3 })}>-3</Button>
+            <Button variant="secondary" size="sm" onClick={() => patchLayout({ rotation: 0 })}>
+              <RotateCcw size={14} />
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => patchLayout({ rotation: selectedItem.rotation + 3 })}>+3</Button>
+          </div>
+        </section>
+
+        <section className="mb-5">
+          <h4 className="mb-2 text-xs font-semibold text-text-muted">Layer</h4>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={() => onUpdateLayout(selectedItem, {
+              x: selectedItem.x,
+              y: selectedItem.y,
+              width: selectedItem.width,
+              height: selectedItem.height,
+              rotation: selectedItem.rotation,
+              z_index: getNextZIndex(items),
+            })}
+          >
+            <ArrowUp size={14} />
+            Bring forward
+          </Button>
+        </section>
+
+        <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={() => onRemove(selectedItem.id)}>
+          <Trash2 size={15} />
+          Remove from page
+        </Button>
+      </aside>
+    )
+  }
+
+  const note = activeItem.note
+  if (!note) return null
+  const noteId = note.id
+  const noteTitle = note.title
+  const noteContent = note.content
+  const notePlainText = note.plain_text
+  const noteFavorite = note.favorite
 
   async function handleSaveNote() {
-    if (!selectedItem) return
     setSaving(true)
     try {
       const { json, text } = editorRef.current
-      await onUpdateNote(selectedItem.note.id, {
+      await onUpdateNote(noteId, {
         title: title || 'Untitled',
         content: JSON.stringify(json),
         plain_text: text,
@@ -83,24 +192,12 @@ export function JournalInspector({
   }
 
   function handleStartEditing() {
-    if (!selectedItem) return
-    setTitle(selectedItem.note.title)
+    setTitle(noteTitle)
     editorRef.current = {
-      json: parseNoteContent(selectedItem.note.content),
-      text: selectedItem.note.plain_text,
+      json: parseNoteContent(noteContent),
+      text: notePlainText,
     }
-    setEditingItemId(selectedItem.id)
-  }
-
-  function patchLayout(change: Partial<Pick<JournalItemWithNote, 'width' | 'height' | 'rotation'>>) {
-    if (!selectedItem) return
-    onUpdateLayout(selectedItem, clampLayout({
-      x: selectedItem.x,
-      y: selectedItem.y,
-      width: change.width ?? selectedItem.width,
-      height: change.height ?? selectedItem.height,
-      rotation: change.rotation ?? selectedItem.rotation,
-    }))
+    setEditingItemId(activeItem.id)
   }
 
   return (
@@ -113,7 +210,7 @@ export function JournalInspector({
           <div className="min-w-0 flex-1">
             <p className="text-xs uppercase tracking-wide text-text-muted">Selected sticker</p>
             <h3 className="mt-1 line-clamp-2 text-base font-semibold text-text-primary">
-              {selectedItem.note.title || 'Untitled'}
+              {noteTitle || 'Untitled'}
             </h3>
           </div>
           {variant === 'popover' && onClose && (
@@ -128,24 +225,24 @@ export function JournalInspector({
           )}
         </div>
         <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-text-secondary">
-          {selectedItem.note.plain_text || 'No content yet'}
+          {notePlainText || 'No content yet'}
         </p>
       </div>
 
       <div className="mb-5 flex gap-2">
         <button
           type="button"
-          onClick={() => onToggleFavorite(selectedItem.note.id)}
+          onClick={() => onToggleFavorite(noteId)}
           className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
-            selectedItem.note.favorite
+            noteFavorite
               ? 'border-pink-200 bg-pink-50 text-pink-500'
               : 'border-border-color bg-bg-primary text-text-muted hover:text-pink-500'
           }`}
           title="Favorite"
         >
-          <Heart size={16} fill={selectedItem.note.favorite ? 'currentColor' : 'none'} />
+          <Heart size={16} fill={noteFavorite ? 'currentColor' : 'none'} />
         </button>
-        <Link to={`/oshis/${oshiId}/notes/${selectedItem.note.id}`} className="flex-1">
+        <Link to={`/oshis/${oshiId}/notes/${noteId}`} className="flex-1">
           <Button variant="secondary" size="sm" className="w-full">
             <ExternalLink size={15} />
             Full editor
@@ -174,8 +271,8 @@ export function JournalInspector({
             </div>
             <div className="h-72 overflow-hidden">
               <TipTapEditor
-                key={selectedItem.note.id}
-                content={parseNoteContent(selectedItem.note.content)}
+                key={noteId}
+                content={parseNoteContent(noteContent)}
                 onUpdate={(json, textValue) => {
                   editorRef.current = { json, text: textValue }
                 }}

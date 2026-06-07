@@ -7,7 +7,10 @@ import type {
   JournalCoverDecoration,
   JournalCoverStyle,
   JournalPage,
+  JournalPageType,
   JournalStickerStyle,
+  Illustration,
+  IllustrationRow,
   Note,
   NoteRow,
 } from '../../types'
@@ -16,14 +19,34 @@ import { createInitialLayout } from './journalLayout'
 interface JoinedJournalItemRow extends JournalItemRow {
   note_oshi_id: string | null
   note_archive_id: string | null
-  note_title: string
-  note_content: string
-  note_plain_text: string
-  note_source_url: string
-  note_tags: string
-  note_favorite: number
-  note_created_at: string
-  note_updated_at: string
+  note_title: string | null
+  note_content: string | null
+  note_plain_text: string | null
+  note_source_url: string | null
+  note_tags: string | null
+  note_favorite: number | null
+  note_created_at: string | null
+  note_updated_at: string | null
+  illustration_oshi_id: string | null
+  illustration_category: string | null
+  illustration_title: string | null
+  illustration_original_path: string | null
+  illustration_thumbnail_path: string | null
+  illustration_original_filename: string | null
+  illustration_mime_type: string | null
+  illustration_file_size: number | null
+  illustration_width: number | null
+  illustration_height: number | null
+  illustration_date: string | null
+  illustration_owner: string | null
+  illustration_artist: string | null
+  illustration_source_url: string | null
+  illustration_tags: string | null
+  illustration_description: string | null
+  illustration_favorite: number | null
+  illustration_archived: number | null
+  illustration_created_at: string | null
+  illustration_updated_at: string | null
 }
 
 export interface JournalLayoutUpdate {
@@ -41,12 +64,17 @@ export interface JournalStyleUpdate {
   border_style?: string | null
 }
 
+interface JournalPageRow extends Omit<JournalPage, 'page_type' | 'standalone'> {
+  page_type: string
+  standalone: number
+}
+
 export async function fetchJournalBooks(oshiId: string): Promise<JournalBook[]> {
   const db = await getDb()
   const rows = await db.select<JournalBook[]>(
     `SELECT jb.*, COUNT(jp.id) as page_count
      FROM journal_books jb
-     LEFT JOIN journal_pages jp ON jp.book_id = jb.id
+     LEFT JOIN journal_pages jp ON jp.book_id = jb.id AND jp.standalone = 0
      WHERE jb.oshi_id = ?
      GROUP BY jb.id
      ORDER BY jb.sort_order ASC, jb.created_at ASC`,
@@ -124,10 +152,22 @@ export async function deleteJournalBook(id: string): Promise<void> {
 
 export async function fetchJournalPages(bookId: string): Promise<JournalPage[]> {
   const db = await getDb()
-  return db.select<JournalPage[]>(
-    'SELECT * FROM journal_pages WHERE book_id = ? ORDER BY page_index ASC',
+  const rows = await db.select<JournalPageRow[]>(
+    'SELECT * FROM journal_pages WHERE book_id = ? AND standalone = 0 ORDER BY page_index ASC',
     [bookId]
   )
+  return rows.map(deserializePage)
+}
+
+export async function fetchStandalonePostcards(oshiId: string): Promise<JournalPage[]> {
+  const db = await getDb()
+  const rows = await db.select<JournalPageRow[]>(
+    `SELECT * FROM journal_pages
+     WHERE oshi_id = ? AND page_type = 'postcard' AND standalone = 1
+     ORDER BY updated_at DESC, created_at DESC`,
+    [oshiId]
+  )
+  return rows.map(deserializePage)
 }
 
 export async function ensureJournalPage(bookId: string): Promise<JournalPage> {
@@ -138,31 +178,77 @@ export async function ensureJournalPage(bookId: string): Promise<JournalPage> {
 
 export async function createJournalPage(bookId: string, title?: string): Promise<JournalPage> {
   const db = await getDb()
+  const bookRows = await db.select<{ oshi_id: string }[]>('SELECT oshi_id FROM journal_books WHERE id = ?', [bookId])
+  const oshiId = bookRows[0]?.oshi_id || ''
   const rows = await db.select<{ next_index: number }[]>(
-    'SELECT COALESCE(MAX(page_index), -1) + 1 as next_index FROM journal_pages WHERE book_id = ?',
+    'SELECT COALESCE(MAX(page_index), -1) + 1 as next_index FROM journal_pages WHERE book_id = ? AND standalone = 0',
     [bookId]
   )
   const id = generateId()
   const pageIndex = rows[0]?.next_index ?? 0
   await db.execute(
-    `INSERT INTO journal_pages (id, book_id, title, page_index, background)
-     VALUES (?, ?, ?, ?, 'paper')`,
-    [id, bookId, title || `Page ${pageIndex + 1}`, pageIndex]
+    `INSERT INTO journal_pages (id, book_id, oshi_id, page_type, title, page_index, background, standalone)
+     VALUES (?, ?, ?, 'book_page', ?, ?, 'paper', 0)`,
+    [id, bookId, oshiId, title || `Page ${pageIndex + 1}`, pageIndex]
+  )
+  return (await fetchJournalPageById(id))!
+}
+
+export async function createStandalonePostcard(oshiId: string, title: string): Promise<JournalPage> {
+  const db = await getDb()
+  const id = generateId()
+  const label = String(new Date().getFullYear())
+  await db.execute(
+    `INSERT INTO journal_pages
+     (id, book_id, oshi_id, page_type, title, description, date_label, page_index, background, standalone)
+     VALUES (?, NULL, ?, 'postcard', ?, '', ?, 0, 'postcard', 1)`,
+    [id, oshiId, title, label]
   )
   return (await fetchJournalPageById(id))!
 }
 
 export async function updateJournalPage(
   id: string,
-  input: Partial<Pick<JournalPage, 'title' | 'background'>>
+  input: Partial<Pick<JournalPage, 'title' | 'description' | 'date_label' | 'background'>>
 ): Promise<void> {
   const db = await getDb()
   const sets: string[] = []
   const params: unknown[] = []
   if (input.title !== undefined) { sets.push('title = ?'); params.push(input.title) }
+  if (input.description !== undefined) { sets.push('description = ?'); params.push(input.description) }
+  if (input.date_label !== undefined) { sets.push('date_label = ?'); params.push(input.date_label) }
   if (input.background !== undefined) { sets.push('background = ?'); params.push(input.background) }
   sets.push("updated_at = datetime('now', 'localtime')")
   await db.execute(`UPDATE journal_pages SET ${sets.join(', ')} WHERE id = ?`, [...params, id])
+}
+
+export async function collectPostcardIntoBook(pageId: string, bookId: string): Promise<void> {
+  const db = await getDb()
+  const rows = await db.select<{ next_index: number }[]>(
+    'SELECT COALESCE(MAX(page_index), -1) + 1 as next_index FROM journal_pages WHERE book_id = ? AND standalone = 0',
+    [bookId]
+  )
+  await db.execute(
+    `UPDATE journal_pages
+     SET book_id = ?, standalone = 0, page_index = ?, updated_at = datetime('now', 'localtime')
+     WHERE id = ?`,
+    [bookId, rows[0]?.next_index ?? 0, pageId]
+  )
+}
+
+export async function detachPageToPostcard(pageId: string, oshiId: string): Promise<void> {
+  const db = await getDb()
+  await db.execute(
+    `UPDATE journal_pages
+     SET book_id = NULL,
+         oshi_id = ?,
+         page_type = 'postcard',
+         standalone = 1,
+         page_index = 0,
+         updated_at = datetime('now', 'localtime')
+     WHERE id = ?`,
+    [oshiId, pageId]
+  )
 }
 
 export async function deleteJournalPage(id: string): Promise<void> {
@@ -185,9 +271,30 @@ export async function fetchJournalItems(pageId: string): Promise<JournalItemWith
        n.tags as note_tags,
        n.favorite as note_favorite,
        n.created_at as note_created_at,
-       n.updated_at as note_updated_at
+       n.updated_at as note_updated_at,
+       i.oshi_id as illustration_oshi_id,
+       i.category as illustration_category,
+       i.title as illustration_title,
+       i.original_path as illustration_original_path,
+       i.thumbnail_path as illustration_thumbnail_path,
+       i.original_filename as illustration_original_filename,
+       i.mime_type as illustration_mime_type,
+       i.file_size as illustration_file_size,
+       i.width as illustration_width,
+       i.height as illustration_height,
+       i.date as illustration_date,
+       i.owner as illustration_owner,
+       i.artist as illustration_artist,
+       i.source_url as illustration_source_url,
+       i.tags as illustration_tags,
+       i.description as illustration_description,
+       i.favorite as illustration_favorite,
+       i.archived as illustration_archived,
+       i.created_at as illustration_created_at,
+       i.updated_at as illustration_updated_at
      FROM journal_items ji
-     JOIN notes n ON n.id = ji.note_id
+     LEFT JOIN notes n ON n.id = ji.note_id
+     LEFT JOIN illustrations i ON i.id = ji.illustration_id
      WHERE ji.page_id = ?
      ORDER BY ji.z_index ASC, ji.created_at ASC`,
     [pageId]
@@ -260,6 +367,40 @@ export async function createJournalItemForNote(pageId: string, noteId: string): 
   return (await fetchJournalItemById(id))!
 }
 
+export async function createJournalItemForIllustration(pageId: string, illustrationId: string): Promise<JournalItem> {
+  const db = await getDb()
+  const existing = await db.select<JournalItemRow[]>(
+    'SELECT * FROM journal_items WHERE page_id = ? AND illustration_id = ?',
+    [pageId, illustrationId]
+  )
+  if (existing[0]) return deserializeItem(existing[0])
+
+  const rows = await db.select<{ count: number }[]>(
+    'SELECT COUNT(*) as count FROM journal_items WHERE page_id = ?',
+    [pageId]
+  )
+  const layout = createInitialLayout(rows[0]?.count || 0)
+  const id = generateId()
+  await db.execute(
+    `INSERT INTO journal_items
+     (id, page_id, illustration_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color)
+     VALUES (?, ?, ?, 'illustration', ?, ?, ?, ?, ?, ?, 'memo', ?)`,
+    [
+      id,
+      pageId,
+      illustrationId,
+      layout.x,
+      layout.y,
+      Math.max(260, layout.width),
+      Math.max(220, layout.height),
+      layout.rotation,
+      layout.z_index,
+      '#eef6ff',
+    ]
+  )
+  return (await fetchJournalItemById(id))!
+}
+
 export async function fetchUnplacedNotes(pageId: string, oshiId: string): Promise<Note[]> {
   const db = await getDb()
   const rows = await db.select<NoteRow[]>(
@@ -273,6 +414,22 @@ export async function fetchUnplacedNotes(pageId: string, oshiId: string): Promis
     [oshiId, pageId]
   )
   return rows.map(deserializeNote)
+}
+
+export async function fetchUnplacedIllustrations(pageId: string, oshiId: string): Promise<Illustration[]> {
+  const db = await getDb()
+  const rows = await db.select<IllustrationRow[]>(
+    `SELECT i.* FROM illustrations i
+     WHERE i.archived = 0
+       AND (i.oshi_id = ? OR i.oshi_id IS NULL)
+       AND NOT EXISTS (
+         SELECT 1 FROM journal_items ji
+         WHERE ji.page_id = ? AND ji.illustration_id = i.id
+       )
+     ORDER BY COALESCE(i.date, i.created_at) DESC, i.created_at DESC`,
+    [oshiId, pageId]
+  )
+  return rows.map(deserializeIllustration)
 }
 
 export async function updateJournalItemLayout(id: string, input: JournalLayoutUpdate): Promise<void> {
@@ -305,8 +462,8 @@ export async function removeJournalItem(id: string): Promise<void> {
 
 async function fetchJournalPageById(id: string): Promise<JournalPage | null> {
   const db = await getDb()
-  const rows = await db.select<JournalPage[]>('SELECT * FROM journal_pages WHERE id = ?', [id])
-  return rows[0] || null
+  const rows = await db.select<JournalPageRow[]>('SELECT * FROM journal_pages WHERE id = ?', [id])
+  return rows[0] ? deserializePage(rows[0]) : null
 }
 
 async function fetchJournalBookById(id: string): Promise<JournalBook | null> {
@@ -314,12 +471,22 @@ async function fetchJournalBookById(id: string): Promise<JournalBook | null> {
   const rows = await db.select<JournalBook[]>(
     `SELECT jb.*, COUNT(jp.id) as page_count
      FROM journal_books jb
-     LEFT JOIN journal_pages jp ON jp.book_id = jb.id
+     LEFT JOIN journal_pages jp ON jp.book_id = jb.id AND jp.standalone = 0
      WHERE jb.id = ?
      GROUP BY jb.id`,
     [id]
   )
   return rows[0] ? deserializeBook(rows[0]) : null
+}
+
+function deserializePage(row: JournalPageRow): JournalPage {
+  return {
+    ...row,
+    page_type: isPageType(row.page_type) ? row.page_type : 'book_page',
+    standalone: row.standalone === 1,
+    description: row.description || '',
+    date_label: row.date_label || '',
+  }
 }
 
 async function fetchJournalItemById(id: string): Promise<JournalItem | null> {
@@ -331,7 +498,7 @@ async function fetchJournalItemById(id: string): Promise<JournalItem | null> {
 async function fetchJournalItemNoteIds(pageId: string): Promise<Set<string>> {
   const db = await getDb()
   const rows = await db.select<{ note_id: string }[]>(
-    'SELECT note_id FROM journal_items WHERE page_id = ?',
+    'SELECT note_id FROM journal_items WHERE page_id = ? AND note_id IS NOT NULL',
     [pageId]
   )
   return new Set(rows.map((row) => row.note_id))
@@ -340,26 +507,49 @@ async function fetchJournalItemNoteIds(pageId: string): Promise<Set<string>> {
 function deserializeJoinedItem(row: JoinedJournalItemRow): JournalItemWithNote {
   return {
     ...deserializeItem(row),
-    note: deserializeNote({
+    note: row.note_id && row.note_title !== null ? deserializeNote({
       id: row.note_id,
       oshi_id: row.note_oshi_id,
       archive_id: row.note_archive_id,
-      title: row.note_title,
-      content: row.note_content,
-      plain_text: row.note_plain_text,
-      source_url: row.note_source_url,
-      tags: row.note_tags,
-      favorite: row.note_favorite,
-      created_at: row.note_created_at,
-      updated_at: row.note_updated_at,
-    }),
+      title: row.note_title || '',
+      content: row.note_content || '{}',
+      plain_text: row.note_plain_text || '',
+      source_url: row.note_source_url || '',
+      tags: row.note_tags || '[]',
+      favorite: row.note_favorite || 0,
+      created_at: row.note_created_at || '',
+      updated_at: row.note_updated_at || '',
+    }) : null,
+    illustration: row.illustration_id && row.illustration_title !== null ? deserializeIllustration({
+      id: row.illustration_id,
+      oshi_id: row.illustration_oshi_id,
+      category: row.illustration_category || 'official',
+      title: row.illustration_title || '',
+      original_path: row.illustration_original_path || '',
+      thumbnail_path: row.illustration_thumbnail_path,
+      original_filename: row.illustration_original_filename || '',
+      mime_type: row.illustration_mime_type || '',
+      file_size: row.illustration_file_size || 0,
+      width: row.illustration_width,
+      height: row.illustration_height,
+      date: row.illustration_date,
+      owner: row.illustration_owner || '',
+      artist: row.illustration_artist || '',
+      source_url: row.illustration_source_url || '',
+      tags: row.illustration_tags || '[]',
+      description: row.illustration_description || '',
+      favorite: row.illustration_favorite || 0,
+      archived: row.illustration_archived || 0,
+      created_at: row.illustration_created_at || '',
+      updated_at: row.illustration_updated_at || '',
+    }) : null,
   }
 }
 
 function deserializeItem(row: JournalItemRow): JournalItem {
   return {
     ...row,
-    item_type: 'note',
+    item_type: row.item_type === 'illustration' ? 'illustration' : 'note',
     sticker_style: isStickerStyle(row.sticker_style) ? row.sticker_style : 'sticky',
   }
 }
@@ -369,6 +559,25 @@ function deserializeNote(row: NoteRow): Note {
     ...row,
     tags: JSON.parse(row.tags || '[]'),
     favorite: row.favorite === 1,
+  }
+}
+
+function deserializeIllustration(row: IllustrationRow): Illustration {
+  return {
+    ...row,
+    category: row.category === 'fanart' ? 'fanart' : 'official',
+    tags: parseJsonStringArray(row.tags),
+    favorite: row.favorite === 1,
+    archived: row.archived === 1,
+  }
+}
+
+function parseJsonStringArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value || '[]')
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
   }
 }
 
@@ -383,6 +592,10 @@ function deserializeBook(row: JournalBook): JournalBook {
 
 function isStickerStyle(value: string): value is JournalStickerStyle {
   return value === 'sticky' || value === 'memo' || value === 'ticket'
+}
+
+function isPageType(value: string): value is JournalPageType {
+  return value === 'book_page' || value === 'postcard'
 }
 
 function isCoverStyle(value: string): value is JournalCoverStyle {

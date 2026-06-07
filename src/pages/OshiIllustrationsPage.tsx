@@ -312,7 +312,7 @@ function IllustrationMasonry({
   )
 }
 
-function IllustrationCreateModal({
+export function IllustrationCreateModal({
   oshiId,
   oshis,
   onClose,
@@ -495,7 +495,7 @@ function IllustrationCreateModal({
   )
 }
 
-function IllustrationDetailDrawer({
+export function IllustrationDetailDrawer({
   illustration,
   oshis,
   onClose,
@@ -733,7 +733,7 @@ function IllustrationFormFields({
   )
 }
 
-function MediaImage({ path, alt, className }: { path: string | null; alt: string; className?: string }) {
+export function MediaImage({ path, alt, className }: { path: string | null; alt: string; className?: string }) {
   const [src, setSrc] = useState('')
   useEffect(() => {
     let alive = true
@@ -817,10 +817,10 @@ function OshiSelectField({
 const fieldClassName = 'w-full rounded-xl border border-border-color bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft'
 
 function parseTagInput(value: string): string[] {
-  return Array.from(new Set(value.replaceAll('，', ',').split(',').map((tag) => tag.trim()).filter(Boolean)))
+  return Array.from(new Set(value.replace(/\uFF0C/g, ',').split(',').map((tag) => tag.trim()).filter(Boolean)))
 }
 
-function formatDate(value: string): string {
+export function formatDate(value: string): string {
   const date = new Date(value.replace(' ', 'T'))
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString()
@@ -859,7 +859,7 @@ function formatUrlLabel(value: string): string {
   }
 }
 
-function getOshiName(oshis: Oshi[], oshiId: string | null): string {
+export function getOshiName(oshis: Oshi[], oshiId: string | null): string {
   if (!oshiId) return 'No Oshi'
   return oshis.find((oshi) => oshi.id === oshiId)?.name || 'Unknown Oshi'
 }

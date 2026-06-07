@@ -17,6 +17,8 @@ export async function fetchIllustrations(params: IllustrationSearchParams): Prom
   if (params.oshiId) {
     conditions.push('oshi_id = ?')
     bindings.push(params.oshiId)
+  } else if (params.unassigned) {
+    conditions.push('oshi_id IS NULL')
   }
   if (params.category) {
     conditions.push('category = ?')

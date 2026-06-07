@@ -133,6 +133,7 @@ export interface UpdateIllustrationInput {
 
 export interface IllustrationSearchParams {
   oshiId?: string
+  unassigned?: boolean
   category?: IllustrationCategory
   favorite?: boolean
   query?: string
@@ -147,7 +148,8 @@ export type UiMotionDuration = 'off' | 'fast' | 'normal' | 'slow'
 export type ViewMode = 'card' | 'list' | 'graph' | 'journal'
 export type CardStyle = 'basic' | 'sticky' | 'bookshelf' | 'postcard'
 export type JournalStickerStyle = 'sticky' | 'memo' | 'ticket'
-export type JournalItemType = 'note'
+export type JournalItemType = 'note' | 'illustration'
+export type JournalPageType = 'book_page' | 'postcard'
 export type JournalCoverStyle = 'classic' | 'cloth' | 'paper' | 'night' | 'postcard' | 'minimal'
 export type JournalCoverDecoration = 'none' | 'flower' | 'moon' | 'heart' | 'camera' | 'ticket'
 
@@ -168,8 +170,13 @@ export interface JournalBook {
 
 export interface JournalPage {
   id: string
-  book_id: string
+  book_id: string | null
+  oshi_id: string
+  page_type: JournalPageType
   title: string
+  description: string
+  date_label: string
+  standalone: boolean
   page_index: number
   background: string
   created_at: string
@@ -179,7 +186,8 @@ export interface JournalPage {
 export interface JournalItem {
   id: string
   page_id: string
-  note_id: string
+  note_id: string | null
+  illustration_id: string | null
   item_type: JournalItemType
   x: number
   y: number
@@ -200,7 +208,8 @@ export interface JournalItemRow extends Omit<JournalItem, 'item_type' | 'sticker
 }
 
 export interface JournalItemWithNote extends JournalItem {
-  note: Note
+  note: Note | null
+  illustration: Illustration | null
 }
 
 export interface BackgroundFilters {

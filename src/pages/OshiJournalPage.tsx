@@ -21,7 +21,7 @@ export function OshiJournalPage() {
       <OshiModuleHeader
         oshiId={oshiId}
         title="Journal"
-        subtitle={`Memory books and scrapbook pages${oshi ? ` for ${oshi.name}` : ''}.`}
+        subtitle={`Archives and loose pages${oshi ? ` for ${oshi.name}` : ''}.`}
         icon={BookOpen}
       />
       <div className="min-h-0 flex-1 overflow-hidden">

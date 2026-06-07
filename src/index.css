@@ -10,13 +10,13 @@
 
 :root {
   --ui-motion-duration: 0.18s;
-  --journal-canvas-bg: #fffdf8;
-  --journal-canvas-dot: rgba(160, 130, 120, 0.18);
-  --journal-sticker-1: #fff1f5;
-  --journal-sticker-2: #eef6ff;
-  --journal-sticker-3: #fff7d6;
-  --journal-sticker-4: #f3f0ff;
-  --journal-sticker-5: #edf7ed;
+  --journal-canvas-bg: color-mix(in srgb, var(--color-bg-primary, #fffdf8) 86%, white);
+  --journal-canvas-dot: color-mix(in srgb, var(--color-accent, #EC4899) 28%, transparent);
+  --journal-sticker-1: color-mix(in srgb, var(--color-bg-card, white) 78%, var(--color-accent-soft, #F9A8D4));
+  --journal-sticker-2: color-mix(in srgb, var(--color-bg-card, white) 72%, var(--color-bg-secondary, #FFE4E6));
+  --journal-sticker-3: color-mix(in srgb, var(--color-bg-card, white) 82%, var(--color-accent, #EC4899));
+  --journal-sticker-4: color-mix(in srgb, var(--color-bg-card, white) 76%, var(--color-bg-tertiary, #FCE7F3));
+  --journal-sticker-5: color-mix(in srgb, var(--color-bg-card, white) 84%, var(--color-text-secondary, #831843));
 }
 
 *,

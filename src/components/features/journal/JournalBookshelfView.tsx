@@ -5,6 +5,8 @@ import {
   BookOpen,
   Camera,
   Check,
+  ChevronDown,
+  FileImage,
   Flower2,
   Grid3X3,
   Heart,
@@ -22,12 +24,13 @@ import {
 } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { useJournalStore } from '../../../stores/journalStore'
-import type { JournalBook, JournalCoverDecoration, JournalCoverStyle } from '../../../types'
+import type { JournalBook, JournalCoverDecoration, JournalCoverStyle, JournalPage } from '../../../types'
 import { usePageTransition, usePanelTransition, usePopoverTransition, useUiMotionSeconds } from '../themes/uiMotion'
 
 interface JournalBookshelfViewProps {
   oshiId: string
   onOpenBook: (book: JournalBook) => void
+  onOpenPostcard: (postcard: JournalPage) => void
 }
 
 interface BookDraft {
@@ -40,6 +43,7 @@ interface BookDraft {
 }
 
 type BookshelfViewMode = 'grid' | 'list'
+type CreateKind = 'book' | 'postcard'
 
 const COVER_COLORS = ['#c9c5f3', '#f2c4ce', '#d7e4f5', '#efe2cc', '#29314b', '#e8e5dd', '#c9dfd2', '#f4d9b9']
 const COVER_STYLES: { id: JournalCoverStyle; label: string }[] = [
@@ -47,7 +51,7 @@ const COVER_STYLES: { id: JournalCoverStyle; label: string }[] = [
   { id: 'paper', label: 'Paper' },
   { id: 'classic', label: 'Classic' },
   { id: 'night', label: 'Night' },
-  { id: 'postcard', label: 'Postcard' },
+  { id: 'postcard', label: 'Loose page' },
   { id: 'minimal', label: 'Minimal' },
 ]
 const COVER_DECORATIONS: { id: JournalCoverDecoration; label: string }[] = [
@@ -59,13 +63,16 @@ const COVER_DECORATIONS: { id: JournalCoverDecoration; label: string }[] = [
   { id: 'ticket', label: 'Ticket' },
 ]
 
-export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfViewProps) {
-  const { books, loading, error, createBook, updateBook, deleteBook } = useJournalStore()
+export function JournalBookshelfView({ oshiId, onOpenBook, onOpenPostcard }: JournalBookshelfViewProps) {
+  const { books, postcards, loading, error, createBook, createPostcard, updateBook, deleteBook, collectPostcard } = useJournalStore()
   const motionSeconds = useUiMotionSeconds()
   const pageTransition = usePageTransition()
   const panelTransition = usePanelTransition()
+  const popoverTransition = usePopoverTransition()
   const [newTitle, setNewTitle] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [showCreateMenu, setShowCreateMenu] = useState(false)
+  const [createKind, setCreateKind] = useState<CreateKind>('book')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [menuBookId, setMenuBookId] = useState<string | null>(null)
   const [draft, setDraft] = useState<BookDraft>(createDraft())
@@ -82,10 +89,24 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
     )
   }, [books, query])
 
+  const filteredPostcards = useMemo(() => {
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) return postcards
+    return postcards.filter((postcard) =>
+      (postcard.title || '').toLowerCase().includes(normalized) ||
+      (postcard.description || '').toLowerCase().includes(normalized) ||
+      (postcard.date_label || '').toLowerCase().includes(normalized)
+    )
+  }, [postcards, query])
+
   async function handleCreate() {
     const title = newTitle.trim()
     if (!title) return
-    await createBook(oshiId, title)
+    if (createKind === 'postcard') {
+      await createPostcard(oshiId, title)
+    } else {
+      await createBook(oshiId, title)
+    }
     setNewTitle('')
     setShowCreate(false)
   }
@@ -112,32 +133,78 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
   }
 
   async function handleDelete(book: JournalBook) {
-    if (!confirm(`Delete journal "${book.title}"? Its pages and placed stickers will be removed. Original notes will be kept.`)) return
+    if (!confirm(`Delete archive "${book.title}"? Its pages and placed stickers will be removed. Original notes will be kept.`)) return
     await deleteBook(book.id, oshiId)
     setMenuBookId(null)
   }
 
   return (
-    <div className="min-h-full bg-bg-primary px-6 py-7 text-text-primary">
+    <div className="min-h-full bg-bg-primary px-6 py-6 text-text-primary">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-5 flex items-center gap-7 border-b border-border-color">
-          <button type="button" className="min-w-24 border-b-2 border-accent px-1 pb-3 text-sm font-semibold text-accent">Books</button>
-          <button type="button" className="min-w-24 px-1 pb-3 text-sm font-medium text-text-muted transition-colors hover:text-text-primary">Templates</button>
-        </div>
-
-        <div className="mb-8 flex flex-wrap items-center gap-3">
-          <div className="relative">
+        <div className="mb-7 flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1 sm:max-w-sm">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="w-64 rounded-2xl border border-border-color bg-bg-card py-2 pl-9 pr-3 text-sm text-text-primary shadow-sm outline-none transition-shadow placeholder:text-text-muted focus:ring-2 focus:ring-accent-soft/40"
-              placeholder="Search books..."
+              className="w-full rounded-2xl border border-border-color bg-bg-card py-2 pl-9 pr-3 text-sm text-text-primary shadow-sm outline-none transition-shadow placeholder:text-text-muted focus:ring-2 focus:ring-accent-soft/40"
+              placeholder="Search journal..."
             />
           </div>
           <button type="button" className="rounded-2xl border border-border-color bg-bg-card px-4 py-2 text-sm font-medium text-accent shadow-sm">
-            All Books
+            All
           </button>
+          <div className="relative">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setShowCreateMenu(!showCreateMenu)}
+              aria-expanded={showCreateMenu}
+            >
+              <Plus size={16} />
+              New
+              <ChevronDown size={15} />
+            </Button>
+            <AnimatePresence>
+              {showCreateMenu && (
+                <motion.div
+                  {...popoverTransition}
+                  className="absolute right-0 top-11 z-50 w-56 rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreateKind('book')
+                      setShowCreate(true)
+                      setShowCreateMenu(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary"
+                  >
+                    <BookOpen size={14} className="text-accent" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold">Archive</span>
+                      <span className="block text-xs text-text-muted">A folder-like collection of pages</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreateKind('postcard')
+                      setShowCreate(true)
+                      setShowCreateMenu(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary"
+                  >
+                    <FileImage size={14} className="text-accent" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold">Loose page</span>
+                      <span className="block text-xs text-text-muted">A single layout you can collect later</span>
+                    </span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <div className="ml-auto flex rounded-2xl border border-border-color bg-bg-card p-1 shadow-sm">
             <IconToggle active={viewMode === 'grid'} title="Grid view" onClick={() => setViewMode('grid')}><Grid3X3 size={16} /></IconToggle>
             <IconToggle active={viewMode === 'list'} title="List view" onClick={() => setViewMode('list')}><List size={16} /></IconToggle>
@@ -151,14 +218,30 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
               onSubmit={(event) => { event.preventDefault(); handleCreate() }}
               className="mb-8 flex max-w-md items-center gap-2 overflow-hidden rounded-2xl border border-border-color bg-bg-card p-3 shadow-sm"
             >
+              <div className="flex rounded-xl border border-border-color bg-bg-secondary p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setCreateKind('book')}
+                  className={clsx('rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors', createKind === 'book' ? 'bg-accent-soft/25 text-accent' : 'text-text-muted')}
+                >
+                  Archive
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreateKind('postcard')}
+                  className={clsx('rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors', createKind === 'postcard' ? 'bg-accent-soft/25 text-accent' : 'text-text-muted')}
+                >
+                  Loose page
+                </button>
+              </div>
               <input
                 autoFocus
                 value={newTitle}
                 onChange={(event) => setNewTitle(event.target.value)}
-                placeholder="Book title..."
+                placeholder={createKind === 'postcard' ? 'Loose page title...' : 'Archive title...'}
                 className="min-w-0 flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
               />
-              <button type="submit" className="rounded-lg p-1.5 text-accent hover:bg-bg-tertiary" title="Create book"><Check size={16} /></button>
+              <button type="submit" className="rounded-lg p-1.5 text-accent hover:bg-bg-tertiary" title="Create"><Check size={16} /></button>
               <button type="button" onClick={() => { setShowCreate(false); setNewTitle('') }} className="rounded-lg p-1.5 text-text-muted hover:bg-bg-tertiary" title="Cancel"><X size={16} /></button>
             </motion.form>
           )}
@@ -167,11 +250,11 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
         {loading && books.length === 0 && <Loader2 size={24} className="mx-auto mt-20 animate-spin text-accent" />}
         {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
-        {!loading && books.length === 0 && (
+        {!loading && books.length === 0 && postcards.length === 0 && (
           <div className="rounded-3xl border border-dashed border-border-color bg-bg-secondary/25 px-6 py-16 text-center">
             <BookOpen size={42} className="mx-auto mb-3 text-accent" />
-            <h3 className="text-base font-semibold text-text-primary">Your bookshelf is waiting</h3>
-            <p className="mt-1 text-sm text-text-muted">Create a journal to begin arranging notes into pages.</p>
+            <h3 className="text-base font-semibold text-text-primary">Your journal is waiting</h3>
+            <p className="mt-1 text-sm text-text-muted">Create an archive or a loose page to begin arranging memories.</p>
           </div>
         )}
 
@@ -182,6 +265,15 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
               {...pageTransition}
               className="grid grid-cols-2 gap-x-7 gap-y-10 md:grid-cols-3 xl:grid-cols-4"
             >
+              {filteredPostcards.map((postcard) => (
+                <LoosePageCard
+                  key={postcard.id}
+                  postcard={postcard}
+                  books={books}
+                  onOpen={() => onOpenPostcard(postcard)}
+                  onCollect={(bookId) => collectPostcard(postcard.id, bookId, oshiId)}
+                />
+              ))}
               {filteredBooks.map((book, index) => (
                 <JournalBookCard
                   key={book.id}
@@ -201,7 +293,10 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
               ))}
               <motion.button
                 type="button"
-                onClick={() => setShowCreate(true)}
+                onClick={() => {
+                  setCreateKind('book')
+                  setShowCreate(true)
+                }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 whileHover={{ y: -2 }}
@@ -210,8 +305,8 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
                 className="flex h-[262px] flex-col items-center justify-center rounded-2xl border border-dashed border-border-color bg-bg-secondary/20 text-accent transition-colors hover:border-border-hover hover:bg-bg-secondary/40"
               >
                 <Plus size={28} />
-                <span className="mt-4 text-sm font-semibold">New Book</span>
-                <span className="mt-1 text-xs text-text-muted">Create an empty book</span>
+                <span className="mt-4 text-sm font-semibold">New</span>
+                <span className="mt-1 text-xs text-text-muted">Create an archive or loose page</span>
               </motion.button>
             </motion.div>
           ) : (
@@ -239,6 +334,28 @@ export function JournalBookshelfView({ oshiId, onOpenBook }: JournalBookshelfVie
                   </div>
                   <span className="text-sm text-text-muted">{book.date_label || new Date(book.created_at).getFullYear()}</span>
                   <span className="text-sm text-text-muted">{book.page_count} pages</span>
+                </motion.button>
+              ))}
+              {filteredPostcards.map((postcard) => (
+                <motion.button
+                  key={postcard.id}
+                  type="button"
+                  onClick={() => onOpenPostcard(postcard)}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: motionSeconds, ease: 'easeOut' }}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="flex w-full items-center gap-4 rounded-2xl border border-border-color bg-bg-card p-3 text-left shadow-sm"
+                >
+                  <span className="flex h-20 w-28 shrink-0 items-center justify-center rounded-xl border border-border-color bg-[var(--journal-canvas-bg)] text-accent">
+                    <FileImage size={22} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-text-primary">{postcard.title || 'Untitled loose page'}</p>
+                    <p className="mt-1 line-clamp-1 text-sm text-text-muted">{postcard.description || 'Loose page'}</p>
+                  </div>
+                  <span className="text-sm text-text-muted">{postcard.date_label || new Date(postcard.created_at).getFullYear()}</span>
                 </motion.button>
               ))}
             </motion.div>
@@ -292,7 +409,7 @@ function JournalBookCard({
           type="button"
           onClick={onToggleMenu}
           className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-bg-card text-accent shadow-sm transition-colors hover:bg-bg-secondary"
-          title="Book actions"
+          title="Archive actions"
         >
           <MoreHorizontal size={16} />
         </button>
@@ -330,6 +447,62 @@ function JournalBookCard({
         <p className="mt-1 text-xs text-text-muted">{book.page_count} page{book.page_count === 1 ? '' : 's'}</p>
       </div>
     </motion.div>
+  )
+}
+
+function LoosePageCard({
+  postcard,
+  books,
+  onOpen,
+  onCollect,
+}: {
+  postcard: JournalPage
+  books: JournalBook[]
+  onOpen: () => void
+  onCollect: (bookId: string) => void
+}) {
+  const [showCollect, setShowCollect] = useState(false)
+  return (
+    <div className="relative rounded-2xl border border-border-color bg-bg-card p-3 shadow-sm">
+      <button type="button" onClick={onOpen} className="block w-full text-left">
+        <div className="relative aspect-[1.48] overflow-hidden rounded-xl border border-border-color bg-[var(--journal-canvas-bg)]">
+          <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(var(--journal-canvas-dot)_1px,transparent_1px)] [background-size:15px_15px]" />
+          <div className="absolute left-4 top-4 h-12 w-16 rotate-[-3deg] rounded-lg bg-[var(--journal-sticker-2)] shadow-sm" />
+          <div className="absolute bottom-4 right-4 h-10 w-20 rotate-[2deg] rounded-lg bg-[var(--journal-sticker-4)] shadow-sm" />
+          <FileImage size={24} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-accent" />
+        </div>
+        <p className="mt-3 truncate text-sm font-semibold text-text-primary">{postcard.title || 'Untitled loose page'}</p>
+        <p className="mt-1 text-xs text-text-muted">{postcard.date_label || new Date(postcard.created_at).getFullYear()}</p>
+      </button>
+      <div className="mt-3">
+        <Button variant="secondary" size="sm" className="w-full" onClick={() => setShowCollect(!showCollect)} disabled={books.length === 0}>
+          <BookOpen size={14} />
+          Collect into archive
+        </Button>
+      </div>
+      <AnimatePresence>
+        {showCollect && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute inset-x-3 top-[calc(100%-8px)] z-40 rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl"
+          >
+            {books.map((book) => (
+              <button
+                key={book.id}
+                type="button"
+                onClick={() => onCollect(book.id)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary"
+              >
+                <BookOpen size={14} className="text-accent" />
+                <span className="min-w-0 flex-1 truncate">{book.title}</span>
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -408,8 +581,8 @@ function BookEditor({
             <Palette size={18} />
           </span>
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-bold text-text-primary">Edit book</h3>
-            <p className="text-xs text-text-muted">Choose a cover style for this memory book.</p>
+            <h3 className="text-base font-bold text-text-primary">Edit archive</h3>
+            <p className="text-xs text-text-muted">Choose a cover style for this archive.</p>
           </div>
           <button type="button" onClick={onCancel} className="rounded-xl p-2 text-text-muted hover:bg-bg-tertiary hover:text-text-primary" title="Close">
             <X size={17} />
@@ -420,7 +593,7 @@ function BookEditor({
           value={draft.title}
           onChange={(event) => onChange({ ...draft, title: event.target.value })}
           className="mb-2 w-full rounded-2xl border border-border-color bg-bg-secondary px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-muted focus:ring-2 focus:ring-accent-soft/40"
-          placeholder="Book title"
+          placeholder="Archive title"
         />
         <input
           value={draft.date_label}

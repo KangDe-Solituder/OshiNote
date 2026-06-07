@@ -4,7 +4,7 @@ import { JournalBookshelfView } from './JournalBookshelfView'
 import { JournalPageView } from './JournalPageView'
 
 export function JournalWorkspace({ oshiId }: { oshiId: string }) {
-  const { books, activeBookId, loadBookshelf, closeBook } = useJournalStore()
+  const { books, postcards, activeBookId, activeStandalonePageId, loadBookshelf, closeBook } = useJournalStore()
 
   useEffect(() => {
     loadBookshelf(oshiId)
@@ -14,16 +14,27 @@ export function JournalWorkspace({ oshiId }: { oshiId: string }) {
     () => books.find((book) => book.id === activeBookId) || null,
     [activeBookId, books]
   )
+  const activePostcard = useMemo(
+    () => postcards.find((postcard) => postcard.id === activeStandalonePageId) || null,
+    [activeStandalonePageId, postcards]
+  )
 
-  if (!activeBook) {
-    return <JournalBookshelfView oshiId={oshiId} onOpenBook={(book) => useJournalStore.getState().openBook(book.id, oshiId)} />
+  if (!activeBook && !activePostcard) {
+    return (
+      <JournalBookshelfView
+        oshiId={oshiId}
+        onOpenBook={(book) => useJournalStore.getState().openBook(book.id, oshiId)}
+        onOpenPostcard={(postcard) => useJournalStore.getState().openPostcard(postcard.id, oshiId)}
+      />
+    )
   }
 
   return (
     <JournalPageView
       oshiId={oshiId}
-      bookId={activeBook.id}
-      bookTitle={activeBook.title}
+      bookId={activeBook?.id || null}
+      bookTitle={activeBook?.title || activePostcard?.title || 'Loose page'}
+      standalonePostcard={activePostcard}
       onBack={() => {
         closeBook()
         loadBookshelf(oshiId)

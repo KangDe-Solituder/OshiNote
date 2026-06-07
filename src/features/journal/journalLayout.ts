@@ -4,6 +4,8 @@ export const JOURNAL_PAGE = {
   width: 980,
   height: 700,
   padding: 36,
+  maxWidth: 2200,
+  maxHeight: 1600,
 }
 
 export const DEFAULT_STICKER = {
@@ -61,10 +63,10 @@ export function autoArrangeNotes(notes: Note[]): Map<string, JournalLayoutInput>
 export function clampLayout(input: JournalLayoutInput): JournalLayoutInput {
   const minWidth = 180
   const minHeight = 130
-  const width = Math.min(Math.max(input.width, minWidth), JOURNAL_PAGE.width - JOURNAL_PAGE.padding * 2)
-  const height = Math.min(Math.max(input.height, minHeight), JOURNAL_PAGE.height - JOURNAL_PAGE.padding * 2)
-  const x = Math.min(Math.max(input.x, JOURNAL_PAGE.padding / 2), JOURNAL_PAGE.width - width - JOURNAL_PAGE.padding / 2)
-  const y = Math.min(Math.max(input.y, JOURNAL_PAGE.padding / 2), JOURNAL_PAGE.height - height - JOURNAL_PAGE.padding / 2)
+  const width = Math.min(Math.max(input.width, minWidth), JOURNAL_PAGE.maxWidth - JOURNAL_PAGE.padding * 2)
+  const height = Math.min(Math.max(input.height, minHeight), JOURNAL_PAGE.maxHeight - JOURNAL_PAGE.padding * 2)
+  const x = Math.min(Math.max(input.x, JOURNAL_PAGE.padding / 2), JOURNAL_PAGE.maxWidth - width - JOURNAL_PAGE.padding / 2)
+  const y = Math.min(Math.max(input.y, JOURNAL_PAGE.padding / 2), JOURNAL_PAGE.maxHeight - height - JOURNAL_PAGE.padding / 2)
 
   return {
     x,
@@ -72,6 +74,16 @@ export function clampLayout(input: JournalLayoutInput): JournalLayoutInput {
     width,
     height,
     rotation: Math.min(Math.max(input.rotation, -18), 18),
+  }
+}
+
+export function getJournalCanvasSize(items: Pick<JournalItem, 'x' | 'y' | 'width' | 'height'>[]): { width: number; height: number } {
+  const contentWidth = items.reduce((max, item) => Math.max(max, item.x + item.width + JOURNAL_PAGE.padding), JOURNAL_PAGE.width)
+  const contentHeight = items.reduce((max, item) => Math.max(max, item.y + item.height + JOURNAL_PAGE.padding), JOURNAL_PAGE.height)
+
+  return {
+    width: Math.min(Math.max(JOURNAL_PAGE.width, Math.ceil(contentWidth)), JOURNAL_PAGE.maxWidth),
+    height: Math.min(Math.max(JOURNAL_PAGE.height, Math.ceil(contentHeight)), JOURNAL_PAGE.maxHeight),
   }
 }
 

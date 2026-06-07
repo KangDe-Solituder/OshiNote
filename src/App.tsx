@@ -15,6 +15,7 @@ import { ExportPage } from './pages/ExportPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { NotesPage } from './pages/NotesPage'
 import { OshiIllustrationsPage } from './pages/OshiIllustrationsPage'
+import { IllustrationsPage } from './pages/IllustrationsPage'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="notes" element={<NotesPage />} />
               <Route path="notes/new" element={<NoteEditorPage />} />
               <Route path="notes/:noteId" element={<NoteEditorPage />} />
+              <Route path="illustrations" element={<IllustrationsPage />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="tags/:tagName" element={<TagDetailPage />} />
               <Route path="export" element={<ExportPage />} />

@@ -132,7 +132,7 @@ export function OshiOverviewPage() {
         <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard icon={FileText} label="Notes" value={stats.notes} to={`/oshis/${oshiId}/notes`} />
           <StatCard icon={ImageIcon} label="Illustrations" value={stats.illustrations} to={`/oshis/${oshiId}/illustrations`} />
-          <StatCard icon={BookOpen} label="Journal Books" value={stats.books} to={`/oshis/${oshiId}/journal`} />
+          <StatCard icon={BookOpen} label="Journal Archives" value={stats.books} to={`/oshis/${oshiId}/journal`} />
           <StatCard icon={Tag} label="Tags" value={stats.tags} to={`/oshis/${oshiId}/tags`} />
         </section>
 
@@ -175,9 +175,9 @@ export function OshiOverviewPage() {
             </section>
 
             <section className="rounded-2xl border border-border-color bg-bg-card p-5">
-              <SectionHeader title="Recent Journal Books" to={`/oshis/${oshiId}/journal`} />
+              <SectionHeader title="Recent Journal Archives" to={`/oshis/${oshiId}/journal`} />
               {books.length === 0 ? (
-                <EmptyLine text="No journal books yet." action="Open Journal" to={`/oshis/${oshiId}/journal`} />
+                <EmptyLine text="No journal archives yet." action="Open Journal" to={`/oshis/${oshiId}/journal`} />
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {books.map((book) => (

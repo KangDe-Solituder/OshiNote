@@ -85,19 +85,26 @@ export const MIGRATIONS = [
 
   `CREATE TABLE IF NOT EXISTS journal_pages (
     id         TEXT PRIMARY KEY,
-    book_id    TEXT NOT NULL,
+    book_id    TEXT,
+    oshi_id    TEXT NOT NULL DEFAULT '',
+    page_type  TEXT NOT NULL DEFAULT 'book_page',
     title      TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    date_label TEXT NOT NULL DEFAULT '',
+    standalone INTEGER NOT NULL DEFAULT 0,
     page_index INTEGER NOT NULL DEFAULT 0,
     background TEXT NOT NULL DEFAULT 'paper',
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    FOREIGN KEY (book_id) REFERENCES journal_books(id) ON DELETE CASCADE
+    FOREIGN KEY (book_id) REFERENCES journal_books(id) ON DELETE CASCADE,
+    FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE
   )`,
 
   `CREATE TABLE IF NOT EXISTS journal_items (
     id            TEXT PRIMARY KEY,
     page_id       TEXT NOT NULL,
-    note_id       TEXT NOT NULL,
+    note_id       TEXT,
+    illustration_id TEXT,
     item_type     TEXT NOT NULL DEFAULT 'note',
     x             REAL NOT NULL DEFAULT 0,
     y             REAL NOT NULL DEFAULT 0,
@@ -111,7 +118,8 @@ export const MIGRATIONS = [
     created_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (page_id) REFERENCES journal_pages(id) ON DELETE CASCADE,
-    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+    FOREIGN KEY (illustration_id) REFERENCES illustrations(id) ON DELETE CASCADE
   )`,
 
   `CREATE INDEX IF NOT EXISTS idx_journal_items_page ON journal_items(page_id)`,
