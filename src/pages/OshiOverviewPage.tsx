@@ -179,11 +179,19 @@ export function OshiOverviewPage() {
               {books.length === 0 ? (
                 <EmptyLine text="No journal archives yet." action="Open Journal" to={`/oshis/${oshiId}/journal`} />
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2">
                   {books.map((book) => (
-                    <Link key={book.id} to={`/oshis/${oshiId}/journal`} className="rounded-xl border border-border-color bg-bg-secondary p-3 transition-colors hover:border-accent">
-                      <div className="aspect-[0.72] rounded-lg border border-white/20" style={{ backgroundColor: book.cover_color }} />
-                      <p className="mt-2 truncate text-xs font-semibold text-text-primary">{book.title}</p>
+                    <Link
+                      key={book.id}
+                      to={`/oshis/${oshiId}/journal`}
+                      className="flex min-h-[132px] gap-3 rounded-xl border border-border-color bg-bg-secondary p-3 transition-colors hover:border-accent"
+                    >
+                      <OverviewJournalBookCover book={book} />
+                      <div className="min-w-0 flex-1 self-center">
+                        <p className="truncate text-sm font-semibold text-text-primary">{book.title}</p>
+                        <p className="mt-1 text-xs text-text-muted">{book.date_label || new Date(book.created_at).getFullYear()}</p>
+                        <p className="mt-1 text-xs text-text-muted">{book.page_count} page{book.page_count === 1 ? '' : 's'}</p>
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -251,6 +259,30 @@ function OverviewMediaImage({ path, alt }: { path: string | null; alt: string })
   }, [path])
   if (!src) return <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={20} /></div>
   return <img src={src} alt={alt} className="h-full w-full object-cover" />
+}
+
+function OverviewJournalBookCover({ book }: { book: JournalBook }) {
+  const isDark = book.cover_style === 'night'
+  return (
+    <div
+      className="journal-book-cover relative h-[108px] w-[76px] shrink-0 overflow-hidden rounded-r-xl rounded-l-lg border shadow-sm"
+      style={{
+        backgroundColor: book.cover_color || '#c9c5f3',
+        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(80,95,130,0.16)',
+      }}
+    >
+      <span className="absolute inset-y-0 left-0 w-3 bg-black/10 shadow-[inset_-2px_0_2px_rgba(255,255,255,0.22)]" />
+      <span className="pointer-events-none absolute inset-0 opacity-55 [background-image:linear-gradient(90deg,rgba(255,255,255,0.24)_0,rgba(255,255,255,0)_28%),radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.5)_0,rgba(255,255,255,0)_18%),radial-gradient(circle_at_82%_70%,rgba(0,0,0,0.09)_0,rgba(0,0,0,0)_22%)]" />
+      <span className="pointer-events-none absolute inset-2 rounded-lg border border-white/24" />
+      <div className={`absolute inset-x-4 top-[32%] truncate text-center text-xs font-semibold ${isDark ? 'text-white/80' : 'text-[#56667f]'}`}>
+        {book.title}
+      </div>
+      <div className={`absolute inset-x-4 top-[52%] truncate text-center text-[10px] ${isDark ? 'text-white/55' : 'text-[#7c8da5]'}`}>
+        {book.date_label || new Date(book.created_at).getFullYear()}
+      </div>
+      <BookOpen size={20} className={`absolute bottom-5 left-1/2 -translate-x-1/2 ${isDark ? 'text-white/58' : 'text-[#64748b]'}`} />
+    </div>
+  )
 }
 
 function normalizeWebUrl(value: string): string | null {

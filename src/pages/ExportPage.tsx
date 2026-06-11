@@ -52,16 +52,16 @@ export function ExportPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {FORMATS.map(({ format, label, description }) => (
-          <Card key={format}>
-            <Download size={24} className="mb-3 text-accent" />
-            <h3 className="font-semibold text-text-primary mb-1">{label}</h3>
-            <p className="text-sm text-text-muted mb-4">{description}</p>
+          <Card key={format} className="flex min-h-[196px] flex-col" hover={false}>
+            <Download size={24} className="mb-3 shrink-0 text-accent" />
+            <h3 className="mb-1 font-semibold text-text-primary">{label}</h3>
+            <p className="min-h-[44px] text-sm text-text-muted">{description}</p>
             <Button
               variant="secondary"
               size="sm"
-              className="w-full"
+              className="mt-auto w-full whitespace-nowrap"
               onClick={() => handleExport(format)}
               disabled={exporting !== null}
             >

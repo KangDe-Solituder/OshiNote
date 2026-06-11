@@ -33,8 +33,6 @@ async function fetchAllArchives(): Promise<Archive[]> {
   return results
 }
 
-// ── JSON Format ────────────────────────────────────────────────────────
-
 function formatAsJson(
   oshis: Oshi[],
   archives: Archive[],
@@ -54,8 +52,6 @@ function formatAsJson(
     2
   )
 }
-
-// ── Tiptap JSON → Markdown ────────────────────────────────────────────
 
 type TipTapNode = {
   type?: string
@@ -79,7 +75,6 @@ function tiptapToMarkdown(contentJson: string): string {
 function nodeToMarkdown(node: TipTapNode): string {
   if (!node) return ''
 
-  // Inline text with marks
   if (node.type === 'text') {
     let text = node.text || ''
     if (node.marks) {
@@ -113,7 +108,6 @@ function nodeToMarkdown(node: TipTapNode): string {
     return text
   }
 
-  // Block nodes
   const inner =
     node.content?.map((child) => nodeToMarkdown(child)).join('') || ''
 
@@ -147,15 +141,13 @@ function nodeToMarkdown(node: TipTapNode): string {
   }
 }
 
-// ── Markdown Format ────────────────────────────────────────────────────
-
 function formatAsMarkdown(
   oshis: Oshi[],
   archives: Archive[],
   notes: Note[]
 ): string {
   const lines: string[] = []
-  lines.push(`# OshiNote Export\n`)
+  lines.push('# OshiNote Export\n')
   lines.push(`*Exported on ${new Date().toLocaleString()}*\n`)
   lines.push('---\n')
 
@@ -194,7 +186,7 @@ function formatAsMarkdown(
         const md = tiptapToMarkdown(note.content)
         lines.push(md || (note.plain_text ? `${note.plain_text}\n` : ''))
         if (note.favorite) {
-          lines.push('⭐ Favorite\n')
+          lines.push('Favorite\n')
         }
         lines.push('---\n')
       }
@@ -203,8 +195,6 @@ function formatAsMarkdown(
 
   return lines.join('\n')
 }
-
-// ── TXT Format ─────────────────────────────────────────────────────────
 
 function formatAsTxt(
   oshis: Oshi[],
@@ -218,7 +208,7 @@ function formatAsTxt(
   lines.push('')
 
   for (const oshi of oshis) {
-    lines.push(`★ ${oshi.name}`)
+    lines.push(`## ${oshi.name}`)
     if (oshi.description) lines.push(`  ${oshi.description}`)
     lines.push('')
 
@@ -229,7 +219,7 @@ function formatAsTxt(
       )
       if (archiveNotes.length === 0) continue
 
-      lines.push(`── ${archive.name} ──`)
+      lines.push(`-- ${archive.name} --`)
       lines.push('')
 
       for (const note of archiveNotes) {
@@ -238,7 +228,7 @@ function formatAsTxt(
         if (note.tags.length > 0) {
           lines.push(`Tags: ${note.tags.map((t) => `#${t}`).join(', ')}`)
         }
-        if (note.favorite) lines.push('⭐ Favorite')
+        if (note.favorite) lines.push('Favorite')
         lines.push('-'.repeat(40))
         lines.push(note.plain_text || '(empty)')
         lines.push('-'.repeat(40))
@@ -250,41 +240,48 @@ function formatAsTxt(
   return lines.join('\n')
 }
 
-// ── Main Export Entry ──────────────────────────────────────────────────
+export function formatExportData(
+  format: ExportFormat,
+  oshis: Oshi[],
+  archives: Archive[],
+  notes: Note[]
+): string {
+  switch (format) {
+    case 'json':
+      return formatAsJson(oshis, archives, notes)
+    case 'markdown':
+      return formatAsMarkdown(oshis, archives, notes)
+    case 'txt':
+      return formatAsTxt(oshis, archives, notes)
+  }
+}
+
+function getExportFileOptions(format: ExportFormat): {
+  defaultName: string
+  filters: { name: string; extensions: string[] }[]
+} {
+  if (format === 'json') {
+    return { defaultName: 'oshinote-export.json', filters: [{ name: 'JSON', extensions: ['json'] }] }
+  }
+  if (format === 'markdown') {
+    return { defaultName: 'oshinote-export.md', filters: [{ name: 'Markdown', extensions: ['md'] }] }
+  }
+  return { defaultName: 'oshinote-export.txt', filters: [{ name: 'Text', extensions: ['txt'] }] }
+}
 
 export async function exportAllData(format: ExportFormat): Promise<void> {
   const oshis = await fetchAllOshis()
   const archives = await fetchAllArchives()
   const notes = await fetchAllNotes()
-
-  let content: string
-  let defaultName: string
-  const filters: { name: string; extensions: string[] }[] = []
-
-  switch (format) {
-    case 'json':
-      content = formatAsJson(oshis, archives, notes)
-      defaultName = `oshinote-export.json`
-      filters.push({ name: 'JSON', extensions: ['json'] })
-      break
-    case 'markdown':
-      content = formatAsMarkdown(oshis, archives, notes)
-      defaultName = `oshinote-export.md`
-      filters.push({ name: 'Markdown', extensions: ['md'] })
-      break
-    case 'txt':
-      content = formatAsTxt(oshis, archives, notes)
-      defaultName = `oshinote-export.txt`
-      filters.push({ name: 'Text', extensions: ['txt'] })
-      break
-  }
+  const content = formatExportData(format, oshis, archives, notes)
+  const { defaultName, filters } = getExportFileOptions(format)
 
   const filePath = await save({
     defaultPath: defaultName,
     filters,
   })
 
-  if (!filePath) return // user cancelled
+  if (!filePath) return
 
   await writeTextFile(filePath, content)
 }

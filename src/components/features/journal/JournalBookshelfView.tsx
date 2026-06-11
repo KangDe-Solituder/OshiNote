@@ -511,7 +511,7 @@ function BookCover({ book, compact = false }: { book: JournalBook; compact?: boo
   return (
     <div
       className={clsx(
-        'relative overflow-hidden border text-center shadow-[0_14px_28px_rgba(66,90,130,0.16)]',
+        'journal-book-cover relative overflow-hidden border text-center shadow-[0_14px_28px_rgba(66,90,130,0.16)]',
         compact ? 'h-20 w-14 rounded-lg' : 'aspect-[0.68] w-full rounded-[14px]',
         getCoverClass(book.cover_style)
       )}

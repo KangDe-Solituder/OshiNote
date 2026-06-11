@@ -16,12 +16,14 @@ import { SettingsPage } from './pages/SettingsPage'
 import { NotesPage } from './pages/NotesPage'
 import { OshiIllustrationsPage } from './pages/OshiIllustrationsPage'
 import { IllustrationsPage } from './pages/IllustrationsPage'
+import { UpdateNotifier } from './components/features/update/UpdateNotifier'
 
 export default function App() {
   return (
     <ThemeProvider>
       <MotionProvider>
         <BrowserRouter>
+          <UpdateNotifier />
           <Routes>
             <Route element={<MainLayout />}>
               <Route index element={<HomePage />} />

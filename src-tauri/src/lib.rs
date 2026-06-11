@@ -1,7 +1,7 @@
-use tauri::Manager;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::process::Command;
+use tauri::Manager;
 
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
@@ -11,22 +11,33 @@ fn open_external_url(url: String) -> Result<(), String> {
     }
 
     #[cfg(target_os = "windows")]
-    let status = Command::new("rundll32.exe").args(["url.dll,FileProtocolHandler", trimmed]).status();
+    let status = Command::new("rundll32.exe")
+        .args(["url.dll,FileProtocolHandler", trimmed])
+        .status();
     #[cfg(target_os = "macos")]
     let status = Command::new("open").arg(trimmed).status();
     #[cfg(all(unix, not(target_os = "macos")))]
     let status = Command::new("xdg-open").arg(trimmed).status();
 
-    status
-        .map_err(|error| error.to_string())
-        .and_then(|exit| if exit.success() { Ok(()) } else { Err("Could not open the system browser.".to_string()) })
+    status.map_err(|error| error.to_string()).and_then(|exit| {
+        if exit.success() {
+            Ok(())
+        } else {
+            Err("Could not open the system browser.".to_string())
+        }
+    })
 }
 
 #[tauri::command]
-fn post_local_ai_chat(url: String, api_key: String, body: serde_json::Value) -> Result<serde_json::Value, String> {
+fn post_local_ai_chat(
+    url: String,
+    api_key: String,
+    body: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let endpoint = parse_http_endpoint(&url)?;
     let payload = serde_json::to_string(&body).map_err(|error| error.to_string())?;
-    let mut stream = TcpStream::connect((&endpoint.host[..], endpoint.port)).map_err(|error| error.to_string())?;
+    let mut stream = TcpStream::connect((&endpoint.host[..], endpoint.port))
+        .map_err(|error| error.to_string())?;
 
     let mut request = format!(
         "POST {} HTTP/1.1\r\nHost: {}:{}\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
@@ -41,10 +52,14 @@ fn post_local_ai_chat(url: String, api_key: String, body: serde_json::Value) -> 
     request.push_str("\r\n");
     request.push_str(&payload);
 
-    stream.write_all(request.as_bytes()).map_err(|error| error.to_string())?;
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|error| error.to_string())?;
 
     let mut response = String::new();
-    stream.read_to_string(&mut response).map_err(|error| error.to_string())?;
+    stream
+        .read_to_string(&mut response)
+        .map_err(|error| error.to_string())?;
     let (headers, response_body) = response
         .split_once("\r\n\r\n")
         .ok_or_else(|| "Invalid Local API response".to_string())?;
@@ -56,7 +71,10 @@ fn post_local_ai_chat(url: String, api_key: String, body: serde_json::Value) -> 
         .and_then(|code| code.parse::<u16>().ok())
         .ok_or_else(|| "Invalid Local API status line".to_string())?;
 
-    let decoded_body = if headers.to_ascii_lowercase().contains("transfer-encoding: chunked") {
+    let decoded_body = if headers
+        .to_ascii_lowercase()
+        .contains("transfer-encoding: chunked")
+    {
         decode_chunked_body(response_body)?
     } else {
         response_body.to_string()
@@ -86,7 +104,9 @@ fn parse_http_endpoint(url: &str) -> Result<HttpEndpoint, String> {
     };
     let (host, port) = match authority.rsplit_once(':') {
         Some((host, port)) => {
-            let parsed_port = port.parse::<u16>().map_err(|_| "Invalid Local API port".to_string())?;
+            let parsed_port = port
+                .parse::<u16>()
+                .map_err(|_| "Invalid Local API port".to_string())?;
             (host.to_string(), parsed_port)
         }
         None => (authority.to_string(), 80),
@@ -123,6 +143,8 @@ fn decode_chunked_body(body: &str) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_sql::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -130,7 +152,10 @@ pub fn run() {
             let _window = app.get_webview_window("main").unwrap();
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![post_local_ai_chat, open_external_url])
+        .invoke_handler(tauri::generate_handler![
+            post_local_ai_chat,
+            open_external_url
+        ])
         .run(tauri::generate_context!())
         .expect("error while running OshiNote");
 }

@@ -1,13 +1,12 @@
 import { useRef } from 'react'
 import { Card } from '../components/ui/Card'
-import { Input } from '../components/ui/Input'
 import { useThemeStore } from '../stores/themeStore'
-import { useAiStore } from '../stores/aiStore'
+import { useUpdateStore } from '../stores/updateStore'
 import type { ThemeId, UiMotionDuration } from '../types'
-import type { AiProviderId } from '../services/ai'
-import { getProviderName } from '../services/ai'
-import { Sparkles, Trash2, Upload } from 'lucide-react'
+import { checkForUpdate, getCurrentAppVersion, installPendingUpdate, type UpdateInfo, type UpdateInstallProgress } from '../services/update/updateService'
+import { Download, RefreshCw, Sparkles, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
+import { useEffect, useState } from 'react'
 
 const THEMES: { id: ThemeId; label: string; description: string }[] = [
   { id: 'pink-cozy', label: 'Pink Cozy', description: 'Warm and sweet' },
@@ -16,8 +15,6 @@ const THEMES: { id: ThemeId; label: string; description: string }[] = [
   { id: 'sakura', label: 'Sakura', description: 'Romantic and soft' },
   { id: 'rainy-cafe', label: 'Rainy Cafe', description: 'Moody and cozy' },
 ]
-
-const AI_PROVIDERS: AiProviderId[] = ['openai', 'claude', 'gemini', 'local']
 
 const UI_MOTION_OPTIONS: { value: UiMotionDuration; label: string }[] = [
   { value: 'off', label: 'Off' },
@@ -35,8 +32,47 @@ export function SettingsPage() {
     fontSize, setFontSize,
     uiMotionDuration, setUiMotionDuration,
   } = useThemeStore()
-  const { config, setProvider, setEnabled, setProviderConfig } = useAiStore()
+  const { checkOnStartup, setCheckOnStartup, loadFromDB: loadUpdateSettings } = useUpdateStore()
+  const [appVersion, setAppVersion] = useState('')
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'none' | 'installing' | 'error'>('idle')
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null)
+  const [updateError, setUpdateError] = useState('')
+  const [updateProgress, setUpdateProgress] = useState<UpdateInstallProgress | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    loadUpdateSettings()
+    getCurrentAppVersion().then(setAppVersion).catch(() => setAppVersion(''))
+  }, [loadUpdateSettings])
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('checking')
+    setUpdateError('')
+    setAvailableUpdate(null)
+    try {
+      const update = await checkForUpdate()
+      if (update) {
+        setAvailableUpdate(update)
+        setUpdateStatus('available')
+      } else {
+        setUpdateStatus('none')
+      }
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Could not check for updates.')
+      setUpdateStatus('error')
+    }
+  }
+
+  const handleInstallUpdate = async () => {
+    setUpdateStatus('installing')
+    setUpdateError('')
+    try {
+      await installPendingUpdate(setUpdateProgress)
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Could not install the update.')
+      setUpdateStatus('error')
+    }
+  }
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -51,9 +87,9 @@ export function SettingsPage() {
               key={theme.id}
               onClick={() => setTheme(theme.id)}
               className={clsx(
-                'p-4 rounded-xl border-2 text-left transition-all',
+                'p-4 rounded-xl border text-left transition-all',
                 currentTheme === theme.id
-                  ? 'border-accent bg-accent/5'
+                  ? 'border-accent bg-accent/5 ring-1 ring-accent/45'
                   : 'border-border-color hover:border-border-hover bg-bg-secondary'
               )}
             >
@@ -88,19 +124,7 @@ export function SettingsPage() {
               <span className="block text-sm text-text-muted">Apply frosted blur to cards and rounded surfaces.</span>
             </span>
           </span>
-          <span
-            className={clsx(
-              'relative h-7 w-12 shrink-0 rounded-full transition-colors',
-              glassEnabled ? 'bg-accent' : 'bg-bg-tertiary'
-            )}
-          >
-            <span
-              className={clsx(
-                'absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform',
-                glassEnabled ? 'translate-x-6' : 'translate-x-1'
-              )}
-            />
-          </span>
+          <ToggleSwitch enabled={glassEnabled} />
         </button>
       </section>
 
@@ -246,88 +270,89 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      {/* LLM Configuration */}
-      <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">LLM Configuration</h2>
-
-        <Card className="space-y-6">
-          {/* Enable toggle */}
-          <div className="flex items-center justify-between">
+      {/* Updates */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Updates</h2>
+        <Card className="space-y-5">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-text-primary">Enable LLM Interface</p>
-              <p className="text-xs text-text-muted">Keep provider settings available for future local or private workflows.</p>
+              <p className="text-sm font-medium text-text-primary">Check on Startup</p>
+              <p className="text-xs text-text-muted">Look for a new version when OshiNote opens. Updates install only after you confirm.</p>
             </div>
             <button
-              onClick={() => setEnabled(!config.enabled)}
-              className={clsx(
-                'relative w-11 h-6 rounded-full transition-colors',
-                config.enabled ? 'bg-accent' : 'bg-bg-tertiary'
-              )}
+              onClick={() => setCheckOnStartup(!checkOnStartup)}
+              className="shrink-0"
+              aria-label="Toggle startup update checks"
             >
-              <div
-                className={clsx(
-                  'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
-                  config.enabled ? 'translate-x-5' : 'translate-x-0.5'
-                )}
-              />
+              <ToggleSwitch enabled={checkOnStartup} />
             </button>
           </div>
 
-          {/* Provider selector */}
-          <div>
-            <label className="text-sm font-medium text-text-secondary mb-2 block">Provider</label>
-            <div className="flex gap-1 bg-bg-secondary rounded-xl p-1">
-              {AI_PROVIDERS.map((id) => (
-                <button
-                  key={id}
-                  onClick={() => setProvider(id)}
-                  className={clsx(
-                    'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
-                    config.provider === id
-                      ? 'bg-bg-primary text-accent shadow-sm'
-                      : 'text-text-muted hover:text-text-primary'
-                  )}
-                >
-                  {getProviderName(id)}
-                </button>
-              ))}
+          <div className="flex items-center justify-between gap-4 border-t border-border-color pt-4">
+            <div>
+              <p className="text-sm font-medium text-text-primary">Current Version</p>
+              <p className="text-xs text-text-muted">{appVersion ? `OshiNote ${appVersion}` : 'Version unavailable in web preview.'}</p>
             </div>
+            <button
+              onClick={handleCheckUpdate}
+              disabled={updateStatus === 'checking' || updateStatus === 'installing'}
+              className="inline-flex items-center gap-2 rounded-lg border border-border-color bg-bg-secondary px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw size={15} className={clsx(updateStatus === 'checking' && 'animate-spin')} />
+              {updateStatus === 'checking' ? 'Checking...' : 'Check Now'}
+            </button>
           </div>
 
-          {/* Selected provider config */}
-          {AI_PROVIDERS.map((id) => (
-            <div
-              key={id}
-              className={clsx('space-y-3', config.provider !== id && 'hidden')}
-            >
-              <Input
-                label="API Key"
-                type="password"
-                placeholder={id === 'local' ? 'Optional for local APIs...' : 'sk-...'}
-                value={config[id].apiKey}
-                onChange={(e) => setProviderConfig(id, 'apiKey', e.target.value)}
-              />
-              <Input
-                label="Model"
-                placeholder="e.g. gpt-4o, claude-sonnet-4-6"
-                value={config[id].model}
-                onChange={(e) => setProviderConfig(id, 'model', e.target.value)}
-              />
-              <Input
-                label="Base URL"
-                placeholder={id === 'local' ? 'http://127.0.0.1:1234/v1 or /api/v1' : 'https://api.openai.com/v1'}
-                value={config[id].baseUrl}
-                onChange={(e) => setProviderConfig(id, 'baseUrl', e.target.value)}
-              />
-            </div>
-          ))}
-        </Card>
+          {updateStatus === 'none' && (
+            <p className="rounded-xl border border-border-color bg-bg-secondary px-4 py-3 text-sm text-text-secondary">
+              You are using the latest version.
+            </p>
+          )}
 
-        <p className="text-xs text-text-muted mt-3">
-          These settings are stored locally in SQLite and are not used unless an LLM feature is added or enabled later.
-          For LM Studio, use either OpenAI-compatible <span className="font-mono">http://127.0.0.1:1234/v1</span> or native <span className="font-mono">http://127.0.0.1:1234/api/v1</span>.
-        </p>
+          {(updateStatus === 'available' || updateStatus === 'installing') && availableUpdate && (
+            <div className="rounded-xl border border-accent/20 bg-accent/5 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">OshiNote {availableUpdate.version} is available</p>
+                  <p className="mt-1 text-xs text-text-muted">Current version: {availableUpdate.currentVersion || appVersion}</p>
+                </div>
+                <button
+                  onClick={handleInstallUpdate}
+                  disabled={updateStatus === 'installing'}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Download size={15} />
+                  {updateStatus === 'installing' ? 'Installing...' : 'Update'}
+                </button>
+              </div>
+              {availableUpdate.body && (
+                <p className="mt-3 max-h-20 overflow-hidden whitespace-pre-line text-xs text-text-secondary">{availableUpdate.body}</p>
+              )}
+              {updateStatus === 'installing' && (
+                <div className="mt-4">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-bg-tertiary">
+                    <div
+                      className="h-full rounded-full bg-accent transition-all"
+                      style={{ width: `${updateProgress?.percent ?? 12}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-text-muted">
+                    {updateProgress?.percent ? `Downloading ${updateProgress.percent}%` : 'Downloading update...'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {updateStatus === 'error' && (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {updateError}
+            </p>
+          )}
+        </Card>
       </section>
+
+      {/* LLM configuration is intentionally hidden for the first release. */}
     </div>
   )
 }
@@ -371,5 +396,23 @@ function FilterSlider({
         </span>
       </div>
     </div>
+  )
+}
+
+function ToggleSwitch({ enabled }: { enabled: boolean }) {
+  return (
+    <span
+      className={clsx(
+        'relative block h-[24px] w-[44px] rounded-full transition-colors',
+        enabled ? 'bg-accent' : 'bg-bg-tertiary'
+      )}
+    >
+      <span
+        className={clsx(
+          'absolute left-[2px] top-[2px] h-[20px] w-[20px] rounded-full bg-white shadow transition-transform',
+          enabled && 'translate-x-[20px]'
+        )}
+      />
+    </span>
   )
 }

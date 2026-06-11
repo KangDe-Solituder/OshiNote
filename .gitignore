@@ -36,6 +36,8 @@ media/**
 # Rust and Tauri generated output
 src-tauri/target/
 src-tauri/gen/schemas/
+src-tauri/*.key
+src-tauri/*.key.pub
 
 # Editor directories and files
 .vscode/*

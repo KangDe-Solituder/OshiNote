@@ -49,21 +49,11 @@ export function Sidebar() {
     library: true,
     more: true,
   })
-  const [expandedOshiIds, setExpandedOshiIds] = useState<Set<string>>(new Set())
+  const [oshiExpansionOverrides, setOshiExpansionOverrides] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
-
-  useEffect(() => {
-    if (!oshiId) return
-    setExpandedOshiIds((ids) => {
-      if (ids.has(oshiId)) return ids
-      const next = new Set(ids)
-      next.add(oshiId)
-      return next
-    })
-  }, [oshiId])
 
   const createOshiSpaceItems = (id: string): OshiSpaceItem[] => [
     { to: `/oshis/${id}`, icon: Home, label: 'Overview' },
@@ -130,18 +120,13 @@ export function Sidebar() {
               key={oshi.id}
               oshi={oshi}
               collapsed={collapsed}
-              expanded={expandedOshiIds.has(oshi.id)}
+              expanded={oshiExpansionOverrides[oshi.id] ?? oshiId === oshi.id}
               items={createOshiSpaceItems(oshi.id)}
               pathname={location.pathname}
-              onToggle={() => setExpandedOshiIds((ids) => {
-                const next = new Set(ids)
-                if (next.has(oshi.id)) {
-                  next.delete(oshi.id)
-                } else {
-                  next.add(oshi.id)
-                }
-                return next
-              })}
+              onToggle={() => {
+                const expanded = oshiExpansionOverrides[oshi.id] ?? oshiId === oshi.id
+                setOshiExpansionOverrides((overrides) => ({ ...overrides, [oshi.id]: !expanded }))
+              }}
             />
           ))}
 
@@ -347,6 +332,7 @@ function OshiNavGroup({
       <div className="flex items-center gap-1">
         <NavLink
           to={`/oshis/${oshi.id}`}
+          onClick={!collapsed ? onToggle : undefined}
           className={({ isActive }) =>
             clsx(
               'flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
