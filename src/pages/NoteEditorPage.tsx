@@ -28,6 +28,7 @@ import { fetchNoteById, fetchNoteImages, replaceNoteImages } from '../features/n
 import { createArchive as createArchiveRecord, fetchArchivesByOshi } from '../features/oshis/archiveService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import type { Archive, Note, Oshi } from '../types'
+import { SelectMenu } from '../components/ui/SelectMenu'
 
 export function NoteEditorPage() {
   const { oshiId, noteId } = useParams<{ oshiId: string; noteId: string }>()
@@ -505,31 +506,35 @@ function DetailsPanel(props: DetailsPanelProps) {
   return (
     <Panel title="Details">
       <FieldLabel icon={<UserRound size={15} />} label="Oshi">
-        <select
+        <SelectMenu
           value={props.selectedOshiId}
-          onChange={(e) => props.onOshiChange(e.target.value)}
-          className={fieldClassName}
-        >
-          <option value="">No Oshi</option>
-          {props.oshis.map((oshi) => (
-            <option key={oshi.id} value={oshi.id}>{oshi.name}</option>
-          ))}
-        </select>
+          onChange={props.onOshiChange}
+          options={[
+            { value: '', label: 'No Oshi' },
+            ...props.oshis.map((oshi) => ({ value: oshi.id, label: oshi.name })),
+          ]}
+          ariaLabel="Oshi"
+          className="w-full"
+          buttonClassName="w-full rounded-xl text-text-primary"
+          menuClassName="w-full"
+        />
       </FieldLabel>
 
       <FieldLabel icon={<FolderOpen size={15} />} label="Archive">
         <div className="flex gap-2">
-          <select
+          <SelectMenu
             value={props.archiveId}
-            onChange={(e) => props.onArchiveChange(e.target.value)}
+            onChange={props.onArchiveChange}
             disabled={!props.selectedOshiId}
-            className={fieldClassName}
-          >
-            <option value="">Unfiled</option>
-            {props.archives.map((archive) => (
-              <option key={archive.id} value={archive.id}>{archive.name}</option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'Unfiled' },
+              ...props.archives.map((archive) => ({ value: archive.id, label: archive.name })),
+            ]}
+            ariaLabel="Archive"
+            className="min-w-0 flex-1"
+            buttonClassName="w-full rounded-xl text-text-primary"
+            menuClassName="w-full"
+          />
           <button
             type="button"
             onClick={props.onShowAddArchive}

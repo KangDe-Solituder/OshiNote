@@ -45,6 +45,7 @@ import type {
   Oshi,
   UpdateIllustrationInput,
 } from '../types'
+import { SelectMenu } from '../components/ui/SelectMenu'
 
 const TABS: { id: IllustrationTab; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -171,28 +172,31 @@ export function OshiIllustrationsPage() {
                 className="w-full rounded-2xl border border-border-color bg-bg-secondary py-2.5 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
               />
             </div>
-            <div className="flex items-center gap-2 rounded-2xl border border-border-color bg-bg-secondary px-3 py-2 text-text-muted">
+            <div className="flex items-center gap-2 rounded-full border border-border-color bg-bg-secondary pl-3 text-text-muted">
               <Filter size={15} />
-              <select
+              <SelectMenu
                 value={tag}
-                onChange={(event) => setTag(event.target.value)}
-                className="bg-transparent text-sm text-text-secondary focus:outline-none"
-              >
-                <option value="">All Tags</option>
-                {tags.map((item) => (
-                  <option key={item.tag} value={item.tag}>#{item.tag}</option>
-                ))}
-              </select>
+                onChange={setTag}
+                options={[
+                  { value: '', label: 'All Tags' },
+                  ...tags.map((item) => ({ value: item.tag, label: `#${item.tag}` })),
+                ]}
+                ariaLabel="All Tags"
+                buttonClassName="min-w-[128px] border-0 bg-transparent pl-1 pr-3 shadow-none hover:bg-transparent"
+                menuClassName="w-[220px]"
+              />
             </div>
-            <select
+            <SelectMenu
               value={sort}
-              onChange={(event) => setSort(event.target.value as IllustrationSort)}
-              className="rounded-2xl border border-border-color bg-bg-secondary px-3 py-2.5 text-sm text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft"
-            >
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="title">Title A-Z</option>
-            </select>
+              onChange={(value) => setSort(value as IllustrationSort)}
+              options={[
+                { value: 'newest', label: 'Newest First' },
+                { value: 'oldest', label: 'Oldest First' },
+                { value: 'title', label: 'Title A-Z' },
+              ]}
+              ariaLabel="Sort illustrations"
+              menuClassName="w-[196px]"
+            />
           </div>
 
           {loading ? (
@@ -800,16 +804,18 @@ function OshiSelectField({
   return (
     <div className="mb-3 grid gap-1.5 text-xs font-medium text-text-muted">
       {label}
-      <select
+      <SelectMenu
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={fieldClassName}
-      >
-        <option value="">No Oshi</option>
-        {oshis.map((oshi) => (
-          <option key={oshi.id} value={oshi.id}>{oshi.name}</option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={[
+          { value: '', label: 'No Oshi' },
+          ...oshis.map((oshi) => ({ value: oshi.id, label: oshi.name })),
+        ]}
+        ariaLabel={label}
+        className="w-full"
+        buttonClassName="w-full rounded-xl text-text-primary"
+        menuClassName="w-full"
+      />
     </div>
   )
 }

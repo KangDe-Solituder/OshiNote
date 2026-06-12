@@ -143,6 +143,8 @@ export interface IllustrationSearchParams {
 }
 
 export type ThemeId = 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'
+
+export type Locale = 'en' | 'zh' | 'ja'
 export type UiMotionDuration = 'off' | 'fast' | 'normal' | 'slow'
 
 export type ViewMode = 'card' | 'list' | 'graph' | 'journal'

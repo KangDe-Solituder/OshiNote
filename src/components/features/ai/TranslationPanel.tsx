@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Loader2, Copy, Check, Languages } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
+import { SelectMenu } from '../../ui/SelectMenu'
 import { useAiStore } from '../../../stores/aiStore'
 import type { Language } from '../../../services/ai'
 import { LANGUAGE_LABELS } from '../../../services/ai'
@@ -60,30 +61,28 @@ export function TranslationPanel() {
           Translation
         </h2>
         <div className="flex items-center gap-2 text-sm flex-wrap">
-          <select
+          <SelectMenu
             value={fromLang}
-            onChange={(e) => setFromLang(e.target.value as Language)}
-            className="px-3 py-1.5 rounded-lg border border-border-color bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-soft"
-          >
-            {SUPPORTED_LANGS.map((l) => (
-              <option key={l} value={l}>{LANGUAGE_LABELS[l]}</option>
-            ))}
-          </select>
+            onChange={(value) => setFromLang(value as Language)}
+            options={SUPPORTED_LANGS.map((language) => ({ value: language, label: LANGUAGE_LABELS[language] }))}
+            ariaLabel="Source language"
+            buttonClassName="rounded-xl"
+            menuClassName="w-[148px]"
+          />
           <button
             onClick={swapLanguages}
             className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-muted hover:text-accent transition-colors"
           >
             <ArrowRight size={18} />
           </button>
-          <select
+          <SelectMenu
             value={toLang}
-            onChange={(e) => setToLang(e.target.value as Language)}
-            className="px-3 py-1.5 rounded-lg border border-border-color bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-soft"
-          >
-            {SUPPORTED_LANGS.map((l) => (
-              <option key={l} value={l}>{LANGUAGE_LABELS[l]}</option>
-            ))}
-          </select>
+            onChange={(value) => setToLang(value as Language)}
+            options={SUPPORTED_LANGS.map((language) => ({ value: language, label: LANGUAGE_LABELS[language] }))}
+            ariaLabel="Target language"
+            buttonClassName="rounded-xl"
+            menuClassName="w-[148px]"
+          />
         </div>
       </div>
 

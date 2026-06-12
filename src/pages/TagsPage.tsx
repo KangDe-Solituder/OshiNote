@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Tag } from 'lucide-react'
 import { getAllTags } from '../features/notes/noteService'
+import { useI18n } from '../i18n/useI18n'
 
 export function TagsPage() {
+  const { t } = useI18n()
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
 
   useEffect(() => {
@@ -12,14 +14,14 @@ export function TagsPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-3xl font-bold text-text-primary mb-2">Tags</h1>
-      <p className="text-text-secondary mb-8">Browse your memories by tag.</p>
+      <h1 className="text-3xl font-bold text-text-primary mb-2">{t('tags.title')}</h1>
+      <p className="text-text-secondary mb-8">{t('tags.subtitle')}</p>
 
       {tags.length === 0 ? (
         <div className="text-center py-20">
           <Tag size={48} className="mx-auto mb-4 text-accent-soft" />
-          <h2 className="text-lg font-semibold text-text-primary mb-2">No tags yet</h2>
-          <p className="text-text-muted">Tags will appear as you add them to your notes.</p>
+          <h2 className="text-lg font-semibold text-text-primary mb-2">{t('tags.empty.title')}</h2>
+          <p className="text-text-muted">{t('tags.empty.body')}</p>
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">

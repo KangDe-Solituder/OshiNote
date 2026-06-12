@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { useThemeStore } from '../../../stores/themeStore'
 import { useAiStore } from '../../../stores/aiStore'
+import { useLanguageStore } from '../../../stores/languageStore'
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts'
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -10,13 +11,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const backgroundFilters = useThemeStore((s) => s.backgroundFilters)
   const loadTheme = useThemeStore((s) => s.loadFromDB)
   const loadAi = useAiStore((s) => s.loadFromDB)
+  const loadLanguage = useLanguageStore((s) => s.loadFromDB)
 
   useKeyboardShortcuts()
 
   useEffect(() => {
     loadTheme()
     loadAi()
-  }, [loadTheme, loadAi])
+    loadLanguage()
+  }, [loadTheme, loadAi, loadLanguage])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', currentTheme)

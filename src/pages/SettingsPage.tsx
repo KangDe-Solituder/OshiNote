@@ -7,23 +7,29 @@ import { checkForUpdate, getCurrentAppVersion, installPendingUpdate, type Update
 import { Download, RefreshCw, Sparkles, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
+import { LOCALE_OPTIONS } from '../i18n/translations'
+import { useI18n } from '../i18n/useI18n'
+import { useLanguageStore } from '../stores/languageStore'
+import { SelectMenu } from '../components/ui/SelectMenu'
 
-const THEMES: { id: ThemeId; label: string; description: string }[] = [
-  { id: 'pink-cozy', label: 'Pink Cozy', description: 'Warm and sweet' },
-  { id: 'dark-night', label: 'Dark Night', description: 'Calm and deep' },
-  { id: 'soft-blue', label: 'Soft Blue', description: 'Gentle and airy' },
-  { id: 'sakura', label: 'Sakura', description: 'Romantic and soft' },
-  { id: 'rainy-cafe', label: 'Rainy Cafe', description: 'Moody and cozy' },
+const THEMES: { id: ThemeId }[] = [
+  { id: 'pink-cozy' },
+  { id: 'dark-night' },
+  { id: 'soft-blue' },
+  { id: 'sakura' },
+  { id: 'rainy-cafe' },
 ]
 
-const UI_MOTION_OPTIONS: { value: UiMotionDuration; label: string }[] = [
-  { value: 'off', label: 'Off' },
-  { value: 'fast', label: 'Fast' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'slow', label: 'Slow' },
+const UI_MOTION_OPTIONS: { value: UiMotionDuration }[] = [
+  { value: 'off' },
+  { value: 'fast' },
+  { value: 'normal' },
+  { value: 'slow' },
 ]
 
 export function SettingsPage() {
+  const { locale, t } = useI18n()
+  const setLocale = useLanguageStore((s) => s.setLocale)
   const {
     currentTheme, setTheme,
     glassEnabled, setGlassEnabled,
@@ -58,7 +64,7 @@ export function SettingsPage() {
         setUpdateStatus('none')
       }
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : 'Could not check for updates.')
+      setUpdateError(error instanceof Error ? error.message : t('settings.updateCheckError'))
       setUpdateStatus('error')
     }
   }
@@ -69,18 +75,17 @@ export function SettingsPage() {
     try {
       await installPendingUpdate(setUpdateProgress)
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : 'Could not install the update.')
+      setUpdateError(error instanceof Error ? error.message : t('settings.updateInstallError'))
       setUpdateStatus('error')
     }
   }
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-text-primary mb-8">Settings</h1>
+      <h1 className="text-3xl font-bold text-text-primary mb-8">{t('settings.title')}</h1>
 
-      {/* Theme */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Theme</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.theme')}</h2>
         <div className="grid grid-cols-2 gap-3">
           {THEMES.map((theme) => (
             <button
@@ -93,19 +98,18 @@ export function SettingsPage() {
                   : 'border-border-color hover:border-border-hover bg-bg-secondary'
               )}
             >
-              <p className="font-medium text-text-primary">{theme.label}</p>
-              <p className="text-sm text-text-muted">{theme.description}</p>
+              <p className="font-medium text-text-primary">{t(`settings.theme.${theme.id}.label`)}</p>
+              <p className="text-sm text-text-muted">{t(`settings.theme.${theme.id}.description`)}</p>
             </button>
           ))}
         </div>
         <p className="text-xs text-text-muted mt-3">
-          Ctrl+1 ~ Ctrl+5 to quickly switch themes.
+          {t('settings.themeShortcut')}
         </p>
       </section>
 
-      {/* Appearance */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Appearance</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.appearance')}</h2>
         <button
           onClick={() => setGlassEnabled(!glassEnabled)}
           className={clsx(
@@ -120,30 +124,28 @@ export function SettingsPage() {
               <Sparkles size={22} />
             </span>
             <span>
-              <span className="block font-medium text-text-primary">Glass Effect</span>
-              <span className="block text-sm text-text-muted">Apply frosted blur to cards and rounded surfaces.</span>
+              <span className="block font-medium text-text-primary">{t('settings.glassEffect')}</span>
+              <span className="block text-sm text-text-muted">{t('settings.glassEffectDescription')}</span>
             </span>
           </span>
           <ToggleSwitch enabled={glassEnabled} />
         </button>
       </section>
 
-      {/* Background */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Background</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.background')}</h2>
         <Card className="space-y-4">
-          {/* Background image selector */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-primary">Custom Background</p>
-              <p className="text-xs text-text-muted">Upload a wallpaper or fanart image.</p>
+              <p className="text-sm font-medium text-text-primary">{t('settings.customBackground')}</p>
+              <p className="text-xs text-text-muted">{t('settings.customBackgroundDescription')}</p>
             </div>
             <div className="flex items-center gap-2">
               {customBackground && (
                 <div className="w-10 h-10 rounded-lg overflow-hidden border border-border-color bg-bg-secondary">
                   <img
                     src={customBackground}
-                    alt="Background preview"
+                    alt={t('settings.backgroundPreview')}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -169,7 +171,7 @@ export function SettingsPage() {
                 className="px-3 py-1.5 rounded-lg border border-border-color bg-bg-secondary text-text-secondary text-sm hover:text-accent hover:border-accent transition-colors flex items-center gap-1.5"
               >
                 <Upload size={14} />
-                Choose
+                {t('common.choose')}
               </button>
               {customBackground && (
                 <button
@@ -178,7 +180,7 @@ export function SettingsPage() {
                     if (fileInputRef.current) fileInputRef.current.value = ''
                   }}
                   className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
-                  title="Remove background"
+                  title={t('settings.removeBackground')}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -188,9 +190,8 @@ export function SettingsPage() {
 
           {customBackground && (
             <>
-              {/* Blur */}
               <FilterSlider
-                label="Blur"
+                label={t('settings.blur')}
                 value={backgroundFilters.blur}
                 min={0}
                 max={20}
@@ -198,9 +199,8 @@ export function SettingsPage() {
                 unit="px"
                 onChange={(v) => setFilter('blur', v)}
               />
-              {/* Brightness */}
               <FilterSlider
-                label="Brightness"
+                label={t('settings.brightness')}
                 value={backgroundFilters.brightness}
                 min={50}
                 max={150}
@@ -208,9 +208,8 @@ export function SettingsPage() {
                 unit="%"
                 onChange={(v) => setFilter('brightness', v)}
               />
-              {/* Opacity */}
               <FilterSlider
-                label="Opacity"
+                label={t('settings.opacity')}
                 value={backgroundFilters.opacity}
                 min={20}
                 max={100}
@@ -218,9 +217,8 @@ export function SettingsPage() {
                 unit="%"
                 onChange={(v) => setFilter('opacity', v)}
               />
-              {/* Saturation */}
               <FilterSlider
-                label="Saturation"
+                label={t('settings.saturation')}
                 value={backgroundFilters.saturation}
                 min={0}
                 max={200}
@@ -233,56 +231,71 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      {/* General */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">General</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.general')}</h2>
         <Card className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-primary">Font Size</p>
-              <p className="text-xs text-text-muted">Adjust interface text size.</p>
+              <p className="text-sm font-medium text-text-primary">{t('settings.language')}</p>
+              <p className="text-xs text-text-muted">{t('settings.languageDescription')}</p>
             </div>
-            <select
-              value={fontSize}
-              onChange={(e) => setFontSize(e.target.value as 'small' | 'medium' | 'large')}
-              className="px-3 py-1.5 rounded-lg border border-border-color bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-soft"
-            >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-            </select>
+            <SelectMenu
+              value={locale}
+              onChange={(value) => setLocale(value as typeof locale)}
+              options={LOCALE_OPTIONS.map((option) => ({ value: option.value, label: option.nativeLabel }))}
+              ariaLabel={t('settings.language')}
+              menuAlign="right"
+              menuClassName="w-[168px]"
+            />
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-primary">Animation Speed</p>
-              <p className="text-xs text-text-muted">Adjust interface and page transition motion.</p>
+              <p className="text-sm font-medium text-text-primary">{t('settings.fontSize')}</p>
+              <p className="text-xs text-text-muted">{t('settings.fontSizeDescription')}</p>
             </div>
-            <select
+            <SelectMenu
+              value={fontSize}
+              onChange={(value) => setFontSize(value as 'small' | 'medium' | 'large')}
+              options={[
+                { value: 'small', label: t('settings.font.small') },
+                { value: 'medium', label: t('settings.font.medium') },
+                { value: 'large', label: t('settings.font.large') },
+              ]}
+              ariaLabel={t('settings.fontSize')}
+              menuAlign="right"
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text-primary">{t('settings.animationSpeed')}</p>
+              <p className="text-xs text-text-muted">{t('settings.animationSpeedDescription')}</p>
+            </div>
+            <SelectMenu
               value={uiMotionDuration}
-              onChange={(e) => setUiMotionDuration(e.target.value as UiMotionDuration)}
-              className="px-3 py-1.5 rounded-lg border border-border-color bg-bg-secondary text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-soft"
-            >
-              {UI_MOTION_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+              onChange={(value) => setUiMotionDuration(value as UiMotionDuration)}
+              options={UI_MOTION_OPTIONS.map((option) => ({
+                value: option.value,
+                label: t(`settings.motion.${option.value}`),
+              }))}
+              ariaLabel={t('settings.animationSpeed')}
+              menuAlign="right"
+            />
           </div>
         </Card>
       </section>
 
-      {/* Updates */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Updates</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.updates')}</h2>
         <Card className="space-y-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-text-primary">Check on Startup</p>
-              <p className="text-xs text-text-muted">Look for a new version when OshiNote opens. Updates install only after you confirm.</p>
+              <p className="text-sm font-medium text-text-primary">{t('settings.checkOnStartup')}</p>
+              <p className="text-xs text-text-muted">{t('settings.checkOnStartupDescription')}</p>
             </div>
             <button
               onClick={() => setCheckOnStartup(!checkOnStartup)}
               className="shrink-0"
-              aria-label="Toggle startup update checks"
+              aria-label={t('settings.toggleStartupUpdates')}
             >
               <ToggleSwitch enabled={checkOnStartup} />
             </button>
@@ -290,8 +303,8 @@ export function SettingsPage() {
 
           <div className="flex items-center justify-between gap-4 border-t border-border-color pt-4">
             <div>
-              <p className="text-sm font-medium text-text-primary">Current Version</p>
-              <p className="text-xs text-text-muted">{appVersion ? `OshiNote ${appVersion}` : 'Version unavailable in web preview.'}</p>
+              <p className="text-sm font-medium text-text-primary">{t('settings.currentVersion')}</p>
+              <p className="text-xs text-text-muted">{appVersion ? t('settings.versionLabel', { version: appVersion }) : t('settings.versionUnavailable')}</p>
             </div>
             <button
               onClick={handleCheckUpdate}
@@ -299,13 +312,13 @@ export function SettingsPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-border-color bg-bg-secondary px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw size={15} className={clsx(updateStatus === 'checking' && 'animate-spin')} />
-              {updateStatus === 'checking' ? 'Checking...' : 'Check Now'}
+              {updateStatus === 'checking' ? t('settings.checking') : t('settings.checkNow')}
             </button>
           </div>
 
           {updateStatus === 'none' && (
             <p className="rounded-xl border border-border-color bg-bg-secondary px-4 py-3 text-sm text-text-secondary">
-              You are using the latest version.
+              {t('settings.latestVersion')}
             </p>
           )}
 
@@ -313,8 +326,8 @@ export function SettingsPage() {
             <div className="rounded-xl border border-accent/20 bg-accent/5 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-text-primary">OshiNote {availableUpdate.version} is available</p>
-                  <p className="mt-1 text-xs text-text-muted">Current version: {availableUpdate.currentVersion || appVersion}</p>
+                  <p className="text-sm font-semibold text-text-primary">{t('settings.updateAvailable', { version: availableUpdate.version })}</p>
+                  <p className="mt-1 text-xs text-text-muted">{t('settings.currentVersionInline', { version: availableUpdate.currentVersion || appVersion })}</p>
                 </div>
                 <button
                   onClick={handleInstallUpdate}
@@ -322,7 +335,7 @@ export function SettingsPage() {
                   className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Download size={15} />
-                  {updateStatus === 'installing' ? 'Installing...' : 'Update'}
+                  {updateStatus === 'installing' ? t('settings.installing') : t('settings.update')}
                 </button>
               </div>
               {availableUpdate.body && (
@@ -337,7 +350,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <p className="mt-2 text-xs text-text-muted">
-                    {updateProgress?.percent ? `Downloading ${updateProgress.percent}%` : 'Downloading update...'}
+                    {updateProgress?.percent ? t('settings.downloadingProgress', { percent: updateProgress.percent }) : t('settings.downloading')}
                   </p>
                 </div>
               )}

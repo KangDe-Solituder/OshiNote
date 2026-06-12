@@ -3,6 +3,7 @@ import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Palette } from
 import { EmojiPicker } from '../ui/EmojiPicker'
 import { useState, useRef, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { SelectMenu } from '../ui/SelectMenu'
 
 interface EditorToolbarProps {
   editor: Editor | null
@@ -62,33 +63,37 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
 
       <div className="w-px h-5 bg-border-color mx-1" />
 
-      <select
-        onChange={(e) => {
-          if (e.target.value) editor.chain().focus().setFontSize(e.target.value).run()
+      <SelectMenu
+        value=""
+        onChange={(value) => {
+          if (value) editor.chain().focus().setFontSize(value).run()
         }}
-        className="px-2 py-1 rounded text-xs bg-transparent text-text-secondary border border-border-color focus:outline-none"
-        defaultValue=""
-      >
-        <option value="" disabled>Size</option>
-        {FONT_SIZES.map((size) => (
-          <option key={size} value={size}>{size}</option>
-        ))}
-      </select>
+        options={FONT_SIZES.map((size) => ({ value: size, label: size }))}
+        placeholder="Size"
+        ariaLabel="Font size"
+        size="sm"
+        buttonClassName="rounded-lg bg-transparent"
+        menuClassName="w-[104px]"
+      />
 
-      <select
-        onChange={(e) => {
-          if (e.target.value) editor.chain().focus().setFontFamily(e.target.value).run()
+      <SelectMenu
+        value=""
+        onChange={(value) => {
+          if (value) editor.chain().focus().setFontFamily(value).run()
         }}
-        className="px-2 py-1 rounded text-xs bg-transparent text-text-secondary border border-border-color focus:outline-none"
-        defaultValue=""
-      >
-        <option value="" disabled>Font</option>
-        <option value="Quicksand">Quicksand</option>
-        <option value="Nunito">Nunito</option>
-        <option value="serif">Serif</option>
-        <option value="monospace">Mono</option>
-        <option value="cursive">Cursive</option>
-      </select>
+        options={[
+          { value: 'Quicksand', label: 'Quicksand' },
+          { value: 'Nunito', label: 'Nunito' },
+          { value: 'serif', label: 'Serif' },
+          { value: 'monospace', label: 'Mono' },
+          { value: 'cursive', label: 'Cursive' },
+        ]}
+        placeholder="Font"
+        ariaLabel="Font family"
+        size="sm"
+        buttonClassName="rounded-lg bg-transparent"
+        menuClassName="w-[148px]"
+      />
 
       <div className="w-px h-5 bg-border-color mx-1" />
 

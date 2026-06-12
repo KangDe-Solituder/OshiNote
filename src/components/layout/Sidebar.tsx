@@ -20,6 +20,7 @@ import appIconUrl from '../../assets/app-icon.svg'
 import clsx from 'clsx'
 import type { Oshi } from '../../types'
 import { useUiMotionSeconds } from '../features/themes/uiMotion'
+import { useI18n } from '../../i18n/useI18n'
 
 interface OshiSpaceItem {
   to: string
@@ -27,18 +28,8 @@ interface OshiSpaceItem {
   label: string
 }
 
-const libraryNavItems = [
-  { to: '/notes', icon: FileText, label: 'All Notes' },
-  { to: '/illustrations', icon: ImageIcon, label: 'Illustrations' },
-  { to: '/tags', icon: Tag, label: 'Tags' },
-]
-
-const moreNavItems = [
-  { to: '/', icon: Home, label: 'Home' },
-  { to: '/export', icon: Download, label: 'Export' },
-]
-
 export function Sidebar() {
+  const { t } = useI18n()
   const { collapsed, toggle } = useSidebarStore()
   const motionSeconds = useUiMotionSeconds()
   const { oshiId } = useParams<{ oshiId: string }>()
@@ -55,12 +46,23 @@ export function Sidebar() {
     fetchAll()
   }, [fetchAll])
 
+  const libraryNavItems = [
+    { to: '/notes', icon: FileText, label: t('nav.allNotes') },
+    { to: '/illustrations', icon: ImageIcon, label: t('nav.illustrations') },
+    { to: '/tags', icon: Tag, label: t('nav.tags') },
+  ]
+
+  const moreNavItems = [
+    { to: '/', icon: Home, label: t('nav.home') },
+    { to: '/export', icon: Download, label: t('nav.export') },
+  ]
+
   const createOshiSpaceItems = (id: string): OshiSpaceItem[] => [
-    { to: `/oshis/${id}`, icon: Home, label: 'Overview' },
-    { to: `/oshis/${id}/notes`, icon: FileText, label: 'Notes' },
-    { to: `/oshis/${id}/journal`, icon: BookOpen, label: 'Journal' },
-    { to: `/oshis/${id}/illustrations`, icon: ImageIcon, label: 'Illustrations' },
-    { to: `/oshis/${id}/tags`, icon: Tag, label: 'Tags' },
+    { to: `/oshis/${id}`, icon: Home, label: t('nav.overview') },
+    { to: `/oshis/${id}/notes`, icon: FileText, label: t('nav.notes') },
+    { to: `/oshis/${id}/journal`, icon: BookOpen, label: t('nav.journal') },
+    { to: `/oshis/${id}/illustrations`, icon: ImageIcon, label: t('nav.illustrations') },
+    { to: `/oshis/${id}/tags`, icon: Tag, label: t('nav.tags') },
   ]
 
   return (
@@ -80,7 +82,7 @@ export function Sidebar() {
             type="button"
             onClick={toggle}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl hover:bg-bg-tertiary focus:outline-none focus:ring-2 focus:ring-accent-soft"
-            title="Expand sidebar"
+            title={t('nav.expandSidebar')}
           >
             <img src={appIconUrl} alt="OshiNote" className="block h-8 w-8 min-w-8 shrink-0 object-contain" />
           </button>
@@ -100,7 +102,7 @@ export function Sidebar() {
           <button
             onClick={toggle}
             className="ml-auto rounded-lg p-1.5 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
-            title="Collapse sidebar"
+            title={t('nav.collapseSidebar')}
           >
             <ChevronLeft size={18} />
           </button>
@@ -109,7 +111,7 @@ export function Sidebar() {
 
       <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-4">
         <SidebarSection
-          title="My Oshis"
+          title={t('nav.myOshis')}
           collapsed={collapsed}
           open={openSections.oshis}
           motionSeconds={motionSeconds}
@@ -143,12 +145,12 @@ export function Sidebar() {
             }
           >
             <Plus size={20} className="shrink-0" />
-            <SidebarLabel collapsed={collapsed}>Add Oshi</SidebarLabel>
+            <SidebarLabel collapsed={collapsed}>{t('nav.addOshi')}</SidebarLabel>
           </NavLink>
         </SidebarSection>
 
         <SidebarSection
-          title="Library"
+          title={t('nav.library')}
           collapsed={collapsed}
           open={openSections.library}
           motionSeconds={motionSeconds}
@@ -176,7 +178,7 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection
-          title="More"
+          title={t('nav.more')}
           collapsed={collapsed}
           open={openSections.more}
           motionSeconds={motionSeconds}
@@ -226,7 +228,7 @@ export function Sidebar() {
                 exit={{ opacity: 0, x: -10 }}
                 className="text-sm truncate"
               >
-                Settings
+                {t('nav.settings')}
               </motion.span>
             )}
           </AnimatePresence>
@@ -266,6 +268,7 @@ function SidebarSection({
   className?: string
   children: React.ReactNode
 }) {
+  const { t } = useI18n()
   return (
     <section className={clsx('mb-5 space-y-1', className)}>
       <AnimatePresence>
@@ -277,7 +280,7 @@ function SidebarSection({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
             className="flex w-full items-center justify-between rounded-lg px-3 pb-1 pt-1 text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-secondary"
-            title={open ? `Collapse ${title}` : `Expand ${title}`}
+            title={open ? t('nav.collapseSection', { title }) : t('nav.expandSection', { title })}
           >
             <span>{title}</span>
             {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}

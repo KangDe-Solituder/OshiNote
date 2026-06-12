@@ -19,10 +19,13 @@ import {
   IllustrationDetailDrawer,
   MediaImage,
 } from './OshiIllustrationsPage'
+import { useI18n } from '../i18n/useI18n'
+import { SelectMenu } from '../components/ui/SelectMenu'
 
 type IllustrationCategoryFilter = 'all' | IllustrationCategory
 
 export function IllustrationsPage() {
+  const { t } = useI18n()
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
@@ -78,7 +81,7 @@ export function IllustrationsPage() {
   }
 
   async function handleDelete(illustration: Illustration) {
-    if (!confirm(`Delete "${illustration.title || 'Untitled'}"? The copied image inside OshiNote media storage will also be removed.`)) return
+    if (!confirm(t('illustrations.delete.confirm', { title: illustration.title || t('common.untitled') }))) return
     await deleteIllustration(illustration.id)
     setSelectedId(null)
     await load()
@@ -94,12 +97,12 @@ export function IllustrationsPage() {
       <header className={PAGE_HEADER_CLASS}>
         <div className="flex w-full items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">Illustrations</h1>
-            <p className="mt-1 text-text-secondary">Manage official art, fanart, and visual materials across all oshis.</p>
+            <h1 className="text-3xl font-bold text-text-primary">{t('illustrations.title')}</h1>
+            <p className="mt-1 text-text-secondary">{t('illustrations.subtitle')}</p>
           </div>
           <Button onClick={() => setShowCreate(true)}>
             <Plus size={16} />
-            Add Illustration
+            {t('illustrations.add')}
           </Button>
         </div>
       </header>
@@ -113,41 +116,65 @@ export function IllustrationsPage() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search title, artist, tags, source..."
+                  placeholder={t('illustrations.search')}
                   className="w-full rounded-xl border border-border-color bg-bg-secondary py-2.5 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
                 />
               </div>
               <div className="flex rounded-xl bg-bg-secondary p-1">
-                <IconToggle active={viewMode === 'grid'} title="Grid view" onClick={() => setViewMode('grid')}><LayoutGrid size={17} /></IconToggle>
-                <IconToggle active={viewMode === 'list'} title="List view" onClick={() => setViewMode('list')}><List size={17} /></IconToggle>
+                <IconToggle active={viewMode === 'grid'} title={t('illustrations.gridView')} onClick={() => setViewMode('grid')}><LayoutGrid size={17} /></IconToggle>
+                <IconToggle active={viewMode === 'list'} title={t('illustrations.listView')} onClick={() => setViewMode('list')}><List size={17} /></IconToggle>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <FilterSelect value={oshiId} onChange={setOshiId}>
-                <option value="">All Oshis</option>
-                <option value="__none">No Oshi</option>
-                {oshis.map((oshi) => <option key={oshi.id} value={oshi.id}>{oshi.name}</option>)}
-              </FilterSelect>
-              <FilterSelect value={category} onChange={(value) => setCategory(value as IllustrationCategoryFilter)}>
-                <option value="all">All Categories</option>
-                <option value="official">Official</option>
-                <option value="fanart">Fanart</option>
-              </FilterSelect>
-              <FilterSelect value={tag} onChange={setTag}>
-                <option value="">All Tags</option>
-                {tags.map((item) => <option key={item.tag} value={item.tag}>#{item.tag}</option>)}
-              </FilterSelect>
-              <FilterSelect value={sort} onChange={(value) => setSort(value as IllustrationSort)}>
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="title">Title A-Z</option>
-              </FilterSelect>
+              <SelectMenu
+                value={oshiId}
+                onChange={setOshiId}
+                options={[
+                  { value: '', label: t('notes.allOshis') },
+                  { value: '__none', label: t('illustrations.noOshi') },
+                  ...oshis.map((oshi) => ({ value: oshi.id, label: oshi.name })),
+                ]}
+                ariaLabel={t('notes.allOshis')}
+                menuClassName="w-[220px]"
+              />
+              <SelectMenu
+                value={category}
+                onChange={(value) => setCategory(value as IllustrationCategoryFilter)}
+                options={[
+                  { value: 'all', label: t('illustrations.allCategories') },
+                  { value: 'official', label: t('common.official') },
+                  { value: 'fanart', label: t('common.fanart') },
+                ]}
+                ariaLabel={t('illustrations.allCategories')}
+                menuClassName="w-[196px]"
+              />
+              <SelectMenu
+                value={tag}
+                onChange={setTag}
+                options={[
+                  { value: '', label: t('notes.allTags') },
+                  ...tags.map((item) => ({ value: item.tag, label: `#${item.tag}` })),
+                ]}
+                ariaLabel={t('notes.allTags')}
+                menuClassName="w-[220px]"
+              />
+              <SelectMenu
+                value={sort}
+                onChange={(value) => setSort(value as IllustrationSort)}
+                options={[
+                  { value: 'newest', label: t('notes.newest') },
+                  { value: 'oldest', label: t('notes.oldest') },
+                  { value: 'title', label: t('illustrations.titleSort') },
+                ]}
+                ariaLabel={t('notes.newest')}
+                menuClassName="w-[196px]"
+              />
               <label className="inline-flex items-center gap-2 rounded-lg border border-border-color bg-bg-secondary px-3 py-2 text-sm text-text-secondary">
                 <input type="checkbox" checked={favorite} onChange={(event) => setFavorite(event.target.checked)} />
-                Favorites
+                {t('common.favorites')}
               </label>
-              <span className="ml-auto text-sm text-text-muted">{illustrations.length} illustration{illustrations.length === 1 ? '' : 's'}</span>
+              <span className="ml-auto text-sm text-text-muted">{t('illustrations.count', { count: illustrations.length, plural: illustrations.length === 1 ? '' : 's' })}</span>
             </div>
           </div>
 
@@ -156,11 +183,11 @@ export function IllustrationsPage() {
           ) : illustrations.length === 0 ? (
             <div className="py-20 text-center">
               <ImageIcon size={46} className="mx-auto mb-4 text-accent-soft" />
-              <h2 className="text-lg font-semibold text-text-primary">No matching illustrations</h2>
-              <p className="mt-1 text-sm text-text-muted">Try another filter or add a visual memory.</p>
+              <h2 className="text-lg font-semibold text-text-primary">{t('illustrations.empty.title')}</h2>
+              <p className="mt-1 text-sm text-text-muted">{t('illustrations.empty.body')}</p>
               <Button className="mt-5" onClick={() => setShowCreate(true)}>
                 <Plus size={16} />
-                Add Illustration
+                {t('illustrations.add')}
               </Button>
             </div>
           ) : viewMode === 'grid' ? (
@@ -229,6 +256,7 @@ function IllustrationCard({
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
 }) {
+  const { t } = useI18n()
   return (
     <article className="overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
       <button type="button" onClick={() => onSelect(illustration.id)} className="block w-full text-left">
@@ -244,8 +272,8 @@ function IllustrationCard({
       <div className="p-3">
         <div className="flex items-start gap-2">
           <button type="button" onClick={() => onSelect(illustration.id)} className="min-w-0 flex-1 text-left">
-            <h2 className="line-clamp-1 text-sm font-semibold text-text-primary">{illustration.title || 'Untitled'}</h2>
-            <p className="mt-1 line-clamp-1 text-xs text-text-muted">by {illustration.artist || 'Unknown artist'}</p>
+            <h2 className="line-clamp-1 text-sm font-semibold text-text-primary">{illustration.title || t('common.untitled')}</h2>
+            <p className="mt-1 line-clamp-1 text-xs text-text-muted">{t('common.byArtist', { artist: illustration.artist || t('common.unknownArtist') })}</p>
           </button>
           <FavoriteButton illustration={illustration} onToggleFavorite={onToggleFavorite} />
         </div>
@@ -272,6 +300,7 @@ function IllustrationRow({
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
 }) {
+  const { t } = useI18n()
   return (
     <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-bg-secondary">
       <button type="button" onClick={() => onSelect(illustration.id)} className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-bg-tertiary">
@@ -282,14 +311,14 @@ function IllustrationRow({
         />
       </button>
       <button type="button" onClick={() => onSelect(illustration.id)} className="min-w-0 flex-1 text-left">
-        <p className="truncate text-sm font-semibold text-text-primary">{illustration.title || 'Untitled'}</p>
+        <p className="truncate text-sm font-semibold text-text-primary">{illustration.title || t('common.untitled')}</p>
         <p className="mt-0.5 truncate text-xs text-text-muted">{illustration.original_filename}</p>
       </button>
       <span className="hidden min-w-28 text-xs text-text-muted md:inline-flex md:items-center md:gap-1.5">
         <UserRound size={13} />
         <span className="truncate">{getOshiName(oshis, illustration.oshi_id)}</span>
       </span>
-      <span className="hidden min-w-28 truncate text-xs text-text-muted lg:block">{illustration.artist || 'Unknown artist'}</span>
+      <span className="hidden min-w-28 truncate text-xs text-text-muted lg:block">{illustration.artist || t('common.unknownArtist')}</span>
       <span className="hidden min-w-20 text-xs text-text-muted lg:inline-flex lg:items-center lg:gap-1.5">
         <Calendar size={13} />
         {formatDate(illustration.date || illustration.created_at)}
@@ -301,6 +330,7 @@ function IllustrationRow({
 }
 
 function CategoryBadge({ category, compact = false }: { category: IllustrationCategory; compact?: boolean }) {
+  const { t } = useI18n()
   return (
     <span className={clsx(
       compact ? 'shrink-0' : 'absolute left-3 top-3 shadow-sm backdrop-blur',
@@ -309,12 +339,13 @@ function CategoryBadge({ category, compact = false }: { category: IllustrationCa
         ? 'bg-blue-50/85 text-blue-600'
         : 'bg-pink-50/85 text-pink-600'
     )}>
-      {category === 'official' ? 'Official' : 'Fanart'}
+      {category === 'official' ? t('common.official') : t('common.fanart')}
     </span>
   )
 }
 
 function FavoriteButton({ illustration, onToggleFavorite }: { illustration: Illustration; onToggleFavorite: (id: string) => void }) {
+  const { t } = useI18n()
   return (
     <button
       type="button"
@@ -323,18 +354,10 @@ function FavoriteButton({ illustration, onToggleFavorite }: { illustration: Illu
         'rounded-lg p-1.5 transition-colors',
         illustration.favorite ? 'text-pink-500' : 'text-text-muted hover:bg-bg-tertiary hover:text-pink-500'
       )}
-      title={illustration.favorite ? 'Remove from favorites' : 'Favorite'}
+      title={illustration.favorite ? t('illustrations.removeFavorite') : t('illustrations.favorite')}
     >
       <Heart size={16} fill={illustration.favorite ? 'currentColor' : 'none'} />
     </button>
-  )
-}
-
-function FilterSelect({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
-  return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="rounded-lg border border-border-color bg-bg-secondary px-3 py-2 text-sm text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft">
-      {children}
-    </select>
   )
 }
 
