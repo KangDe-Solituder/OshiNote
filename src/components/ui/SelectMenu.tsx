@@ -39,12 +39,34 @@ export function SelectMenu({
   size = 'md',
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false)
-  const [menuRect, setMenuRect] = useState({ top: 0, left: 0, width: 0 })
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const motionSeconds = useUiMotionSeconds()
   const selected = options.find((option) => option.value === value)
   const menuOrigin = menuAlign === 'right' ? 'origin-top-right' : 'origin-top-left'
+
+  function measureMenuRect() {
+    const rect = rootRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return {
+      top: rect.bottom + 8,
+      left: menuAlign === 'right' ? rect.right : rect.left,
+      width: rect.width,
+    }
+  }
+
+  function toggleOpen() {
+    if (open) {
+      setOpen(false)
+      return
+    }
+
+    const nextRect = measureMenuRect()
+    if (!nextRect) return
+    setMenuRect(nextRect)
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -74,13 +96,8 @@ export function SelectMenu({
     if (!open) return
 
     function updatePosition() {
-      const rect = rootRef.current?.getBoundingClientRect()
-      if (!rect) return
-      setMenuRect({
-        top: rect.bottom + 8,
-        left: menuAlign === 'right' ? rect.right : rect.left,
-        width: rect.width,
-      })
+      const nextRect = measureMenuRect()
+      if (nextRect) setMenuRect(nextRect)
     }
 
     updatePosition()
@@ -92,7 +109,7 @@ export function SelectMenu({
     }
   }, [menuAlign, open])
 
-  const menu = open && !disabled ? (
+  const menu = open && !disabled && menuRect ? (
     <AnimatePresence>
       <div
         className="fixed z-[120]"
@@ -156,7 +173,7 @@ export function SelectMenu({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleOpen}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
