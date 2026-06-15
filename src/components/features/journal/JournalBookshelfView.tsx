@@ -64,7 +64,7 @@ const COVER_DECORATIONS: { id: JournalCoverDecoration; label: string }[] = [
 ]
 
 export function JournalBookshelfView({ oshiId, onOpenBook, onOpenPostcard }: JournalBookshelfViewProps) {
-  const { books, postcards, loading, error, createBook, createPostcard, updateBook, deleteBook, collectPostcard } = useJournalStore()
+  const { books, postcards, loading, error, createBook, createPostcard, updateBook, deleteBook, deletePostcard, collectPostcard } = useJournalStore()
   const motionSeconds = useUiMotionSeconds()
   const pageTransition = usePageTransition()
   const panelTransition = usePanelTransition()
@@ -75,6 +75,7 @@ export function JournalBookshelfView({ oshiId, onOpenBook, onOpenPostcard }: Jou
   const [createKind, setCreateKind] = useState<CreateKind>('book')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [menuBookId, setMenuBookId] = useState<string | null>(null)
+  const [menuPostcardId, setMenuPostcardId] = useState<string | null>(null)
   const [draft, setDraft] = useState<BookDraft>(createDraft())
   const [query, setQuery] = useState('')
   const [viewMode, setViewMode] = useState<BookshelfViewMode>('grid')
@@ -136,6 +137,12 @@ export function JournalBookshelfView({ oshiId, onOpenBook, onOpenPostcard }: Jou
     if (!confirm(`Delete archive "${book.title}"? Its pages and placed stickers will be removed. Original notes will be kept.`)) return
     await deleteBook(book.id, oshiId)
     setMenuBookId(null)
+  }
+
+  async function handleDeletePostcard(postcard: JournalPage) {
+    if (!confirm(`Delete loose page "${postcard.title || 'Untitled loose page'}"? Its placed stickers will be removed. Original notes and illustrations will be kept.`)) return
+    await deletePostcard(postcard.id, oshiId)
+    setMenuPostcardId(null)
   }
 
   return (
@@ -270,7 +277,10 @@ export function JournalBookshelfView({ oshiId, onOpenBook, onOpenPostcard }: Jou
                   key={postcard.id}
                   postcard={postcard}
                   books={books}
+                  menuOpen={menuPostcardId === postcard.id}
                   onOpen={() => onOpenPostcard(postcard)}
+                  onToggleMenu={() => setMenuPostcardId(menuPostcardId === postcard.id ? null : postcard.id)}
+                  onDelete={() => handleDeletePostcard(postcard)}
                   onCollect={(bookId) => collectPostcard(postcard.id, bookId, oshiId)}
                 />
               ))}
@@ -453,46 +463,81 @@ function JournalBookCard({
 function LoosePageCard({
   postcard,
   books,
+  menuOpen,
   onOpen,
+  onToggleMenu,
+  onDelete,
   onCollect,
 }: {
   postcard: JournalPage
   books: JournalBook[]
+  menuOpen: boolean
   onOpen: () => void
+  onToggleMenu: () => void
+  onDelete: () => void
   onCollect: (bookId: string) => void
 }) {
   const [showCollect, setShowCollect] = useState(false)
+  const popoverTransition = usePopoverTransition()
   return (
-    <div className="relative rounded-2xl border border-border-color bg-bg-card p-3 shadow-sm">
-      <button type="button" onClick={onOpen} className="block w-full text-left">
-        <div className="relative aspect-[1.48] overflow-hidden rounded-xl border border-border-color bg-[var(--journal-canvas-bg)]">
-          <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(var(--journal-canvas-dot)_1px,transparent_1px)] [background-size:15px_15px]" />
-          <div className="absolute left-4 top-4 h-12 w-16 rotate-[-3deg] rounded-lg bg-[var(--journal-sticker-2)] shadow-sm" />
-          <div className="absolute bottom-4 right-4 h-10 w-20 rotate-[2deg] rounded-lg bg-[var(--journal-sticker-4)] shadow-sm" />
-          <FileImage size={24} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-accent" />
-        </div>
-        <p className="mt-3 truncate text-sm font-semibold text-text-primary">{postcard.title || 'Untitled loose page'}</p>
-        <p className="mt-1 text-xs text-text-muted">{postcard.date_label || new Date(postcard.created_at).getFullYear()}</p>
-      </button>
-      <div className="mt-3">
-        <Button variant="secondary" size="sm" className="w-full" onClick={() => setShowCollect(!showCollect)} disabled={books.length === 0}>
-          <BookOpen size={14} />
-          Collect into archive
-        </Button>
-      </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      className="group relative"
+    >
+      <div className="relative mx-auto w-full max-w-[180px]">
+        <motion.button type="button" onClick={onOpen} whileHover={{ y: -2 }} whileTap={{ scale: 0.99 }} className="block w-full text-left">
+          <LoosePageCover postcard={postcard} />
+        </motion.button>
+        <button
+          type="button"
+          onClick={onToggleMenu}
+          className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-bg-card text-accent shadow-sm transition-colors hover:bg-bg-secondary"
+          title="Loose page actions"
+        >
+          <MoreHorizontal size={16} />
+        </button>
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              {...popoverTransition}
+              className="absolute right-2 top-12 z-40 w-44 rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl"
+            >
+              <button type="button" onClick={onOpen} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-text-primary hover:bg-bg-secondary">
+                <FileImage size={14} />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCollect(!showCollect)}
+                disabled={books.length === 0}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-text-primary hover:bg-bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <BookOpen size={14} />
+                Collect
+              </button>
+              <button type="button" onClick={onDelete} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-red-500 hover:bg-red-50">
+                <Trash2 size={14} />
+                Delete
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       <AnimatePresence>
-        {showCollect && (
+        {menuOpen && showCollect && (
           <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className="absolute inset-x-3 top-[calc(100%-8px)] z-40 rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl"
+            {...popoverTransition}
+            className="absolute right-2 top-[156px] z-40 w-44 rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl"
           >
             {books.map((book) => (
               <button
                 key={book.id}
                 type="button"
-                onClick={() => onCollect(book.id)}
+                onClick={() => {
+                  onCollect(book.id)
+                  setShowCollect(false)
+                }}
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary"
               >
                 <BookOpen size={14} className="text-accent" />
@@ -502,6 +547,28 @@ function LoosePageCard({
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
+      <div className="mx-auto mt-3 max-w-[180px]">
+        <p className="truncate text-sm font-semibold text-text-primary">{postcard.title || 'Untitled loose page'}</p>
+        <p className="mt-1 text-xs text-text-muted">{postcard.date_label || new Date(postcard.created_at).getFullYear()}</p>
+        <p className="mt-1 text-xs text-text-muted">1 page</p>
+      </div>
+    </motion.div>
+  )
+}
+
+function LoosePageCover({ postcard }: { postcard: JournalPage }) {
+  return (
+    <div className="relative aspect-[0.68] w-full overflow-hidden rounded-[14px] border border-border-color bg-[var(--journal-canvas-bg)] shadow-[0_14px_28px_rgba(66,90,130,0.16)]">
+      <div className="absolute inset-3 rounded-[10px] border border-border-color/80" />
+      <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(var(--journal-canvas-dot)_1px,transparent_1px)] [background-size:15px_15px]" />
+      <div className="absolute left-5 top-8 h-12 w-16 rotate-[-3deg] rounded-xl bg-[var(--journal-sticker-2)] shadow-sm" />
+      <div className="absolute bottom-20 right-5 h-11 w-20 rotate-[2deg] rounded-xl bg-[var(--journal-sticker-4)] shadow-sm" />
+      <FileImage size={28} className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 text-accent" />
+      <div className="absolute inset-x-5 bottom-8 text-center">
+        <p className="truncate text-sm font-semibold text-text-primary">{postcard.title || 'Page'}</p>
+        <p className="mt-2 text-xs text-text-muted">{postcard.date_label || new Date(postcard.created_at).getFullYear()}</p>
+      </div>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { Button } from '../../ui/Button'
 import { TipTapEditor } from '../../editor/TipTapEditor'
 import type { JournalItemWithNote, JournalStickerStyle, UpdateNoteInput } from '../../../types'
 import { clampLayout, getNextZIndex } from '../../../features/journal/journalLayout'
+import { useI18n } from '../../../i18n/useI18n'
 
 interface JournalInspectorProps {
   oshiId: string
@@ -49,6 +50,7 @@ export function JournalInspector({
   onClose,
   variant = 'side',
 }: JournalInspectorProps) {
+  const { t } = useI18n()
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
@@ -57,9 +59,9 @@ export function JournalInspector({
   if (!selectedItem) {
     if (variant === 'popover') return null
     return (
-      <aside className="w-72 shrink-0 border-l border-border-color bg-bg-secondary/20 p-4">
-        <h3 className="text-sm font-semibold text-text-primary">Journal Page</h3>
-        <p className="mt-2 text-xs leading-relaxed text-text-muted">No sticker selected</p>
+      <aside className="w-full bg-bg-secondary/20 p-4">
+        <h3 className="text-sm font-semibold text-text-primary">{t('journalInspector.page')}</h3>
+        <p className="mt-2 text-xs leading-relaxed text-text-muted">{t('journalInspector.noSticker')}</p>
       </aside>
     )
   }
@@ -81,14 +83,14 @@ export function JournalInspector({
     return (
       <aside className={variant === 'popover'
         ? 'max-h-[560px] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-4 shadow-xl'
-        : 'w-72 shrink-0 overflow-y-auto border-l border-border-color bg-bg-secondary/20 p-4'}
+        : 'w-full overflow-y-auto bg-bg-secondary/20 p-4'}
       >
         <div className="mb-4">
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-xs uppercase tracking-wide text-text-muted">Selected illustration</p>
+              <p className="text-xs uppercase tracking-wide text-text-muted">{t('journalInspector.selectedIllustration')}</p>
               <h3 className="mt-1 line-clamp-2 text-base font-semibold text-text-primary">
-                {selectedItem.illustration?.title || 'Untitled'}
+                {selectedItem.illustration?.title || t('journalInspector.untitled')}
               </h3>
             </div>
             {variant === 'popover' && onClose && (
@@ -103,34 +105,34 @@ export function JournalInspector({
             )}
           </div>
           <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-text-secondary">
-            {selectedItem.illustration?.artist ? `by ${selectedItem.illustration.artist}` : 'Unknown artist'}
+            {selectedItem.illustration?.artist ? t('common.byArtist', { artist: selectedItem.illustration.artist }) : t('journalInspector.unknownArtist')}
           </p>
         </div>
 
         <section className="mb-5">
-          <h4 className="mb-2 text-xs font-semibold text-text-muted">Size</h4>
+          <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.size')}</h4>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="secondary" size="sm" onClick={() => patchLayout({ width: selectedItem.width - 24 })}>
               <Minus size={14} />
-              Width
+              {t('journalInspector.width')}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => patchLayout({ width: selectedItem.width + 24 })}>
               <Plus size={14} />
-              Width
+              {t('journalInspector.width')}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => patchLayout({ height: selectedItem.height - 18 })}>
               <Minus size={14} />
-              Height
+              {t('journalInspector.height')}
             </Button>
             <Button variant="secondary" size="sm" onClick={() => patchLayout({ height: selectedItem.height + 18 })}>
               <Plus size={14} />
-              Height
+              {t('journalInspector.height')}
             </Button>
           </div>
         </section>
 
         <section className="mb-5">
-          <h4 className="mb-2 text-xs font-semibold text-text-muted">Rotation</h4>
+          <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.rotation')}</h4>
           <div className="grid grid-cols-3 gap-2">
             <Button variant="secondary" size="sm" onClick={() => patchLayout({ rotation: selectedItem.rotation - 3 })}>-3</Button>
             <Button variant="secondary" size="sm" onClick={() => patchLayout({ rotation: 0 })}>
@@ -141,7 +143,7 @@ export function JournalInspector({
         </section>
 
         <section className="mb-5">
-          <h4 className="mb-2 text-xs font-semibold text-text-muted">Layer</h4>
+          <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.layer')}</h4>
           <Button
             variant="secondary"
             size="sm"
@@ -156,13 +158,13 @@ export function JournalInspector({
             })}
           >
             <ArrowUp size={14} />
-            Bring forward
+            {t('journalInspector.bringForward')}
           </Button>
         </section>
 
         <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={() => onRemove(selectedItem.id)}>
           <Trash2 size={15} />
-          Remove from page
+          {t('journalInspector.removeFromPage')}
         </Button>
       </aside>
     )
@@ -203,14 +205,14 @@ export function JournalInspector({
   return (
     <aside className={variant === 'popover'
       ? 'max-h-[560px] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-4 shadow-xl'
-      : 'w-72 shrink-0 overflow-y-auto border-l border-border-color bg-bg-secondary/20 p-4'}
+      : 'w-full overflow-y-auto bg-bg-secondary/20 p-4'}
     >
       <div className="mb-4">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <p className="text-xs uppercase tracking-wide text-text-muted">Selected sticker</p>
+              <p className="text-xs uppercase tracking-wide text-text-muted">{t('journalInspector.selectedSticker')}</p>
             <h3 className="mt-1 line-clamp-2 text-base font-semibold text-text-primary">
-              {noteTitle || 'Untitled'}
+              {noteTitle || t('journalInspector.untitled')}
             </h3>
           </div>
           {variant === 'popover' && onClose && (
@@ -245,7 +247,7 @@ export function JournalInspector({
         <Link to={`/oshis/${oshiId}/notes/${noteId}`} className="flex-1">
           <Button variant="secondary" size="sm" className="w-full">
             <ExternalLink size={15} />
-            Full editor
+            {t('journalInspector.fullEditor')}
           </Button>
         </Link>
       </div>
@@ -281,20 +283,20 @@ export function JournalInspector({
             <div className="border-t border-border-color p-2">
               <Button size="sm" className="w-full" onClick={handleSaveNote} disabled={saving}>
                 <Save size={15} />
-                {saving ? 'Saving...' : 'Save note'}
+                {saving ? t('journalInspector.saving') : t('journalInspector.saveNote')}
               </Button>
             </div>
           </div>
         ) : (
           <Button variant="secondary" size="sm" className="w-full" onClick={handleStartEditing}>
             <Edit3 size={15} />
-            Edit on page
+            {t('journalInspector.editOnPage')}
           </Button>
         )}
       </section>
 
       <section className="mb-5">
-        <h4 className="mb-2 text-xs font-semibold text-text-muted">Style</h4>
+        <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.style')}</h4>
         <div className="grid grid-cols-3 gap-1">
           {STYLES.map((style) => (
             <button
@@ -314,7 +316,7 @@ export function JournalInspector({
       </section>
 
       <section className="mb-5">
-        <h4 className="mb-2 text-xs font-semibold text-text-muted">Color</h4>
+        <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.color')}</h4>
         <div className="flex flex-wrap gap-2">
           {COLORS.map((color) => (
             <button
@@ -330,29 +332,29 @@ export function JournalInspector({
       </section>
 
       <section className="mb-5">
-        <h4 className="mb-2 text-xs font-semibold text-text-muted">Size</h4>
+        <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.size')}</h4>
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" size="sm" onClick={() => patchLayout({ width: selectedItem.width - 24 })}>
             <Minus size={14} />
-            Width
+            {t('journalInspector.width')}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => patchLayout({ width: selectedItem.width + 24 })}>
             <Plus size={14} />
-            Width
+            {t('journalInspector.width')}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => patchLayout({ height: selectedItem.height - 18 })}>
             <Minus size={14} />
-            Height
+            {t('journalInspector.height')}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => patchLayout({ height: selectedItem.height + 18 })}>
             <Plus size={14} />
-            Height
+            {t('journalInspector.height')}
           </Button>
         </div>
       </section>
 
       <section className="mb-5">
-        <h4 className="mb-2 text-xs font-semibold text-text-muted">Rotation</h4>
+        <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.rotation')}</h4>
         <div className="grid grid-cols-3 gap-2">
           <Button variant="secondary" size="sm" onClick={() => patchLayout({ rotation: selectedItem.rotation - 3 })}>-3</Button>
           <Button variant="secondary" size="sm" onClick={() => patchLayout({ rotation: 0 })}>
@@ -363,7 +365,7 @@ export function JournalInspector({
       </section>
 
       <section className="mb-5">
-        <h4 className="mb-2 text-xs font-semibold text-text-muted">Layer</h4>
+        <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.layer')}</h4>
         <Button
           variant="secondary"
           size="sm"
@@ -378,13 +380,13 @@ export function JournalInspector({
           })}
         >
           <ArrowUp size={14} />
-          Bring forward
+          {t('journalInspector.bringForward')}
         </Button>
       </section>
 
       <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={() => onRemove(selectedItem.id)}>
         <Trash2 size={15} />
-        Remove from page
+        {t('journalInspector.removeFromPage')}
       </Button>
     </aside>
   )

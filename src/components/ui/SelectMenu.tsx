@@ -109,8 +109,9 @@ export function SelectMenu({
     }
   }, [menuAlign, open])
 
-  const menu = open && !disabled && menuRect ? (
-    <AnimatePresence>
+  const menu = menuRect ? (
+    <AnimatePresence initial={false} onExitComplete={() => setMenuRect(null)}>
+      {open && !disabled && (
       <div
         className="fixed z-[120]"
         style={{
@@ -165,6 +166,7 @@ export function SelectMenu({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   ) : null
 

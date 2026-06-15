@@ -54,6 +54,7 @@ interface JournalState {
   deleteBook: (bookId: string, oshiId: string) => Promise<void>
   openBook: (bookId: string, oshiId: string) => Promise<void>
   openPostcard: (pageId: string, oshiId: string) => Promise<void>
+  openPageForEditing: (pageId: string, oshiId: string) => Promise<void>
   collectPostcard: (pageId: string, bookId: string, oshiId: string) => Promise<void>
   detachPage: (pageId: string, oshiId: string) => Promise<void>
   deletePostcard: (pageId: string, oshiId: string) => Promise<void>
@@ -179,6 +180,34 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         activeStandalonePageId: pageId,
         pages: page ? [page] : [],
         activePageId: pageId,
+        items,
+        unplacedNotes,
+        unplacedIllustrations,
+        loading: false,
+      })
+    } catch (e) {
+      set({ error: String(e), loading: false })
+    }
+  },
+
+  openPageForEditing: async (pageId, oshiId) => {
+    set({ loading: true, error: null })
+    try {
+      const page = await journalService.fetchJournalPageById(pageId)
+      if (!page) throw new Error('Journal page not found')
+
+      const pages = page.book_id ? await journalService.fetchJournalPages(page.book_id) : [page]
+      const items = await journalService.fetchJournalItems(page.id)
+      const [unplacedNotes, unplacedIllustrations] = await Promise.all([
+        journalService.fetchUnplacedNotes(page.id, oshiId),
+        journalService.fetchUnplacedIllustrations(page.id, oshiId),
+      ])
+
+      set({
+        activeBookId: page.book_id,
+        activeStandalonePageId: page.standalone ? page.id : null,
+        pages,
+        activePageId: page.id,
         items,
         unplacedNotes,
         unplacedIllustrations,

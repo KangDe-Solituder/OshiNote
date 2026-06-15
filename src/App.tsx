@@ -7,6 +7,7 @@ import { OshiListPage } from './pages/OshiListPage'
 import { OshiDetailPage } from './pages/OshiDetailPage'
 import { OshiOverviewPage } from './pages/OshiOverviewPage'
 import { OshiJournalPage } from './pages/OshiJournalPage'
+import { JournalEditorPage } from './pages/JournalEditorPage'
 import { OshiTagsPage } from './pages/OshiTagsPage'
 import { NoteEditorPage } from './pages/NoteEditorPage'
 import { TagsPage } from './pages/TagsPage'
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="oshis/:oshiId" element={<OshiOverviewPage />} />
               <Route path="oshis/:oshiId/notes" element={<OshiDetailPage />} />
               <Route path="oshis/:oshiId/journal" element={<OshiJournalPage />} />
+              <Route path="oshis/:oshiId/journal/pages/:pageId/edit" element={<JournalEditorPage />} />
               <Route path="oshis/:oshiId/illustrations" element={<OshiIllustrationsPage />} />
               <Route path="oshis/:oshiId/tags" element={<OshiTagsPage />} />
               <Route path="oshis/:oshiId/notes/new" element={<NoteEditorPage />} />
@@ -38,6 +40,7 @@ export default function App() {
               <Route path="notes" element={<NotesPage />} />
               <Route path="notes/new" element={<NoteEditorPage />} />
               <Route path="notes/:noteId" element={<NoteEditorPage />} />
+              <Route path="journal" element={<JournalEditorPage />} />
               <Route path="illustrations" element={<IllustrationsPage />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="tags/:tagName" element={<TagDetailPage />} />

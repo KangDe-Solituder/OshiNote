@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Check, ChevronDown, FileImage, ImageIcon, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '../../ui/Button'
@@ -22,6 +23,7 @@ interface JournalPageViewProps {
 }
 
 export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard = null, onBack }: JournalPageViewProps) {
+  const navigate = useNavigate()
   const pageTransition = usePageTransition()
   const panelTransition = usePanelTransition()
   const popoverTransition = usePopoverTransition()
@@ -46,7 +48,6 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
     loading,
     error,
     openBook,
-    setActivePage,
     updatePage,
     createPage,
     deletePage,
@@ -218,8 +219,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
 
   function handleOpenPage(pageId: string) {
     setSelectedItemId(null)
-    setViewingPageId(pageId)
-    setActivePage(pageId, oshiId)
+    navigate(`/oshis/${oshiId}/journal/pages/${pageId}/edit`)
   }
 
   function handleBack() {

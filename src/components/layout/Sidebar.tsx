@@ -10,6 +10,7 @@ import {
   FileText,
   Home,
   ImageIcon,
+  NotebookPen,
   Plus,
   Settings,
   Tag,
@@ -49,6 +50,7 @@ export function Sidebar() {
   const libraryNavItems = [
     { to: '/notes', icon: FileText, label: t('nav.allNotes') },
     { to: '/illustrations', icon: ImageIcon, label: t('nav.illustrations') },
+    { to: '/journal', icon: NotebookPen, label: t('nav.studio') },
     { to: '/tags', icon: Tag, label: t('nav.tags') },
   ]
 
@@ -150,7 +152,7 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection
-          title={t('nav.library')}
+          title={t('nav.workspace')}
           collapsed={collapsed}
           open={openSections.library}
           motionSeconds={motionSeconds}

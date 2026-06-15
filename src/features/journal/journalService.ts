@@ -460,13 +460,13 @@ export async function removeJournalItem(id: string): Promise<void> {
   await db.execute('DELETE FROM journal_items WHERE id = ?', [id])
 }
 
-async function fetchJournalPageById(id: string): Promise<JournalPage | null> {
+export async function fetchJournalPageById(id: string): Promise<JournalPage | null> {
   const db = await getDb()
   const rows = await db.select<JournalPageRow[]>('SELECT * FROM journal_pages WHERE id = ?', [id])
   return rows[0] ? deserializePage(rows[0]) : null
 }
 
-async function fetchJournalBookById(id: string): Promise<JournalBook | null> {
+export async function fetchJournalBookById(id: string): Promise<JournalBook | null> {
   const db = await getDb()
   const rows = await db.select<JournalBook[]>(
     `SELECT jb.*, COUNT(jp.id) as page_count
