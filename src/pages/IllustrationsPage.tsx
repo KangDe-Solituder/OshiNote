@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { Calendar, Heart, ImageIcon, LayoutGrid, List, Loader2, Plus, Search, UserRound } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import { Calendar, GalleryVerticalEnd, Heart, ImageIcon, LayoutGrid, List, Loader2, Plus, Search, UserRound } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 import { fetchAllOshis } from '../features/oshis/oshiService'
@@ -23,6 +24,7 @@ import { useI18n } from '../i18n/useI18n'
 import { SelectMenu } from '../components/ui/SelectMenu'
 
 type IllustrationCategoryFilter = 'all' | IllustrationCategory
+type IllustrationViewMode = 'masonry' | 'grid' | 'list'
 
 export function IllustrationsPage() {
   const { t } = useI18n()
@@ -35,7 +37,7 @@ export function IllustrationsPage() {
   const [tag, setTag] = useState('')
   const [sort, setSort] = useState<IllustrationSort>('newest')
   const [favorite, setFavorite] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [viewMode, setViewMode] = useState<IllustrationViewMode>('grid')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -108,7 +110,7 @@ export function IllustrationsPage() {
       </header>
 
       <main className={PAGE_CONTENT_CLASS}>
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-[1760px]">
           <div className="mb-5 space-y-3 border-b border-border-color pb-4">
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
@@ -121,6 +123,7 @@ export function IllustrationsPage() {
                 />
               </div>
               <div className="flex rounded-xl bg-bg-secondary p-1">
+                <IconToggle active={viewMode === 'masonry'} title={t('illustrations.masonryView')} onClick={() => setViewMode('masonry')}><GalleryVerticalEnd size={17} /></IconToggle>
                 <IconToggle active={viewMode === 'grid'} title={t('illustrations.gridView')} onClick={() => setViewMode('grid')}><LayoutGrid size={17} /></IconToggle>
                 <IconToggle active={viewMode === 'list'} title={t('illustrations.listView')} onClick={() => setViewMode('list')}><List size={17} /></IconToggle>
               </div>
@@ -190,8 +193,20 @@ export function IllustrationsPage() {
                 {t('illustrations.add')}
               </Button>
             </div>
+          ) : viewMode === 'masonry' ? (
+            <div className="columns-1 gap-3 pb-8 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5">
+              {illustrations.map((illustration) => (
+                <IllustrationMasonryCard
+                  key={illustration.id}
+                  illustration={illustration}
+                  oshis={oshis}
+                  onSelect={setSelectedId}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+              ))}
+            </div>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {illustrations.map((illustration) => (
                 <IllustrationCard
                   key={illustration.id}
@@ -231,16 +246,19 @@ export function IllustrationsPage() {
         />
       )}
 
-      {selected && (
-        <IllustrationDetailDrawer
-          illustration={selected}
-          oshis={oshis}
-          onClose={() => setSelectedId(null)}
-          onUpdate={handleUpdate}
-          onToggleFavorite={handleToggleFavorite}
-          onDelete={handleDelete}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <IllustrationDetailDrawer
+            key={selected.id}
+            illustration={selected}
+            oshis={oshis}
+            onClose={() => setSelectedId(null)}
+            onUpdate={handleUpdate}
+            onToggleFavorite={handleToggleFavorite}
+            onDelete={handleDelete}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -263,26 +281,73 @@ function IllustrationCard({
         <div className="relative aspect-[4/3] bg-bg-tertiary">
           <MediaImage
             path={illustration.thumbnail_path || illustration.original_path}
+            fallbackPath={illustration.original_path}
             alt={illustration.title || illustration.original_filename}
             className="h-full w-full object-cover"
           />
           <CategoryBadge category={illustration.category} />
         </div>
       </button>
-      <div className="p-3">
+      <div className="p-2.5">
         <div className="flex items-start gap-2">
           <button type="button" onClick={() => onSelect(illustration.id)} className="min-w-0 flex-1 text-left">
-            <h2 className="line-clamp-1 text-sm font-semibold text-text-primary">{illustration.title || t('common.untitled')}</h2>
+            <h2 className="line-clamp-1 text-xs font-semibold text-text-primary">{illustration.title || t('common.untitled')}</h2>
             <p className="mt-1 line-clamp-1 text-xs text-text-muted">{t('common.byArtist', { artist: illustration.artist || t('common.unknownArtist') })}</p>
           </button>
           <FavoriteButton illustration={illustration} onToggleFavorite={onToggleFavorite} />
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-text-muted">
-          <span className="rounded-full bg-bg-tertiary px-2 py-0.5">{getOshiName(oshis, illustration.oshi_id)}</span>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-text-muted">
+          <span className="rounded-full bg-bg-tertiary px-2 py-0.5">{getOshiName(oshis, illustration.oshi_id, t('illustrations.noOshi'), t('illustrations.unknownOshi'))}</span>
           {illustration.tags.slice(0, 2).map((tag) => (
             <span key={tag} className="rounded-full bg-accent-soft/50 px-2 py-0.5 text-accent">#{tag}</span>
           ))}
           <span className="ml-auto">{formatDate(illustration.date || illustration.created_at)}</span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function IllustrationMasonryCard({
+  illustration,
+  oshis,
+  onSelect,
+  onToggleFavorite,
+}: {
+  illustration: Illustration
+  oshis: Oshi[]
+  onSelect: (id: string) => void
+  onToggleFavorite: (id: string) => void
+}) {
+  const { t } = useI18n()
+  return (
+    <article className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
+      <button type="button" onClick={() => onSelect(illustration.id)} className="block w-full text-left">
+        <div className="relative bg-bg-tertiary">
+          <MediaImage
+            path={illustration.thumbnail_path || illustration.original_path}
+            fallbackPath={illustration.original_path}
+            alt={illustration.title || illustration.original_filename}
+            className="w-full object-cover"
+          />
+          <CategoryBadge category={illustration.category} />
+        </div>
+      </button>
+      <div className="p-2.5">
+        <div className="flex items-start gap-2">
+          <button type="button" onClick={() => onSelect(illustration.id)} className="min-w-0 flex-1 text-left">
+            <h2 className="line-clamp-1 text-xs font-semibold text-text-primary">{illustration.title || t('common.untitled')}</h2>
+            {illustration.artist && (
+              <p className="mt-1 line-clamp-1 text-xs text-text-muted">{t('common.byArtist', { artist: illustration.artist })}</p>
+            )}
+          </button>
+          <FavoriteButton illustration={illustration} onToggleFavorite={onToggleFavorite} />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-text-muted">
+          <span className="rounded-full bg-bg-tertiary px-2 py-0.5">{getOshiName(oshis, illustration.oshi_id, t('illustrations.noOshi'), t('illustrations.unknownOshi'))}</span>
+          {illustration.tags.slice(0, 2).map((tag) => (
+            <span key={tag} className="rounded-full bg-accent-soft/50 px-2 py-0.5 text-accent">#{tag}</span>
+          ))}
         </div>
       </div>
     </article>
@@ -306,6 +371,7 @@ function IllustrationRow({
       <button type="button" onClick={() => onSelect(illustration.id)} className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-bg-tertiary">
         <MediaImage
           path={illustration.thumbnail_path || illustration.original_path}
+          fallbackPath={illustration.original_path}
           alt={illustration.title || illustration.original_filename}
           className="h-full w-full object-cover"
         />
@@ -316,7 +382,7 @@ function IllustrationRow({
       </button>
       <span className="hidden min-w-28 text-xs text-text-muted md:inline-flex md:items-center md:gap-1.5">
         <UserRound size={13} />
-        <span className="truncate">{getOshiName(oshis, illustration.oshi_id)}</span>
+        <span className="truncate">{getOshiName(oshis, illustration.oshi_id, t('illustrations.noOshi'), t('illustrations.unknownOshi'))}</span>
       </span>
       <span className="hidden min-w-28 truncate text-xs text-text-muted lg:block">{illustration.artist || t('common.unknownArtist')}</span>
       <span className="hidden min-w-20 text-xs text-text-muted lg:inline-flex lg:items-center lg:gap-1.5">

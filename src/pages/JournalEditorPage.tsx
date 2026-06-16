@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -48,6 +49,9 @@ export function JournalEditorPage() {
   const [zoom, setZoom] = useState(1)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const [addMenuRect, setAddMenuRect] = useState<{ top: number; right: number; width: number } | null>(null)
+  const addMenuRootRef = useRef<HTMLDivElement>(null)
+  const addMenuRef = useRef<HTMLDivElement>(null)
   const [showNotePicker, setShowNotePicker] = useState(false)
   const [showIllustrationPicker, setShowIllustrationPicker] = useState(false)
   const [pageDraft, setPageDraft] = useState<PageDraft>(createDefaultPageDraft())
@@ -145,17 +149,18 @@ export function JournalEditorPage() {
   }
 
   async function handleOpenNotePicker() {
-    if (isDraftPage) {
+    const preparedPage = await ensurePageForAdding()
+    if (!preparedPage) {
       setDetailsOpen(true)
       return
     }
-    await loadUnplacedNotes(oshiId)
+    await loadUnplacedNotes(preparedPage.oshiId)
     setShowIllustrationPicker(false)
     setShowNotePicker(true)
   }
 
   async function handlePlaceNote(noteId: string) {
-    await placeNote(noteId, oshiId)
+    await placeNote(noteId, activePage?.oshi_id || selectedOshiId || oshiId)
     const placedItem = useJournalStore.getState().items.find((item) => item.note?.id === noteId)
     if (placedItem) {
       setSelectedItemId(placedItem.id)
@@ -164,17 +169,18 @@ export function JournalEditorPage() {
   }
 
   async function handleOpenIllustrationPicker() {
-    if (isDraftPage) {
+    const preparedPage = await ensurePageForAdding()
+    if (!preparedPage) {
       setDetailsOpen(true)
       return
     }
-    await loadUnplacedIllustrations(oshiId)
+    await loadUnplacedIllustrations(preparedPage.oshiId)
     setShowNotePicker(false)
     setShowIllustrationPicker(true)
   }
 
   async function handlePlaceIllustration(illustrationId: string) {
-    await placeIllustration(illustrationId, oshiId)
+    await placeIllustration(illustrationId, activePage?.oshi_id || selectedOshiId || oshiId)
     const placedItem = useJournalStore.getState().items.find((item) => item.illustration?.id === illustrationId)
     if (placedItem) {
       setSelectedItemId(placedItem.id)
@@ -237,6 +243,121 @@ export function JournalEditorPage() {
     await Promise.all(canvasItems.map((item) => removeItem(item.id)))
   }
 
+  async function ensurePageForAdding(): Promise<{ pageId: string; oshiId: string } | null> {
+    const targetOshiId = activePage?.oshi_id || selectedOshiId || oshiId
+    if (!targetOshiId) return null
+    if (activePage) return { pageId: activePage.id, oshiId: targetOshiId }
+
+    const title = pageDraft.title.trim() || t('journalEditor.defaultPageTitle')
+    const input = {
+      title,
+      description: pageDraft.description.trim(),
+      date_label: pageDraft.date_label.trim(),
+      background: pageDraft.background,
+    }
+
+    setSavingPage(true)
+    try {
+      const page = await createStandalonePostcard(targetOshiId, title)
+      await updateJournalPage(page.id, input)
+      await openPageForEditing(page.id, targetOshiId)
+      navigate(`/oshis/${targetOshiId}/journal/pages/${page.id}/edit`, { replace: true })
+      return { pageId: page.id, oshiId: targetOshiId }
+    } finally {
+      setSavingPage(false)
+    }
+  }
+
+  function measureAddMenuRect() {
+    const rect = addMenuRootRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return {
+      top: rect.bottom + 8,
+      right: window.innerWidth - rect.right,
+      width: rect.width,
+    }
+  }
+
+  function toggleAddMenu() {
+    if (showAddMenu) {
+      setShowAddMenu(false)
+      return
+    }
+    const rect = measureAddMenuRect()
+    if (!rect) return
+    setAddMenuRect(rect)
+    setShowAddMenu(true)
+  }
+
+  useEffect(() => {
+    if (!showAddMenu) return
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node
+      if (!addMenuRootRef.current?.contains(target) && !addMenuRef.current?.contains(target)) {
+        setShowAddMenu(false)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setShowAddMenu(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showAddMenu])
+
+  useLayoutEffect(() => {
+    if (!showAddMenu) return
+
+    function updatePosition() {
+      const rect = measureAddMenuRect()
+      if (rect) setAddMenuRect(rect)
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [showAddMenu])
+
+  const addMenu = addMenuRect ? (
+    <AnimatePresence initial={false} onExitComplete={() => setAddMenuRect(null)}>
+      {showAddMenu && (
+        <div
+          className="fixed z-[130]"
+          style={{
+            top: addMenuRect.top,
+            right: addMenuRect.right,
+          }}
+        >
+          <motion.div
+            ref={addMenuRef}
+            {...popoverTransition}
+            className="w-56 overflow-hidden rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl transform-gpu will-change-[transform,opacity]"
+            style={{ minWidth: addMenuRect.width }}
+          >
+            <button type="button" onClick={() => { handleOpenNotePicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
+              <Plus size={14} className="text-accent" />
+              {t('journalEditor.addNote')}
+            </button>
+            <button type="button" onClick={() => { handleOpenIllustrationPicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
+              <ImageIcon size={14} className="text-accent" />
+              {t('journalEditor.addIllustration')}
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  ) : null
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
       <header className={`${PAGE_HEADER_CLASS} gap-3`}>
@@ -268,29 +389,12 @@ export function JournalEditorPage() {
           {t('journalEditor.autoArrange')}
         </Button>
 
-        <div className="relative">
-          <Button variant="primary" size="sm" onClick={() => setShowAddMenu((open) => !open)}>
+        <div ref={addMenuRootRef} className="relative">
+          <Button variant="primary" size="sm" onClick={toggleAddMenu}>
             <Plus size={15} />
             {t('journalEditor.add')}
             <ChevronDown size={14} />
           </Button>
-          <AnimatePresence>
-            {showAddMenu && (
-              <motion.div
-                {...popoverTransition}
-                className="absolute right-0 top-11 z-50 w-56 rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl"
-              >
-                <button type="button" onClick={() => { handleOpenNotePicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
-                  <Plus size={14} className="text-accent" />
-                  {t('journalEditor.addNote')}
-                </button>
-                <button type="button" onClick={() => { handleOpenIllustrationPicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
-                  <ImageIcon size={14} className="text-accent" />
-                  {t('journalEditor.addIllustration')}
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         <button
@@ -302,6 +406,8 @@ export function JournalEditorPage() {
           {detailsOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </button>
       </header>
+
+      {addMenu ? createPortal(addMenu, document.body) : null}
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <main className="min-w-0 flex-1">

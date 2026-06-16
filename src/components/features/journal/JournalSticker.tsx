@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { Calendar, Heart, ImageIcon } from 'lucide-react'
 import type { JournalItemWithNote } from '../../../types'
 import { clampLayout, type JournalLayoutInput } from '../../../features/journal/journalLayout'
-import { resolveMediaUrl } from '../../../services/media/illustrationMedia'
+import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
 
 interface JournalStickerProps {
   item: JournalItemWithNote
@@ -28,10 +28,31 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
   useEffect(() => {
     if (item.item_type !== 'illustration') return
     let alive = true
-    resolveMediaUrl(item.illustration?.thumbnail_path || item.illustration?.original_path || null).then((url) => {
-      if (alive) setImageSrc(url)
-    })
-    return () => { alive = false }
+    let currentUrl = ''
+    const originalPath = item.illustration?.original_path || null
+    const primaryPath = item.illustration?.thumbnail_path || originalPath
+    resolveMediaUrl(primaryPath)
+      .then((url) => {
+        currentUrl = url
+        if (alive) setImageSrc(url)
+        else releaseMediaUrl(url)
+      })
+      .catch(() => {
+        if (!alive || !item.illustration?.thumbnail_path || !originalPath) return
+        resolveMediaUrl(originalPath)
+          .then((url) => {
+            currentUrl = url
+            if (alive) setImageSrc(url)
+            else releaseMediaUrl(url)
+          })
+          .catch(() => {
+            if (alive) setImageSrc('')
+          })
+      })
+    return () => {
+      alive = false
+      releaseMediaUrl(currentUrl)
+    }
   }, [item.illustration?.original_path, item.illustration?.thumbnail_path, item.item_type])
 
   function handlePointerDown(e: PointerEvent<HTMLButtonElement>) {

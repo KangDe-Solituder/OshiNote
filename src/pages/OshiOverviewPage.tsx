@@ -9,7 +9,7 @@ import { fetchOshiById, getOshiNoteCount, updateOshi } from '../features/oshis/o
 import { fetchRecentNotesByOshi, getTagsByOshi } from '../features/notes/noteService'
 import { fetchIllustrations, getIllustrationCountByOshi } from '../features/illustrations/illustrationService'
 import { fetchJournalBooks, getJournalBookCountByOshi } from '../features/journal/journalService'
-import { resolveMediaUrl } from '../services/media/illustrationMedia'
+import { releaseMediaUrl, resolveMediaUrl } from '../services/media/illustrationMedia'
 import type { CreateOshiInput, Illustration, JournalBook, Note, Oshi } from '../types'
 
 export function OshiOverviewPage() {
@@ -252,10 +252,20 @@ function OverviewMediaImage({ path, alt }: { path: string | null; alt: string })
   const [src, setSrc] = useState('')
   useEffect(() => {
     let alive = true
-    resolveMediaUrl(path).then((url) => {
-      if (alive) setSrc(url)
-    })
-    return () => { alive = false }
+    let currentUrl = ''
+    resolveMediaUrl(path)
+      .then((url) => {
+        currentUrl = url
+        if (alive) setSrc(url)
+        else releaseMediaUrl(url)
+      })
+      .catch(() => {
+        if (alive) setSrc('')
+      })
+    return () => {
+      alive = false
+      releaseMediaUrl(currentUrl)
+    }
   }, [path])
   if (!src) return <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={20} /></div>
   return <img src={src} alt={alt} className="h-full w-full object-cover" />

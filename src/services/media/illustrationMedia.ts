@@ -1,6 +1,5 @@
-import { convertFileSrc, isTauri } from '@tauri-apps/api/core'
-import { appDataDir, join } from '@tauri-apps/api/path'
-import { BaseDirectory, exists, mkdir, remove, writeFile } from '@tauri-apps/plugin-fs'
+import { isTauri } from '@tauri-apps/api/core'
+import { BaseDirectory, exists, mkdir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs'
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 const THUMBNAIL_MAX_WIDTH = 640
@@ -80,9 +79,12 @@ export async function removeIllustrationFiles(paths: Array<string | null | undef
 export async function resolveMediaUrl(relativePath: string | null | undefined): Promise<string> {
   if (!relativePath) return ''
   if (!isTauri()) return ''
-  const root = await appDataDir()
-  const fullPath = await join(root, relativePath)
-  return convertFileSrc(fullPath)
+  const bytes = await readFile(relativePath, { baseDir: BaseDirectory.AppData })
+  return URL.createObjectURL(new Blob([bytes], { type: getImageMimeType(relativePath) }))
+}
+
+export function releaseMediaUrl(url: string): void {
+  if (url.startsWith('blob:')) URL.revokeObjectURL(url)
 }
 
 async function ensureMediaDir(path: string): Promise<void> {
@@ -139,4 +141,12 @@ function createThumbnail(file: File): Promise<Uint8Array | null> {
     }
     image.src = url
   })
+}
+
+function getImageMimeType(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase()
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'png') return 'image/png'
+  if (ext === 'webp') return 'image/webp'
+  return 'application/octet-stream'
 }

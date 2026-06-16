@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Button } from '../../ui/Button'
 import type { Illustration } from '../../../types'
 import { usePopoverTransition } from '../themes/uiMotion'
-import { resolveMediaUrl } from '../../../services/media/illustrationMedia'
+import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
 
 interface JournalIllustrationPickerProps {
   illustrations: Illustration[]
@@ -95,10 +95,28 @@ function PickerImage({ illustration }: { illustration: Illustration }) {
 
   useEffect(() => {
     let alive = true
-    resolveMediaUrl(illustration.thumbnail_path || illustration.original_path).then((url) => {
-      if (alive) setSrc(url)
-    })
-    return () => { alive = false }
+    let currentUrl = ''
+    resolveMediaUrl(illustration.thumbnail_path || illustration.original_path)
+      .then((url) => {
+        currentUrl = url
+        if (alive) setSrc(url)
+        else releaseMediaUrl(url)
+      })
+      .catch(() => {
+        if (alive && illustration.thumbnail_path) {
+          resolveMediaUrl(illustration.original_path).then((url) => {
+            currentUrl = url
+            if (alive) setSrc(url)
+            else releaseMediaUrl(url)
+          }).catch(() => {
+            if (alive) setSrc('')
+          })
+        }
+      })
+    return () => {
+      alive = false
+      releaseMediaUrl(currentUrl)
+    }
   }, [illustration.original_path, illustration.thumbnail_path])
 
   return (
