@@ -47,7 +47,7 @@ export function TipTapEditor({ content, onUpdate, afterToolbar }: TipTapEditorPr
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[300px] px-4 py-3 text-text-primary',
+        class: 'oshinote-editor-content prose prose-sm max-w-none focus:outline-none min-h-[300px] px-4 py-3 text-text-primary',
       },
     },
     onSelectionUpdate: () => {},

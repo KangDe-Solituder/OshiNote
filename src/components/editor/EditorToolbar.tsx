@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/react'
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Palette } from 'lucide-react'
 import { EmojiPicker } from '../ui/EmojiPicker'
 import { useState, useRef, useEffect } from 'react'
-import type { ReactNode } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { SelectMenu } from '../ui/SelectMenu'
 
 interface EditorToolbarProps {
@@ -14,10 +14,15 @@ const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32p
 const COLORS = ['#EC4899', '#8B5CF6', '#60A5FA', '#34D399', '#FBBF24', '#F87171', '#4A1942', '#3B82F6', '#000000', '#FFFFFF']
 const HIGHLIGHTS = ['#FEF08A', '#FBCFE8', '#BFDBFE', '#BBF7D0', '#FED7AA', '#E9D5FF', 'transparent']
 
+function keepEditorFocus(event: ReactMouseEvent) {
+  event.preventDefault()
+}
+
 function ToolBtn({ active, onClick, children, title }: { active?: boolean; onClick: () => void; children: ReactNode; title: string }) {
   return (
     <button
       type="button"
+      onMouseDown={keepEditorFocus}
       onClick={onClick}
       title={title}
       className={`px-2.5 py-1.5 rounded text-sm transition-colors ${
@@ -74,6 +79,7 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
         size="sm"
         buttonClassName="rounded-lg bg-transparent"
         menuClassName="w-[104px]"
+        preserveFocusOnMouseDown
       />
 
       <SelectMenu
@@ -93,6 +99,7 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
         size="sm"
         buttonClassName="rounded-lg bg-transparent"
         menuClassName="w-[148px]"
+        preserveFocusOnMouseDown
       />
 
       <div className="w-px h-5 bg-border-color mx-1" />
@@ -100,6 +107,7 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
       <div ref={colorRef} className="relative">
         <button
           type="button"
+          onMouseDown={keepEditorFocus}
           onClick={() => setShowColor(!showColor)}
           className="px-2.5 py-1.5 rounded text-sm text-text-secondary hover:bg-bg-tertiary transition-colors flex items-center gap-1"
         >
@@ -111,6 +119,7 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
             {COLORS.map((color) => (
               <button
                 key={color}
+                onMouseDown={keepEditorFocus}
                 onClick={() => { editor.chain().focus().setColor(color === '#000000' ? color : color).run(); setShowColor(false) }}
                 className="w-6 h-6 rounded-full border border-border-color"
                 style={{ backgroundColor: color }}
@@ -123,6 +132,7 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
       <div ref={highlightRef} className="relative">
         <button
           type="button"
+          onMouseDown={keepEditorFocus}
           onClick={() => setShowHighlight(!showHighlight)}
           className="px-2.5 py-1.5 rounded text-sm text-text-secondary hover:bg-bg-tertiary transition-colors"
         >
@@ -133,6 +143,7 @@ export function EditorToolbar({ editor, onInsertEmoji }: EditorToolbarProps) {
             {HIGHLIGHTS.map((color) => (
               <button
                 key={color}
+                onMouseDown={keepEditorFocus}
                 onClick={() => {
                   if (color === 'transparent') editor.chain().focus().unsetHighlight().run()
                   else editor.chain().focus().toggleHighlight({ color }).run()

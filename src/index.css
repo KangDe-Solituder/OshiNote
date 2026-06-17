@@ -33,6 +33,20 @@ body {
   user-select: none;
 }
 
+.oshinote-editor-content,
+.oshinote-editor-content *,
+.oshinote-editor-content::before,
+.oshinote-editor-content::after,
+.oshinote-editor-content *::before,
+.oshinote-editor-content *::after {
+  transition-duration: 0s !important;
+}
+
+.oshinote-editor-content .ProseMirror-gapcursor,
+.oshinote-editor-content .ProseMirror-gapcursor::after {
+  display: none !important;
+}
+
 #root {
   width: 100vw;
   height: 100vh;

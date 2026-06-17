@@ -23,6 +23,7 @@ interface SelectMenuProps {
   placeholder?: string
   menuAlign?: 'left' | 'right'
   size?: 'sm' | 'md'
+  preserveFocusOnMouseDown?: boolean
 }
 
 export function SelectMenu({
@@ -37,6 +38,7 @@ export function SelectMenu({
   placeholder,
   menuAlign = 'left',
   size = 'md',
+  preserveFocusOnMouseDown = false,
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false)
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null)
@@ -146,6 +148,7 @@ export function SelectMenu({
                   role="option"
                   aria-selected={active}
                   disabled={option.disabled}
+                  onMouseDown={preserveFocusOnMouseDown ? (event) => event.preventDefault() : undefined}
                   onClick={() => {
                     onChange(option.value)
                     setOpen(false)
@@ -175,6 +178,7 @@ export function SelectMenu({
       <button
         type="button"
         disabled={disabled}
+        onMouseDown={preserveFocusOnMouseDown ? (event) => event.preventDefault() : undefined}
         onClick={toggleOpen}
         aria-haspopup="listbox"
         aria-expanded={open}

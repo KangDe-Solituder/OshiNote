@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Smile, X } from 'lucide-react'
 import { KAOMOJI_CATEGORIES, EMOJI_CATEGORIES } from '../../features/notes/kaomojiPresets'
@@ -10,6 +11,10 @@ interface EmojiPickerProps {
 
 type Tab = 'emoji' | 'kaomoji' | 'custom'
 const CUSTOM_KAOMOJI_KEY = 'oshinote.customKaomoji'
+
+function keepEditorFocus(event: ReactMouseEvent) {
+  event.preventDefault()
+}
 
 export function EmojiPicker({ onSelect }: EmojiPickerProps) {
   const motionSeconds = useUiMotionSeconds()
@@ -32,6 +37,7 @@ export function EmojiPicker({ onSelect }: EmojiPickerProps) {
     <div ref={ref} className="relative">
       <button
         type="button"
+        onMouseDown={keepEditorFocus}
         onClick={() => setOpen(!open)}
         className="px-3 py-1.5 rounded text-sm text-text-secondary hover:bg-bg-tertiary transition-colors"
       >
@@ -84,6 +90,7 @@ export function EmojiPicker({ onSelect }: EmojiPickerProps) {
                         {emojis.map((emoji) => (
                           <button
                             key={emoji}
+                            onMouseDown={keepEditorFocus}
                             onClick={() => { onSelect(emoji); setOpen(false) }}
                             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg-tertiary text-lg transition-colors"
                           >
@@ -103,6 +110,7 @@ export function EmojiPicker({ onSelect }: EmojiPickerProps) {
                         {kaomojis.map((kao) => (
                           <button
                             key={kao}
+                            onMouseDown={keepEditorFocus}
                             onClick={() => { onSelect(kao); setOpen(false) }}
                             className="px-2 py-1 rounded-lg hover:bg-bg-tertiary text-xs text-text-primary transition-colors whitespace-nowrap"
                           >
@@ -148,6 +156,7 @@ export function EmojiPicker({ onSelect }: EmojiPickerProps) {
                       {customItems.map((item) => (
                         <span key={item} className="group inline-flex items-center gap-1 rounded-lg hover:bg-bg-tertiary transition-colors">
                           <button
+                            onMouseDown={keepEditorFocus}
                             onClick={() => { onSelect(item); setOpen(false) }}
                             className="px-2 py-1 text-xs text-text-primary whitespace-nowrap"
                           >
