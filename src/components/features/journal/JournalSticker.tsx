@@ -4,6 +4,7 @@ import { Calendar, Heart, ImageIcon } from 'lucide-react'
 import type { JournalItemWithNote } from '../../../types'
 import { clampLayout, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
+import { useI18n } from '../../../i18n/useI18n'
 
 interface JournalStickerProps {
   item: JournalItemWithNote
@@ -22,6 +23,7 @@ interface DragState {
 }
 
 export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout }: JournalStickerProps) {
+  const { t } = useI18n()
   const dragRef = useRef<DragState | null>(null)
   const [imageSrc, setImageSrc] = useState('')
 
@@ -146,14 +148,14 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
           <div className="shrink-0 p-3">
             <div className="flex items-start gap-2">
               <h4 className="min-w-0 flex-1 text-sm font-semibold text-text-primary line-clamp-1">
-                {item.illustration?.title || 'Untitled'}
+                {item.illustration?.title || t('common.untitled')}
               </h4>
               {item.illustration?.favorite && (
                 <Heart size={15} className="shrink-0 text-pink-500" fill="currentColor" />
               )}
             </div>
             <p className="mt-1 line-clamp-1 text-[11px] text-text-muted">
-              {item.illustration?.artist ? `by ${item.illustration.artist}` : 'Unknown artist'}
+              {item.illustration?.artist ? t('common.byArtist', { artist: item.illustration.artist }) : t('common.unknownArtist')}
             </p>
           </div>
         </div>
@@ -161,7 +163,7 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
         <div className="flex h-full flex-col p-4">
           <div className="mb-2 flex items-start gap-2">
             <h4 className="min-w-0 flex-1 text-sm font-semibold text-text-primary line-clamp-2">
-              {item.note?.title || 'Untitled'}
+              {item.note?.title || t('common.untitled')}
             </h4>
             {item.note?.favorite && (
               <Heart size={15} className="shrink-0 text-pink-500" fill="currentColor" />
@@ -169,7 +171,7 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
           </div>
 
           <p className="flex-1 text-xs leading-relaxed text-text-secondary line-clamp-4">
-            {item.note?.plain_text || 'No content yet'}
+            {item.note?.plain_text || t('common.noContent')}
           </p>
 
           <div className="mt-3 flex items-center gap-1.5 overflow-hidden">

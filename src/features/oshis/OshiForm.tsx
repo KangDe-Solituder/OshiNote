@@ -22,7 +22,6 @@ export function OshiForm({ open, onClose, onSubmit, editing }: OshiFormProps) {
   const [activityLinks, setActivityLinks] = useState<string[]>([''])
   const [linkError, setLinkError] = useState('')
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (editing) {
       setName(editing.name)
@@ -39,7 +38,6 @@ export function OshiForm({ open, onClose, onSubmit, editing }: OshiFormProps) {
     }
     setLinkError('')
   }, [editing, open])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

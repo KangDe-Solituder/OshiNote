@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { useUiMotionSeconds } from '../features/themes/uiMotion'
+import { OVERLAY_Z_INDEX } from './overlay'
 
 export interface SelectMenuOption {
   value: string
@@ -48,7 +49,7 @@ export function SelectMenu({
   const selected = options.find((option) => option.value === value)
   const menuOrigin = menuAlign === 'right' ? 'origin-top-right' : 'origin-top-left'
 
-  function measureMenuRect() {
+  const measureMenuRect = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
     if (!rect) return null
     return {
@@ -56,7 +57,7 @@ export function SelectMenu({
       left: menuAlign === 'right' ? rect.right : rect.left,
       width: rect.width,
     }
-  }
+  }, [menuAlign])
 
   function toggleOpen() {
     if (open) {
@@ -109,17 +110,18 @@ export function SelectMenu({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [menuAlign, open])
+  }, [measureMenuRect, open])
 
   const menu = menuRect ? (
     <AnimatePresence initial={false} onExitComplete={() => setMenuRect(null)}>
       {open && !disabled && (
       <div
-        className="fixed z-[120]"
+        className="fixed"
         style={{
           top: menuRect.top,
           left: menuRect.left,
           transform: menuAlign === 'right' ? 'translateX(-100%)' : undefined,
+          zIndex: OVERLAY_Z_INDEX.dropdown,
         }}
       >
         <motion.div

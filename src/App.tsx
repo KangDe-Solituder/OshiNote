@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './components/features/themes/ThemeProvider'
 import { MotionProvider } from './components/features/themes/MotionProvider'
 import { MainLayout } from './components/layout/MainLayout'
@@ -6,7 +6,7 @@ import { HomePage } from './pages/HomePage'
 import { OshiListPage } from './pages/OshiListPage'
 import { OshiDetailPage } from './pages/OshiDetailPage'
 import { OshiOverviewPage } from './pages/OshiOverviewPage'
-import { OshiJournalPage } from './pages/OshiJournalPage'
+import { JournalHomePage } from './pages/JournalHomePage'
 import { JournalEditorPage } from './pages/JournalEditorPage'
 import { OshiTagsPage } from './pages/OshiTagsPage'
 import { NoteEditorPage } from './pages/NoteEditorPage'
@@ -31,7 +31,7 @@ export default function App() {
               <Route path="oshis" element={<OshiListPage />} />
               <Route path="oshis/:oshiId" element={<OshiOverviewPage />} />
               <Route path="oshis/:oshiId/notes" element={<OshiDetailPage />} />
-              <Route path="oshis/:oshiId/journal" element={<OshiJournalPage />} />
+              <Route path="oshis/:oshiId/journal" element={<Navigate to="/journal" replace />} />
               <Route path="oshis/:oshiId/journal/pages/:pageId/edit" element={<JournalEditorPage />} />
               <Route path="oshis/:oshiId/illustrations" element={<OshiIllustrationsPage />} />
               <Route path="oshis/:oshiId/tags" element={<OshiTagsPage />} />
@@ -40,7 +40,9 @@ export default function App() {
               <Route path="notes" element={<NotesPage />} />
               <Route path="notes/new" element={<NoteEditorPage />} />
               <Route path="notes/:noteId" element={<NoteEditorPage />} />
-              <Route path="journal" element={<JournalEditorPage />} />
+              <Route path="journal" element={<JournalHomePage />} />
+              <Route path="journal/create" element={<JournalEditorPage />} />
+              <Route path="journal/pages/:pageId/edit" element={<JournalEditorPage />} />
               <Route path="illustrations" element={<IllustrationsPage />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="tags/:tagName" element={<TagDetailPage />} />

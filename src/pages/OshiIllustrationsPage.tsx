@@ -39,7 +39,7 @@ import {
 } from '../features/illustrations/illustrationService'
 import {
   releaseMediaUrl,
-  resolveMediaUrl,
+  resolveMediaUrlWithFallback,
   storeIllustrationImage,
   validateIllustrationFile,
 } from '../services/media/illustrationMedia'
@@ -51,7 +51,9 @@ import type {
   Oshi,
   UpdateIllustrationInput,
 } from '../types'
+import { formatDate, formatImageSize, getOshiName } from '../features/illustrations/illustrationFormat'
 import { SelectMenu } from '../components/ui/SelectMenu'
+import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
 import { useI18n } from '../i18n/useI18n'
 import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
 
@@ -573,7 +575,7 @@ export function IllustrationCreateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-bg-primary/70 p-4 backdrop-blur-sm sm:p-6">
+    <div className="fixed inset-0 flex items-center justify-center bg-bg-primary/70 p-4 backdrop-blur-sm sm:p-6" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
       <div className="grid h-[calc(100vh-48px)] max-h-[780px] w-[min(920px,calc(100vw-32px))] min-h-0 overflow-hidden rounded-3xl border border-border-color bg-bg-primary shadow-glass md:grid-cols-[minmax(0,1fr)_360px]">
         <div className="hidden min-h-0 bg-bg-secondary/40 p-4 md:block">
           {previewUrl ? (
@@ -746,7 +748,8 @@ export function IllustrationDetailDrawer({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: motionSeconds, ease: 'easeOut' }}
-          className="fixed inset-0 z-[160] flex items-center justify-center bg-black/82 p-5 backdrop-blur-sm"
+          className="fixed inset-0 flex items-center justify-center bg-black/82 p-5 backdrop-blur-sm"
+          style={{ zIndex: OVERLAY_Z_INDEX.fullscreen }}
           onClick={() => setShowPreview(false)}
         >
           <button
@@ -787,7 +790,8 @@ export function IllustrationDetailDrawer({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: motionSeconds === 0 ? 0 : 28 }}
       transition={{ duration: motionSeconds, ease: 'easeOut' }}
-      className="fixed right-0 top-0 z-[100] flex h-full w-[min(440px,100vw)] flex-col border-l border-border-color bg-bg-primary shadow-2xl transform-gpu will-change-[transform,opacity]"
+      className="fixed right-0 top-0 flex h-full w-[min(440px,100vw)] flex-col border-l border-border-color bg-bg-primary shadow-2xl transform-gpu will-change-[transform,opacity]"
+      style={{ zIndex: OVERLAY_Z_INDEX.drawer }}
     >
       <div className="flex items-center gap-3 border-b border-border-color p-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-accent-soft/25 text-accent">
@@ -1003,8 +1007,9 @@ export function MediaImage({
     let alive = true
     setSrc('')
     let currentUrl = ''
-    resolveMediaUrl(candidates[sourceIndex])
+    resolveMediaUrlWithFallback(candidates[sourceIndex], candidates[sourceIndex + 1])
       .then((url) => {
+        if (!url) throw new Error('Media file not found')
         currentUrl = url
         if (alive) setSrc(url)
         else releaseMediaUrl(url)
@@ -1114,21 +1119,9 @@ function parseTagInput(value: string): string[] {
   return Array.from(new Set(value.replace(/\uFF0C/g, ',').split(',').map((tag) => tag.trim()).filter(Boolean)))
 }
 
-export function formatDate(value: string): string {
-  const date = new Date(value.replace(' ', 'T'))
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString()
-}
-
 function toDateInput(value: string | null): string {
   if (!value) return ''
   return value.slice(0, 10)
-}
-
-function formatImageSize(illustration: Illustration): string {
-  const dimensions = illustration.width && illustration.height ? `${illustration.width}x${illustration.height}` : ''
-  const size = illustration.file_size > 0 ? `${(illustration.file_size / 1024 / 1024).toFixed(1)} MB` : ''
-  return [dimensions, size].filter(Boolean).join(' / ')
 }
 
 function normalizeWebUrl(value: string): string | null {
@@ -1151,9 +1144,4 @@ function formatUrlLabel(value: string): string {
   } catch {
     return value
   }
-}
-
-export function getOshiName(oshis: Oshi[], oshiId: string | null, emptyLabel = 'No Oshi', unknownLabel = 'Unknown Oshi'): string {
-  if (!oshiId) return emptyLabel
-  return oshis.find((oshi) => oshi.id === oshiId)?.name || unknownLabel
 }

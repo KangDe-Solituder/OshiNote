@@ -13,9 +13,8 @@ import {
   updateIllustration,
 } from '../features/illustrations/illustrationService'
 import type { Illustration, IllustrationCategory, IllustrationSort, Oshi, UpdateIllustrationInput } from '../types'
+import { formatDate, getOshiName } from '../features/illustrations/illustrationFormat'
 import {
-  formatDate,
-  getOshiName,
   IllustrationCreateModal,
   IllustrationDetailDrawer,
   MediaImage,

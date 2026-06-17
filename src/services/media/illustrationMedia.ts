@@ -83,6 +83,22 @@ export async function resolveMediaUrl(relativePath: string | null | undefined): 
   return URL.createObjectURL(new Blob([bytes], { type: getImageMimeType(relativePath) }))
 }
 
+export async function resolveMediaUrlWithFallback(
+  primaryPath: string | null | undefined,
+  fallbackPath?: string | null
+): Promise<string> {
+  const candidates = Array.from(new Set([primaryPath, fallbackPath].filter((path): path is string => Boolean(path))))
+  for (const path of candidates) {
+    try {
+      const url = await resolveMediaUrl(path)
+      if (url) return url
+    } catch {
+      // Try the next candidate. Callers should render their normal placeholder if all candidates fail.
+    }
+  }
+  return ''
+}
+
 export function releaseMediaUrl(url: string): void {
   if (url.startsWith('blob:')) URL.revokeObjectURL(url)
 }

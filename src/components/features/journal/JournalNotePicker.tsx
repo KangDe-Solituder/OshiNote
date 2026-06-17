@@ -4,6 +4,8 @@ import { motion } from 'framer-motion'
 import { Button } from '../../ui/Button'
 import type { Note } from '../../../types'
 import { usePopoverTransition } from '../themes/uiMotion'
+import { useI18n } from '../../../i18n/useI18n'
+import { OVERLAY_Z_INDEX } from '../../ui/overlay'
 
 interface JournalNotePickerProps {
   notes: Note[]
@@ -12,6 +14,7 @@ interface JournalNotePickerProps {
 }
 
 export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePickerProps) {
+  const { t } = useI18n()
   const popoverTransition = usePopoverTransition()
   const [query, setQuery] = useState('')
   const filteredNotes = useMemo(() => {
@@ -27,16 +30,17 @@ export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePi
   return (
     <motion.div
       {...popoverTransition}
-      className="absolute right-5 top-16 z-50 flex max-h-[520px] w-96 origin-top-right flex-col overflow-hidden rounded-2xl border border-border-color bg-bg-primary shadow-xl"
+      className="fixed right-5 top-24 flex max-h-[520px] w-[min(384px,calc(100vw-40px))] origin-top-right flex-col overflow-hidden rounded-2xl border border-border-color bg-bg-primary shadow-xl"
+      style={{ zIndex: OVERLAY_Z_INDEX.popover }}
     >
       <div className="flex items-center gap-2 border-b border-border-color p-3">
         <StickyNote size={18} className="text-accent" />
-        <h3 className="flex-1 text-sm font-semibold text-text-primary">Place a note</h3>
+        <h3 className="flex-1 text-sm font-semibold text-text-primary">{t('journalPicker.note.title')}</h3>
         <button
           type="button"
           onClick={onClose}
           className="rounded-lg p-1 text-text-muted hover:bg-bg-tertiary hover:text-text-primary"
-          title="Close"
+          title={t('common.cancel')}
         >
           <X size={16} />
         </button>
@@ -49,14 +53,14 @@ export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePi
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full rounded-xl border border-border-color bg-bg-secondary py-2 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
-            placeholder="Search title, content, tags..."
+            placeholder={t('journalPicker.note.search')}
           />
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {filteredNotes.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-text-muted">No unplaced notes found.</div>
+          <div className="px-4 py-8 text-center text-sm text-text-muted">{t('journalPicker.note.empty')}</div>
         ) : (
           filteredNotes.map((note) => (
             <button
@@ -65,8 +69,8 @@ export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePi
               onClick={() => onPlaceNote(note.id)}
               className="mb-2 w-full rounded-xl border border-border-color bg-bg-secondary/60 p-3 text-left transition-colors hover:border-accent hover:bg-accent-soft/30"
             >
-              <p className="line-clamp-1 text-sm font-semibold text-text-primary">{note.title || 'Untitled'}</p>
-              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-text-muted">{note.plain_text || 'No content'}</p>
+              <p className="line-clamp-1 text-sm font-semibold text-text-primary">{note.title || t('common.untitled')}</p>
+              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-text-muted">{note.plain_text || t('common.noContent')}</p>
               <div className="mt-2 flex items-center gap-1">
                 {note.tags.slice(0, 3).map((tag) => (
                   <span key={tag} className="rounded-full bg-bg-tertiary px-2 py-0.5 text-[11px] text-text-muted">
@@ -80,7 +84,7 @@ export function JournalNotePicker({ notes, onPlaceNote, onClose }: JournalNotePi
       </div>
 
       <div className="border-t border-border-color p-3">
-        <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>Done</Button>
+        <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>{t('common.done')}</Button>
       </div>
     </motion.div>
   )

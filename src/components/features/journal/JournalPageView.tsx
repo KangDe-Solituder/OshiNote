@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Check, ChevronDown, FileImage, ImageIcon, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '../../ui/Button'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../../layout/pageShell'
 import { useJournalStore } from '../../../stores/journalStore'
 import { useNoteStore } from '../../../stores/noteStore'
 import type { JournalBook, JournalItemWithNote, JournalPage } from '../../../types'
 import { autoArrangeNotes, clampLayout, getJournalCanvasSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { fetchJournalItems } from '../../../features/journal/journalService'
-import { getPageBackground, JournalCanvas } from './JournalCanvas'
+import { JournalCanvas } from './JournalCanvas'
+import { getPageBackground } from './journalCanvasStyle'
 import { JournalNotePicker } from './JournalNotePicker'
 import { JournalIllustrationPicker } from './JournalIllustrationPicker'
 import { JournalStickerPopover } from './JournalStickerPopover'
 import { usePageTransition, usePanelTransition, usePopoverTransition } from '../themes/uiMotion'
+import { useI18n } from '../../../i18n/useI18n'
 
 interface JournalPageViewProps {
   oshiId: string
@@ -22,8 +24,10 @@ interface JournalPageViewProps {
   onBack: () => void
 }
 
+type Translate = ReturnType<typeof useI18n>['t']
+
 export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard = null, onBack }: JournalPageViewProps) {
-  const navigate = useNavigate()
+  const { t } = useI18n()
   const pageTransition = usePageTransition()
   const panelTransition = usePanelTransition()
   const popoverTransition = usePopoverTransition()
@@ -48,6 +52,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
     loading,
     error,
     openBook,
+    setActivePage,
     updatePage,
     createPage,
     deletePage,
@@ -110,12 +115,12 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   useEffect(() => {
     if (!activePage) return
     setPageDraft({
-      title: activePage.title || `Page ${activePage.page_index + 1}`,
+      title: activePage.title || t('journalPage.pageNumber', { number: activePage.page_index + 1 }),
       description: activePage.description || '',
       date_label: activePage.date_label || '',
       background: activePage.background || 'paper',
     })
-  }, [activePage])
+  }, [activePage, t])
 
   async function handleCommitLayout(itemId: string, layout: JournalLayoutInput) {
     const item = items.find((candidate) => candidate.id === itemId)
@@ -186,7 +191,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
 
   async function handleDeletePage() {
     if (!activePage || !bookId || pages.length <= 1) return
-    if (!confirm(`Delete "${activePage.title || `Page ${activePage.page_index + 1}`}"? Its placed stickers will be removed from this page.`)) return
+    if (!confirm(t('journalPage.deletePageConfirm', { title: activePage.title || t('journalPage.pageNumber', { number: activePage.page_index + 1 }) }))) return
     setSelectedItemId(null)
     await deletePage(activePage.id, bookId)
     setViewingPageId(null)
@@ -194,7 +199,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
 
   async function handleDeleteStandalonePostcard() {
     if (!activePage || !standalonePostcard) return
-    if (!confirm(`Delete loose page "${activePage.title || 'Untitled loose page'}"? Its placed stickers will be removed. Original notes and illustrations will be kept.`)) return
+    if (!confirm(t('journalPage.deleteLooseConfirm', { title: activePage.title || t('journalPage.untitledLoosePage') }))) return
     await deletePostcard(activePage.id, oshiId)
     onBack()
   }
@@ -202,7 +207,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   async function handleSavePage() {
     if (!activePage) return
     await updatePage(activePage.id, {
-      title: pageDraft.title.trim() || `Page ${activePage.page_index + 1}`,
+      title: pageDraft.title.trim() || t('journalPage.pageNumber', { number: activePage.page_index + 1 }),
       description: pageDraft.description.trim(),
       date_label: pageDraft.date_label.trim(),
       background: pageDraft.background,
@@ -219,7 +224,8 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
 
   function handleOpenPage(pageId: string) {
     setSelectedItemId(null)
-    navigate(`/oshis/${oshiId}/journal/pages/${pageId}/edit`)
+    setViewingPageId(pageId)
+    setActivePage(pageId, oshiId)
   }
 
   function handleBack() {
@@ -238,34 +244,35 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-border-color bg-bg-secondary/10">
-        <div className="flex items-center gap-2 px-4 py-3">
+      <div className="shrink-0 border-b border-border-color bg-bg-primary/95">
+        <div className={`${PAGE_HEADER_CLASS} h-20 gap-3 border-b-0`}>
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <button type="button" onClick={handleBack} className="rounded-lg p-1.5 text-text-muted hover:bg-bg-tertiary hover:text-text-primary" title={bookId && showPageCanvas && !standalonePostcard ? 'Back to pages' : 'Back to journal'}>
-              <ArrowLeft size={17} />
+            <button type="button" onClick={handleBack} className="rounded-lg p-2 text-text-muted hover:bg-bg-tertiary hover:text-text-primary" title={bookId && showPageCanvas && !standalonePostcard ? t('journalPage.backToPages') : t('journalPage.backToJournal')}>
+              <ArrowLeft size={20} />
             </button>
-            <span className="truncate text-sm font-semibold text-text-primary">{bookTitle}</span>
-            <span className="text-xs text-text-muted">/</span>
-            <span className="truncate text-xs text-text-muted">{showPageCanvas ? activePage?.title || 'Page' : 'Pages'}</span>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold text-text-primary">{bookTitle}</h1>
+              <p className="mt-0.5 truncate text-sm text-text-secondary">{showPageCanvas ? activePage?.title || t('journalPage.page') : t('journalPage.pages')}</p>
+            </div>
             {loading && <Loader2 size={15} className="animate-spin text-accent" />}
             {error && <span className="truncate text-xs text-red-500">{error}</span>}
           </div>
           {!standalonePostcard && (
             <Button variant="secondary" size="sm" onClick={() => setShowPageSidebar(!showPageSidebar)}>
               <LayoutGrid size={15} />
-              Pages
+              {t('journalPage.pages')}
             </Button>
           )}
           {showPageCanvas ? (
             <>
               <Button variant="secondary" size="sm" onClick={() => setShowPageEditor(!showPageEditor)}>
                 <Palette size={15} />
-                Page setup
+                {t('journalPage.pageSetup')}
               </Button>
               <div className="relative">
                 <Button variant="secondary" size="sm" onClick={() => setShowAddMenu(!showAddMenu)}>
                   <Plus size={15} />
-                  Add
+                  {t('journalPage.add')}
                   <ChevronDown size={14} />
                 </Button>
                 <AnimatePresence>
@@ -276,16 +283,16 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                     >
                       <button type="button" onClick={() => { handleOpenNotePicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
                         <Plus size={14} className="text-accent" />
-                        Note
+                        {t('journalPage.note')}
                       </button>
                       <button type="button" onClick={() => { handleOpenIllustrationPicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
                         <ImageIcon size={14} className="text-accent" />
-                        Illustration
+                        {t('journalPage.illustration')}
                       </button>
                       {!standalonePostcard && bookId && (
                         <button type="button" onClick={() => { handleCreatePage(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
                           <FileImage size={14} className="text-accent" />
-                          Page
+                          {t('journalPage.page')}
                         </button>
                       )}
                     </motion.div>
@@ -297,7 +304,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
             bookId && (
               <Button variant="secondary" size="sm" onClick={handleCreatePage}>
                 <Plus size={15} />
-                Page
+                {t('journalPage.page')}
               </Button>
             )
           )}
@@ -314,11 +321,11 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                   >
                     <button type="button" onClick={() => { handleAutoArrange(); setShowPageActions(false) }} disabled={items.length === 0} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:pointer-events-none disabled:opacity-50">
                       <LayoutGrid size={14} className="text-accent" />
-                      Auto arrange
+                      {t('journalPage.autoArrange')}
                     </button>
-                    <button type="button" onClick={() => { activePage && detachPage(activePage.id, oshiId); setShowPageActions(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
+                    <button type="button" onClick={() => { if (activePage) detachPage(activePage.id, oshiId); setShowPageActions(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
                       <FileImage size={14} className="text-accent" />
-                      Save as loose page
+                      {t('journalPage.saveAsLoose')}
                     </button>
                   </motion.div>
                 )}
@@ -332,19 +339,19 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 size="sm"
                 onClick={handleDeletePage}
                 disabled={pages.length <= 1}
-                title={pages.length <= 1 ? 'An archive needs at least one page' : 'Delete current page'}
+                title={pages.length <= 1 ? t('journalPage.needsOnePage') : t('journalPage.deleteCurrentPage')}
               >
                 <Trash2 size={15} />
-                Delete
+                {t('journalPage.delete')}
               </Button>
             </>
           )}
           {standalonePostcard && activePage && (
             <>
-              <CollectMenu books={books} onCollect={(targetBookId) => collectPostcard(activePage.id, targetBookId, oshiId).then(onBack)} />
+              <CollectMenu books={books} onCollect={(targetBookId) => collectPostcard(activePage.id, targetBookId, oshiId).then(onBack)} t={t} />
               <Button variant="secondary" size="sm" onClick={handleDeleteStandalonePostcard}>
                 <Trash2 size={15} />
-                Delete
+                {t('journalPage.delete')}
               </Button>
             </>
           )}
@@ -359,19 +366,22 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 value={pageDraft.title}
                 onChange={(event) => setPageDraft({ ...pageDraft, title: event.target.value })}
                 className="min-w-56 rounded-lg border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-soft"
-                placeholder="Page title"
+                placeholder={t('journalPage.pageTitle')}
+                aria-label={t('journalPage.pageTitle')}
               />
               <input
                 value={pageDraft.date_label}
                 onChange={(event) => setPageDraft({ ...pageDraft, date_label: event.target.value })}
                 className="min-w-36 rounded-lg border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-soft"
-                placeholder="Date label"
+                placeholder={t('journalPage.dateLabel')}
+                aria-label={t('journalPage.dateLabel')}
               />
               <input
                 value={pageDraft.description}
                 onChange={(event) => setPageDraft({ ...pageDraft, description: event.target.value })}
                 className="min-w-64 flex-1 rounded-lg border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-soft"
-                placeholder="Page description"
+                placeholder={t('journalPage.pageDescription')}
+                aria-label={t('journalPage.pageDescription')}
               />
               <div className="flex flex-wrap gap-1">
                 {PAGE_BACKGROUNDS.map((background) => (
@@ -381,12 +391,12 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                     onClick={() => setPageDraft({ ...pageDraft, background: background.id })}
                     className={`rounded-lg border px-3 py-2 text-xs transition-colors ${pageDraft.background === background.id ? 'border-accent bg-accent-soft text-accent' : 'border-border-color bg-bg-primary text-text-secondary hover:border-border-hover'}`}
                   >
-                    {background.label}
+                    {t(background.labelKey)}
                   </button>
                 ))}
               </div>
-              <button type="button" onClick={handleSavePage} className="rounded-lg p-2 text-accent hover:bg-bg-tertiary" title="Save page"><Check size={16} /></button>
-              <button type="button" onClick={() => setShowPageEditor(false)} className="rounded-lg p-2 text-text-muted hover:bg-bg-tertiary hover:text-text-primary" title="Cancel"><X size={16} /></button>
+              <button type="button" onClick={handleSavePage} className="rounded-lg p-2 text-accent hover:bg-bg-tertiary" title={t('journalPage.savePage')}><Check size={16} /></button>
+              <button type="button" onClick={() => setShowPageEditor(false)} className="rounded-lg p-2 text-text-muted hover:bg-bg-tertiary hover:text-text-primary" title={t('common.cancel')}><X size={16} /></button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -395,13 +405,14 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
       <div className="flex min-h-0 flex-1">
         <AnimatePresence initial={false}>
           {!standalonePostcard && showPageSidebar && (
-            <PageSidebar
-              pages={pages}
-              activePageId={activePageId}
-              itemsByPageId={previewItemsByPageId}
-              onCreate={handleCreatePage}
-              onSelect={handleOpenPage}
-            />
+              <PageSidebar
+                pages={pages}
+                activePageId={activePageId}
+                itemsByPageId={previewItemsByPageId}
+                onCreate={handleCreatePage}
+                onSelect={handleOpenPage}
+                t={t}
+              />
           )}
         </AnimatePresence>
         <div className="relative flex min-w-0 flex-1">
@@ -428,6 +439,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 transition={pageTransition}
                 onCreate={handleCreatePage}
                 onSelect={handleOpenPage}
+                t={t}
               />
             )}
           </AnimatePresence>
@@ -471,14 +483,14 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   )
 }
 
-function CollectMenu({ books, onCollect }: { books: JournalBook[]; onCollect: (bookId: string) => void }) {
+function CollectMenu({ books, onCollect, t }: { books: JournalBook[]; onCollect: (bookId: string) => void; t: Translate }) {
   const [open, setOpen] = useState(false)
   const popoverTransition = usePopoverTransition()
   return (
     <div className="relative">
       <Button variant="secondary" size="sm" onClick={() => setOpen(!open)} disabled={books.length === 0}>
         <BookOpen size={15} />
-        Collect
+        {t('journalPage.collect')}
       </Button>
       <AnimatePresence>
         {open && (
@@ -511,6 +523,7 @@ function PageGallery({
   transition,
   onCreate,
   onSelect,
+  t,
 }: {
   pages: JournalPage[]
   loading: boolean
@@ -518,18 +531,19 @@ function PageGallery({
   transition: ReturnType<typeof usePageTransition>
   onCreate: () => void
   onSelect: (pageId: string) => void
+  t: Translate
 }) {
   return (
-    <motion.div {...transition} className="h-full min-w-0 flex-1 overflow-y-auto bg-bg-primary px-6 py-6">
+    <motion.div {...transition} className={`${PAGE_CONTENT_CLASS} h-full min-w-0 flex-1 bg-bg-primary`}>
       <div className="mx-auto max-w-6xl">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-lg font-bold text-text-primary">Pages</h3>
-            <p className="mt-1 text-sm text-text-secondary">Open a page to edit it, or add a new blank page to this archive.</p>
+            <h3 className="text-lg font-bold text-text-primary">{t('journalPage.pages')}</h3>
+            <p className="mt-1 text-sm text-text-secondary">{t('journalPage.pagesDescription')}</p>
           </div>
           <Button variant="primary" size="md" onClick={onCreate}>
             <Plus size={16} />
-            Page
+            {t('journalPage.page')}
           </Button>
         </div>
         {loading && pages.length === 0 ? (
@@ -537,7 +551,7 @@ function PageGallery({
         ) : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {pages.map((page) => (
-              <PagePreviewCard key={page.id} page={page} items={itemsByPageId[page.id] || []} active={false} onSelect={() => onSelect(page.id)} />
+              <PagePreviewCard key={page.id} page={page} items={itemsByPageId[page.id] || []} active={false} onSelect={() => onSelect(page.id)} t={t} />
             ))}
             <button
               type="button"
@@ -545,7 +559,7 @@ function PageGallery({
               className="flex aspect-[1.4] flex-col items-center justify-center rounded-2xl border border-dashed border-border-color bg-bg-secondary/20 text-accent transition-colors hover:border-border-hover hover:bg-bg-secondary/40"
             >
               <Plus size={24} />
-              <span className="mt-3 text-sm font-semibold">New page</span>
+              <span className="mt-3 text-sm font-semibold">{t('journalPage.newPage')}</span>
             </button>
           </div>
         )}
@@ -560,22 +574,24 @@ function PageSidebar({
   itemsByPageId,
   onCreate,
   onSelect,
+  t,
 }: {
   pages: JournalPage[]
   activePageId: string | null
   itemsByPageId: Record<string, JournalItemWithNote[]>
   onCreate: () => void
   onSelect: (pageId: string) => void
+  t: Translate
 }) {
   const pageTransition = usePageTransition()
   return (
     <motion.aside {...pageTransition} className="hidden w-72 shrink-0 overflow-y-auto border-r border-border-color bg-bg-secondary/10 p-3 md:block">
       <div className="mb-3 flex items-center justify-between gap-2 px-1">
         <div>
-          <h3 className="text-sm font-bold text-text-primary">Pages</h3>
-          <p className="text-xs text-text-muted">{pages.length} total</p>
+          <h3 className="text-sm font-bold text-text-primary">{t('journalPage.pages')}</h3>
+          <p className="text-xs text-text-muted">{t('journalPage.totalPages', { count: pages.length })}</p>
         </div>
-        <button type="button" onClick={onCreate} className="rounded-lg p-2 text-accent hover:bg-bg-tertiary" title="New page">
+        <button type="button" onClick={onCreate} className="rounded-lg p-2 text-accent hover:bg-bg-tertiary" title={t('journalPage.newPage')}>
           <Plus size={16} />
         </button>
       </div>
@@ -588,6 +604,7 @@ function PageSidebar({
             active={page.id === activePageId}
             compact
             onSelect={() => onSelect(page.id)}
+            t={t}
           />
         ))}
       </div>
@@ -601,12 +618,14 @@ function PagePreviewCard({
   active,
   compact = false,
   onSelect,
+  t,
 }: {
   page: JournalPage
   items: JournalItemWithNote[]
   active: boolean
   compact?: boolean
   onSelect: () => void
+  t: Translate
 }) {
   const canvasSize = getJournalCanvasSize(items)
   return (
@@ -649,8 +668,8 @@ function PagePreviewCard({
           {page.page_index + 1}
         </span>
       </div>
-      <p className="mt-3 truncate text-sm font-semibold text-text-primary">{page.title || `Page ${page.page_index + 1}`}</p>
-      {!compact && <p className="mt-1 line-clamp-1 text-xs text-text-muted">{page.description || page.date_label || 'No description yet'}</p>}
+      <p className="mt-3 truncate text-sm font-semibold text-text-primary">{page.title || t('journalPage.pageNumber', { number: page.page_index + 1 })}</p>
+      {!compact && <p className="mt-1 line-clamp-1 text-xs text-text-muted">{page.description || page.date_label || t('common.noDescription')}</p>}
     </button>
   )
 }
@@ -661,10 +680,10 @@ function getPreviewStickerBackground(color: string | null): string {
 }
 
 const PAGE_BACKGROUNDS = [
-  { id: 'paper', label: 'Paper' },
-  { id: 'grid', label: 'Grid' },
-  { id: 'blush', label: 'Blush' },
-  { id: 'blue', label: 'Blue' },
-  { id: 'mint', label: 'Mint' },
-  { id: 'postcard', label: 'Loose' },
-]
+  { id: 'paper', labelKey: 'journalEditor.background.paper' },
+  { id: 'grid', labelKey: 'journalEditor.background.grid' },
+  { id: 'blush', labelKey: 'journalEditor.background.blush' },
+  { id: 'blue', labelKey: 'journalEditor.background.blue' },
+  { id: 'mint', labelKey: 'journalEditor.background.mint' },
+  { id: 'postcard', labelKey: 'journalEditor.background.loose' },
+] as const

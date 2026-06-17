@@ -38,6 +38,7 @@ export function Sidebar() {
   const { oshis, fetchAll } = useOshiStore()
   const [openSections, setOpenSections] = useState({
     oshis: true,
+    journal: true,
     library: true,
     more: true,
   })
@@ -50,8 +51,12 @@ export function Sidebar() {
   const libraryNavItems = [
     { to: '/notes', icon: FileText, label: t('nav.allNotes') },
     { to: '/illustrations', icon: ImageIcon, label: t('nav.illustrations') },
-    { to: '/journal', icon: NotebookPen, label: t('nav.studio') },
     { to: '/tags', icon: Tag, label: t('nav.tags') },
+  ]
+
+  const journalNavItems = [
+    { to: '/journal', icon: BookOpen, label: t('nav.journalLibrary'), end: true },
+    { to: '/journal/create', icon: NotebookPen, label: t('nav.journalCreate') },
   ]
 
   const moreNavItems = [
@@ -62,7 +67,6 @@ export function Sidebar() {
   const createOshiSpaceItems = (id: string): OshiSpaceItem[] => [
     { to: `/oshis/${id}`, icon: Home, label: t('nav.overview') },
     { to: `/oshis/${id}/notes`, icon: FileText, label: t('nav.notes') },
-    { to: `/oshis/${id}/journal`, icon: BookOpen, label: t('nav.journal') },
     { to: `/oshis/${id}/illustrations`, icon: ImageIcon, label: t('nav.illustrations') },
     { to: `/oshis/${id}/tags`, icon: Tag, label: t('nav.tags') },
   ]
@@ -152,12 +156,40 @@ export function Sidebar() {
         </SidebarSection>
 
         <SidebarSection
+          title={t('nav.journal')}
+          collapsed={collapsed}
+          open={openSections.journal}
+          motionSeconds={motionSeconds}
+          onToggle={() => setOpenSections((sections) => ({ ...sections, journal: !sections.journal }))}
+          className="mt-auto"
+        >
+          {journalNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group',
+                  collapsed && 'justify-center px-2',
+                  isActive
+                    ? 'bg-accent/10 text-accent font-semibold'
+                    : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+                )
+              }
+            >
+              <item.icon size={20} className="shrink-0" />
+              <SidebarLabel collapsed={collapsed}>{item.label}</SidebarLabel>
+            </NavLink>
+          ))}
+        </SidebarSection>
+
+        <SidebarSection
           title={t('nav.workspace')}
           collapsed={collapsed}
           open={openSections.library}
           motionSeconds={motionSeconds}
           onToggle={() => setOpenSections((sections) => ({ ...sections, library: !sections.library }))}
-          className="mt-auto"
         >
           {libraryNavItems.map((item) => (
             <NavLink
@@ -333,7 +365,7 @@ function OshiNavGroup({
   onToggle: () => void
 }) {
   return (
-    <div className={clsx('rounded-2xl', expanded && !collapsed && 'bg-bg-tertiary/40 p-1')}>
+    <div className={clsx('rounded-2xl', !collapsed && 'p-1', expanded && !collapsed && 'bg-bg-tertiary/40')}>
       <div className="flex items-center gap-1">
         <NavLink
           to={`/oshis/${oshi.id}`}

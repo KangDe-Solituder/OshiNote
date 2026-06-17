@@ -21,7 +21,7 @@ import { useJournalStore } from '../stores/journalStore'
 import { useNoteStore } from '../stores/noteStore'
 import type { JournalItemWithNote, Oshi } from '../types'
 import { autoArrangeNotes, clampLayout, type JournalLayoutInput } from '../features/journal/journalLayout'
-import { createStandalonePostcard, updateJournalPage } from '../features/journal/journalService'
+import { createStandalonePostcard, fetchJournalPageById, updateJournalPage } from '../features/journal/journalService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import { JournalCanvas } from '../components/features/journal/JournalCanvas'
 import { JournalIllustrationPicker } from '../components/features/journal/JournalIllustrationPicker'
@@ -29,6 +29,7 @@ import { JournalInspector } from '../components/features/journal/JournalInspecto
 import { JournalNotePicker } from '../components/features/journal/JournalNotePicker'
 import { usePopoverTransition, useUiMotionSeconds } from '../components/features/themes/uiMotion'
 import { SelectMenu } from '../components/ui/SelectMenu'
+import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
 import { useI18n } from '../i18n/useI18n'
 
 interface PageDraft {
@@ -80,7 +81,7 @@ export function JournalEditorPage() {
   } = useJournalStore()
   const toggleFavorite = useNoteStore((state) => state.toggleFavorite)
   const updateNote = useNoteStore((state) => state.updateNote)
-  const backTo = oshiId ? `/oshis/${oshiId}/journal` : '/'
+  const backTo = '/journal'
 
   useEffect(() => {
     fetchAllOshis()
@@ -92,14 +93,34 @@ export function JournalEditorPage() {
   }, [selectedOshiId])
 
   useEffect(() => {
-    if (pageId && oshiId) {
-      openPageForEditing(pageId, oshiId)
-      return
+    let cancelled = false
+    async function openTargetPage() {
+      if (!pageId) return
+      const targetOshiId = oshiId || (await fetchJournalPageById(pageId))?.oshi_id || ''
+      if (!targetOshiId || cancelled) return
+      await openPageForEditing(pageId, targetOshiId)
+    }
+
+    if (pageId) {
+      openTargetPage()
+      return () => {
+        cancelled = true
+      }
     }
     closeBook()
     setSelectedItemId(null)
     setPageDraft(createDefaultPageDraft())
+    return () => {
+      cancelled = true
+    }
   }, [closeBook, openPageForEditing, oshiId, pageId])
+
+  useEffect(() => {
+    if (pageId) {
+      return
+    }
+    setSelectedOshiId(oshiId)
+  }, [oshiId, pageId])
 
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) || null,
@@ -218,7 +239,7 @@ export function JournalEditorPage() {
         if (!selectedOshiId) return
         const page = await createStandalonePostcard(selectedOshiId, title)
         await updateJournalPage(page.id, input)
-        navigate(`/oshis/${selectedOshiId}/journal/pages/${page.id}/edit`, { replace: true })
+        navigate(`/journal/pages/${page.id}/edit`, { replace: true })
         return
       }
       await updatePage(activePage.id, {
@@ -261,7 +282,7 @@ export function JournalEditorPage() {
       const page = await createStandalonePostcard(targetOshiId, title)
       await updateJournalPage(page.id, input)
       await openPageForEditing(page.id, targetOshiId)
-      navigate(`/oshis/${targetOshiId}/journal/pages/${page.id}/edit`, { replace: true })
+      navigate(`/journal/pages/${page.id}/edit`, { replace: true })
       return { pageId: page.id, oshiId: targetOshiId }
     } finally {
       setSavingPage(false)
@@ -332,10 +353,11 @@ export function JournalEditorPage() {
     <AnimatePresence initial={false} onExitComplete={() => setAddMenuRect(null)}>
       {showAddMenu && (
         <div
-          className="fixed z-[130]"
+          className="fixed"
           style={{
             top: addMenuRect.top,
             right: addMenuRect.right,
+            zIndex: OVERLAY_Z_INDEX.popover,
           }}
         >
           <motion.div

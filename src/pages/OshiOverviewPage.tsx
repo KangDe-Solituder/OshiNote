@@ -1,24 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
-import { BookOpen, Edit3, ExternalLink, FileText, Heart, ImageIcon, Link2, Loader2, Plus, Tag } from 'lucide-react'
+import { Edit3, ExternalLink, FileText, Heart, ImageIcon, Link2, Loader2, Plus, Tag } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { PAGE_CONTENT_CLASS } from '../components/layout/pageShell'
 import { OshiForm } from '../features/oshis/OshiForm'
 import { fetchOshiById, getOshiNoteCount, updateOshi } from '../features/oshis/oshiService'
 import { fetchRecentNotesByOshi, getTagsByOshi } from '../features/notes/noteService'
 import { fetchIllustrations, getIllustrationCountByOshi } from '../features/illustrations/illustrationService'
-import { fetchJournalBooks, getJournalBookCountByOshi } from '../features/journal/journalService'
+import { useI18n } from '../i18n/useI18n'
 import { releaseMediaUrl, resolveMediaUrl } from '../services/media/illustrationMedia'
-import type { CreateOshiInput, Illustration, JournalBook, Note, Oshi } from '../types'
+import type { CreateOshiInput, Illustration, Note, Oshi } from '../types'
 
 export function OshiOverviewPage() {
+  const { t } = useI18n()
   const { oshiId } = useParams<{ oshiId: string }>()
   const [oshi, setOshi] = useState<Oshi | null>(null)
   const [notes, setNotes] = useState<Note[]>([])
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
-  const [books, setBooks] = useState<JournalBook[]>([])
-  const [stats, setStats] = useState({ notes: 0, illustrations: 0, books: 0, tags: 0 })
+  const [stats, setStats] = useState({ notes: 0, illustrations: 0, tags: 0 })
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
 
@@ -28,22 +28,19 @@ export function OshiOverviewPage() {
     async function load() {
       setLoading(true)
       try {
-        const [oshiRecord, noteCount, illustrationCount, bookCount, tags, recentNotes, recentIllustrations, recentBooks] = await Promise.all([
+        const [oshiRecord, noteCount, illustrationCount, tags, recentNotes, recentIllustrations] = await Promise.all([
           fetchOshiById(oshiId!),
           getOshiNoteCount(oshiId!),
           getIllustrationCountByOshi(oshiId!),
-          getJournalBookCountByOshi(oshiId!),
           getTagsByOshi(oshiId!),
           fetchRecentNotesByOshi(oshiId!, 5),
           fetchIllustrations({ oshiId: oshiId!, sort: 'newest' }),
-          fetchJournalBooks(oshiId!),
         ])
         if (cancelled) return
         setOshi(oshiRecord)
-        setStats({ notes: noteCount, illustrations: illustrationCount, books: bookCount, tags: tags.length })
+        setStats({ notes: noteCount, illustrations: illustrationCount, tags: tags.length })
         setNotes(recentNotes)
         setIllustrations(recentIllustrations.slice(0, 4))
-        setBooks(recentBooks.slice(0, 4))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -80,7 +77,7 @@ export function OshiOverviewPage() {
   if (!oshi || !oshiId) {
     return (
       <div className="flex h-full items-center justify-center text-text-muted">
-        Oshi not found
+        {t('oshiOverview.notFound')}
       </div>
     )
   }
@@ -102,12 +99,12 @@ export function OshiOverviewPage() {
                 <Heart size={18} className="text-accent" />
               </div>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-                {oshi.description || 'No description yet.'}
+                {oshi.description || t('common.noDescription')}
               </p>
             </div>
             <Button variant="secondary" onClick={() => setEditing(true)}>
               <Edit3 size={16} />
-              Edit Profile
+              {t('oshiOverview.editProfile')}
             </Button>
           </div>
 
@@ -129,18 +126,17 @@ export function OshiOverviewPage() {
           )}
         </section>
 
-        <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={FileText} label="Notes" value={stats.notes} to={`/oshis/${oshiId}/notes`} />
-          <StatCard icon={ImageIcon} label="Illustrations" value={stats.illustrations} to={`/oshis/${oshiId}/illustrations`} />
-          <StatCard icon={BookOpen} label="Journal Archives" value={stats.books} to={`/oshis/${oshiId}/journal`} />
-          <StatCard icon={Tag} label="Tags" value={stats.tags} to={`/oshis/${oshiId}/tags`} />
+        <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard icon={FileText} label={t('nav.notes')} value={stats.notes} to={`/oshis/${oshiId}/notes`} />
+          <StatCard icon={ImageIcon} label={t('nav.illustrations')} value={stats.illustrations} to={`/oshis/${oshiId}/illustrations`} />
+          <StatCard icon={Tag} label={t('nav.tags')} value={stats.tags} to={`/oshis/${oshiId}/tags`} />
         </section>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
           <section className="rounded-2xl border border-border-color bg-bg-card p-5">
-            <SectionHeader title="Recent Notes" to={`/oshis/${oshiId}/notes`} />
+            <SectionHeader title={t('oshiOverview.recentNotes')} to={`/oshis/${oshiId}/notes`} />
             {notes.length === 0 ? (
-              <EmptyLine text="No notes yet." action="New Note" to={`/oshis/${oshiId}/notes/new`} />
+              <EmptyLine text={t('oshiOverview.noNotes')} action={t('notes.new')} to={`/oshis/${oshiId}/notes/new`} />
             ) : (
               <div className="divide-y divide-border-color">
                 {notes.map((note) => (
@@ -148,8 +144,8 @@ export function OshiOverviewPage() {
                     <div className="flex items-center gap-3">
                       <span className="w-24 shrink-0 text-xs text-text-muted">{new Date(note.created_at).toLocaleDateString()}</span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-text-primary">{note.title || 'Untitled'}</p>
-                        <p className="mt-1 truncate text-xs text-text-muted">{note.plain_text || 'No content'}</p>
+                        <p className="truncate font-semibold text-text-primary">{note.title || t('common.untitled')}</p>
+                        <p className="mt-1 truncate text-xs text-text-muted">{note.plain_text || t('common.noContent')}</p>
                       </div>
                     </div>
                   </Link>
@@ -160,38 +156,14 @@ export function OshiOverviewPage() {
 
           <div className="grid gap-5">
             <section className="rounded-2xl border border-border-color bg-bg-card p-5">
-              <SectionHeader title="Recent Illustrations" to={`/oshis/${oshiId}/illustrations`} />
+              <SectionHeader title={t('oshiOverview.recentIllustrations')} to={`/oshis/${oshiId}/illustrations`} />
               {illustrations.length === 0 ? (
-                <EmptyLine text="No illustrations yet." action="Add Illustration" to={`/oshis/${oshiId}/illustrations`} />
+                <EmptyLine text={t('oshiOverview.noIllustrations')} action={t('illustrations.add')} to={`/oshis/${oshiId}/illustrations`} />
               ) : (
                 <div className="grid grid-cols-4 gap-3">
                   {illustrations.map((illustration) => (
                     <Link key={illustration.id} to={`/oshis/${oshiId}/illustrations`} className="aspect-square overflow-hidden rounded-xl bg-bg-tertiary">
                       <OverviewMediaImage path={illustration.thumbnail_path || illustration.original_path} alt={illustration.title} />
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-border-color bg-bg-card p-5">
-              <SectionHeader title="Recent Journal Archives" to={`/oshis/${oshiId}/journal`} />
-              {books.length === 0 ? (
-                <EmptyLine text="No journal archives yet." action="Open Journal" to={`/oshis/${oshiId}/journal`} />
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {books.map((book) => (
-                    <Link
-                      key={book.id}
-                      to={`/oshis/${oshiId}/journal`}
-                      className="flex min-h-[132px] gap-3 rounded-xl border border-border-color bg-bg-secondary p-3 transition-colors hover:border-accent"
-                    >
-                      <OverviewJournalBookCover book={book} />
-                      <div className="min-w-0 flex-1 self-center">
-                        <p className="truncate text-sm font-semibold text-text-primary">{book.title}</p>
-                        <p className="mt-1 text-xs text-text-muted">{book.date_label || new Date(book.created_at).getFullYear()}</p>
-                        <p className="mt-1 text-xs text-text-muted">{book.page_count} page{book.page_count === 1 ? '' : 's'}</p>
-                      </div>
                     </Link>
                   ))}
                 </div>
@@ -228,10 +200,11 @@ function StatCard({ icon: Icon, label, value, to }: { icon: typeof FileText; lab
 }
 
 function SectionHeader({ title, to }: { title: string; to: string }) {
+  const { t } = useI18n()
   return (
     <div className="mb-4 flex items-center justify-between">
       <h2 className="font-semibold text-text-primary">{title}</h2>
-      <Link to={to} className="text-xs font-semibold text-accent hover:text-accent-hover">View all</Link>
+      <Link to={to} className="text-xs font-semibold text-accent hover:text-accent-hover">{t('common.viewAll')}</Link>
     </div>
   )
 }
@@ -269,30 +242,6 @@ function OverviewMediaImage({ path, alt }: { path: string | null; alt: string })
   }, [path])
   if (!src) return <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={20} /></div>
   return <img src={src} alt={alt} className="h-full w-full object-cover" />
-}
-
-function OverviewJournalBookCover({ book }: { book: JournalBook }) {
-  const isDark = book.cover_style === 'night'
-  return (
-    <div
-      className="journal-book-cover relative h-[108px] w-[76px] shrink-0 overflow-hidden rounded-r-xl rounded-l-lg border shadow-sm"
-      style={{
-        backgroundColor: book.cover_color || '#c9c5f3',
-        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(80,95,130,0.16)',
-      }}
-    >
-      <span className="absolute inset-y-0 left-0 w-3 bg-black/10 shadow-[inset_-2px_0_2px_rgba(255,255,255,0.22)]" />
-      <span className="pointer-events-none absolute inset-0 opacity-55 [background-image:linear-gradient(90deg,rgba(255,255,255,0.24)_0,rgba(255,255,255,0)_28%),radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.5)_0,rgba(255,255,255,0)_18%),radial-gradient(circle_at_82%_70%,rgba(0,0,0,0.09)_0,rgba(0,0,0,0)_22%)]" />
-      <span className="pointer-events-none absolute inset-2 rounded-lg border border-white/24" />
-      <div className={`absolute inset-x-4 top-[32%] truncate text-center text-xs font-semibold ${isDark ? 'text-white/80' : 'text-[#56667f]'}`}>
-        {book.title}
-      </div>
-      <div className={`absolute inset-x-4 top-[52%] truncate text-center text-[10px] ${isDark ? 'text-white/55' : 'text-[#7c8da5]'}`}>
-        {book.date_label || new Date(book.created_at).getFullYear()}
-      </div>
-      <BookOpen size={20} className={`absolute bottom-5 left-1/2 -translate-x-1/2 ${isDark ? 'text-white/58' : 'text-[#64748b]'}`} />
-    </div>
-  )
 }
 
 function normalizeWebUrl(value: string): string | null {

@@ -183,7 +183,7 @@ export function JournalInspector({
     try {
       const { json, text } = editorRef.current
       await onUpdateNote(noteId, {
-        title: title || 'Untitled',
+        title: title || t('common.untitled'),
         content: JSON.stringify(json),
         plain_text: text,
       })
@@ -227,7 +227,7 @@ export function JournalInspector({
           )}
         </div>
         <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-text-secondary">
-          {notePlainText || 'No content yet'}
+          {notePlainText || t('common.noContent')}
         </p>
       </div>
 

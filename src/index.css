@@ -19,9 +19,7 @@
   --journal-sticker-5: color-mix(in srgb, var(--color-bg-card, white) 84%, var(--color-text-secondary, #831843));
 }
 
-*,
-*::before,
-*::after {
+:where(.transition, .transition-all, .transition-colors, .transition-opacity, .transition-shadow, .transition-transform) {
   transition-duration: var(--ui-motion-duration) !important;
 }
 

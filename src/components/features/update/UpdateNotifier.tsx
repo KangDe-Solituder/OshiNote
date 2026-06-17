@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Download, RefreshCw, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useUpdateStore } from '../../../stores/updateStore'
+import { OVERLAY_Z_INDEX } from '../../ui/overlay'
 import {
   checkForUpdate,
   getCurrentAppVersion,
@@ -68,7 +69,7 @@ export function UpdateNotifier() {
   }
 
   return (
-    <div className="fixed left-1/2 top-4 z-50 w-[min(560px,calc(100vw-32px))] -translate-x-1/2">
+    <div className="fixed left-1/2 top-4 w-[min(560px,calc(100vw-32px))] -translate-x-1/2" style={{ zIndex: OVERLAY_Z_INDEX.toast }}>
       <div className="rounded-2xl border border-border-color bg-bg-primary/95 p-4 shadow-xl backdrop-blur">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
