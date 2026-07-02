@@ -8,6 +8,7 @@ import type {
   UpdateIllustrationInput,
 } from '../../types'
 import { removeIllustrationFiles } from '../../services/media/illustrationMedia'
+import { deleteStampForTarget } from '../stamps/stampService'
 
 export async function fetchIllustrations(params: IllustrationSearchParams): Promise<Illustration[]> {
   const db = await getDb()
@@ -76,6 +77,12 @@ export async function getIllustrationCountByOshi(oshiId: string): Promise<number
   return rows[0]?.count || 0
 }
 
+export async function getTotalIllustrationCount(): Promise<number> {
+  const db = await getDb()
+  const rows = await db.select<{ count: number }[]>('SELECT COUNT(*) as count FROM illustrations WHERE archived = 0')
+  return rows[0]?.count || 0
+}
+
 export async function createIllustration(input: CreateIllustrationInput): Promise<Illustration> {
   const db = await getDb()
   const id = input.id || generateId()
@@ -141,6 +148,7 @@ export async function deleteIllustration(id: string): Promise<void> {
   const illustration = await fetchIllustrationById(id)
   const db = await getDb()
   await db.execute('DELETE FROM illustrations WHERE id = ?', [id])
+  await deleteStampForTarget('illustration', id)
   if (illustration) {
     await removeIllustrationFiles([illustration.original_path, illustration.thumbnail_path])
   }

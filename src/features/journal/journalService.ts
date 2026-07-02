@@ -15,6 +15,7 @@ import type {
   NoteRow,
 } from '../../types'
 import { createInitialLayout } from './journalLayout'
+import { deleteStampForTarget } from '../stamps/stampService'
 
 interface JoinedJournalItemRow extends JournalItemRow {
   note_oshi_id: string | null
@@ -145,6 +146,7 @@ export async function deleteJournalBook(id: string): Promise<void> {
   const pages = await fetchJournalPages(id)
   for (const page of pages) {
     await db.execute('DELETE FROM journal_items WHERE page_id = ?', [page.id])
+    await deleteStampForTarget('journal_page', page.id)
   }
   await db.execute('DELETE FROM journal_pages WHERE book_id = ?', [id])
   await db.execute('DELETE FROM journal_books WHERE id = ?', [id])
@@ -255,6 +257,7 @@ export async function deleteJournalPage(id: string): Promise<void> {
   const db = await getDb()
   await db.execute('DELETE FROM journal_items WHERE page_id = ?', [id])
   await db.execute('DELETE FROM journal_pages WHERE id = ?', [id])
+  await deleteStampForTarget('journal_page', id)
 }
 
 export async function fetchJournalItems(pageId: string): Promise<JournalItemWithNote[]> {

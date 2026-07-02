@@ -29,7 +29,7 @@
   border-color: var(--glass-panel-border, var(--glass-border));
   box-shadow:
     var(--glass-panel-shadow, var(--glass-shadow)),
-    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    inset 0 1px 0 var(--glass-highlight, rgba(255, 255, 255, 0.28));
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   backdrop-filter: blur(20px) saturate(150%);
 }
@@ -40,7 +40,7 @@
   border-color: var(--glass-panel-hover-border, var(--color-border-hover));
   box-shadow:
     var(--glass-panel-hover-shadow, var(--glass-panel-shadow, var(--glass-shadow))),
-    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+    inset 0 1px 0 var(--glass-highlight-hover, rgba(255, 255, 255, 0.34));
 }
 
 :root[data-glass="true"] .rounded-lg.border-accent,
@@ -50,7 +50,7 @@
   box-shadow:
     var(--glass-panel-shadow, var(--glass-shadow)),
     0 0 0 1px color-mix(in srgb, var(--color-accent) 36%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    inset 0 1px 0 var(--glass-highlight-strong, rgba(255, 255, 255, 0.38));
 }
 
 :root[data-glass="true"] input,
@@ -77,7 +77,7 @@
   color: var(--color-accent);
   box-shadow:
     0 18px 42px color-mix(in srgb, var(--color-accent) 14%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+    inset 0 1px 0 var(--glass-highlight-hover, rgba(255, 255, 255, 0.34));
   -webkit-backdrop-filter: blur(18px) saturate(150%);
   backdrop-filter: blur(18px) saturate(150%);
 }
@@ -89,5 +89,5 @@
   color: var(--color-accent-hover);
   box-shadow:
     0 22px 50px color-mix(in srgb, var(--color-accent) 18%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.56);
+    inset 0 1px 0 var(--glass-highlight-strong, rgba(255, 255, 255, 0.38));
 }

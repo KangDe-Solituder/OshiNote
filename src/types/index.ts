@@ -142,6 +142,76 @@ export interface IllustrationSearchParams {
   sort: IllustrationSort
 }
 
+export type StampTargetType = 'note' | 'illustration' | 'journal_page' | 'postcard'
+export type StampPosition = 'top-left' | 'top-right' | 'center' | 'bottom-left' | 'bottom-right'
+export type StampTemplateId = 'recorded' | 'favorite' | 'collected' | 'precious' | 'anniversary'
+
+export type ResourceTemplateType = 'note' | 'journal_page' | 'stamp' | 'material'
+
+export interface TemplateSnapshot {
+  template_id: string
+  template_type: ResourceTemplateType
+  name: string
+  payload: string
+  captured_at: string
+}
+
+export interface ResourceTemplate {
+  id: string
+  type: ResourceTemplateType
+  name: string
+  description: string
+  source: 'builtin' | 'user'
+  payload: string
+  hidden: boolean
+  deleted: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ResourceTemplateRow extends Omit<ResourceTemplate, 'type' | 'source' | 'hidden' | 'deleted'> {
+  type: string
+  source: string
+  hidden: number
+  deleted: number
+}
+
+export interface Stamp {
+  id: string
+  target_type: StampTargetType
+  target_id: string
+  template_id: StampTemplateId | string
+  template_snapshot: string
+  label: string
+  color: string
+  position: StampPosition
+  x: number
+  y: number
+  rotation: number
+  size: number
+  opacity: number
+  created_at: string
+  updated_at: string
+}
+
+export interface StampRow extends Omit<Stamp, 'target_type' | 'position'> {
+  target_type: string
+  position: string
+}
+
+export interface StampInput {
+  template_id: StampTemplateId | string
+  template_snapshot?: string
+  label: string
+  color: string
+  position: StampPosition
+  x?: number
+  y?: number
+  rotation?: number
+  size?: number
+  opacity?: number
+}
+
 export type ThemeId = 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'
 
 export type Locale = 'en' | 'zh' | 'ja'

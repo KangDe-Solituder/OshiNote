@@ -27,8 +27,11 @@ import { useNoteStore } from '../stores/noteStore'
 import { fetchNoteById, fetchNoteImages, replaceNoteImages } from '../features/notes/noteService'
 import { createArchive as createArchiveRecord, fetchArchivesByOshi } from '../features/oshis/archiveService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
-import type { Archive, Note, Oshi } from '../types'
+import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
+import type { Archive, Note, Oshi, Stamp, StampInput } from '../types'
 import { SelectMenu } from '../components/ui/SelectMenu'
+import { StampControl } from '../components/features/stamps/StampControl'
+import { StampOverlay } from '../components/features/stamps/StampOverlay'
 
 export function NoteEditorPage() {
   const { oshiId, noteId } = useParams<{ oshiId: string; noteId: string }>()
@@ -55,6 +58,7 @@ export function NoteEditorPage() {
   const [images, setImages] = useState<string[]>([])
   const [imageError, setImageError] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
 
   const editorRef = useRef<{ json: object; text: string }>({ json: createEmptyDoc(), text: '' })
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -86,7 +90,7 @@ export function NoteEditorPage() {
       return
     }
     if (!noteId) return
-    Promise.all([fetchNoteById(noteId), fetchNoteImages(noteId)]).then(([n, savedImages]) => {
+    Promise.all([fetchNoteById(noteId), fetchNoteImages(noteId), fetchStampForTarget('note', noteId)]).then(([n, savedImages, savedStamp]) => {
       if (n) {
         const parsedContent = parseNoteContent(n.content)
         setNote(n)
@@ -100,6 +104,7 @@ export function NoteEditorPage() {
         setEditorContent(parsedContent)
         editorRef.current = { json: parsedContent, text: n.plain_text }
         setImages(savedImages.map((image) => image.data_url))
+        setStampDraft(savedStamp)
       }
       markSaved()
       setLoading(false)
@@ -124,6 +129,7 @@ export function NoteEditorPage() {
           created_at: noteDate,
         })
         await replaceNoteImages(newNote.id, images)
+        await persistStampForNote(newNote.id)
         markSaved()
         navigate(selectedOshiId ? `/oshis/${selectedOshiId}/notes/${newNote.id}` : `/notes/${newNote.id}`, { replace: true })
       } else if (note) {
@@ -138,6 +144,7 @@ export function NoteEditorPage() {
           created_at: noteDate,
         })
         await replaceNoteImages(note.id, images)
+        await persistStampForNote(note.id)
         markSaved()
         setNote({
           ...note,
@@ -154,6 +161,10 @@ export function NoteEditorPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function persistStampForNote(targetId: string) {
+    setStampDraft(await persistStampForTarget('note', targetId, stampDraft))
   }
 
   async function handleDelete() {
@@ -352,7 +363,7 @@ export function NoteEditorPage() {
               </section>
             )}
 
-            <section className="overflow-hidden rounded-2xl border border-border-color bg-bg-primary/70 shadow-sm shadow-black/5">
+            <section className="relative overflow-hidden rounded-2xl border border-border-color bg-bg-primary/70 shadow-sm shadow-black/5">
               <div className="h-[calc(100vh-184px)] min-h-[560px]">
                 <TipTapEditor
                   key={isNew ? 'new' : note?.id}
@@ -373,6 +384,7 @@ export function NoteEditorPage() {
                   }}
                 />
               </div>
+              <StampOverlay stamp={stampDraft} />
             </section>
           </div>
         </main>
@@ -443,6 +455,18 @@ export function NoteEditorPage() {
                 imageInputRef={imageInputRef}
                 onAddImages={handleAddImages}
                 onRemoveImage={removeImage}
+              />
+
+              <StampControl
+                value={stampDraft}
+                onChange={(value) => {
+                  setStampDraft(value)
+                  markDirty()
+                }}
+                onClear={() => {
+                  setStampDraft(null)
+                  markDirty()
+                }}
               />
             </div>
           </div>

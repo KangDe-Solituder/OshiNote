@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useLocation, useOutlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { TopBar } from './TopBar'
 import { useThemeStore } from '../../stores/themeStore'
 import { UI_MOTION_SECONDS } from '../features/themes/uiMotion'
 
@@ -12,22 +13,25 @@ export function MainLayout() {
   const animateRoute = duration > 0
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-hidden bg-bg-primary/60">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={location.pathname}
-            className="h-full overflow-y-auto overflow-x-hidden"
-            initial={animateRoute ? { opacity: 0, y: 3 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            exit={animateRoute ? { opacity: 0, y: -2 } : undefined}
-            transition={{ duration, ease: 'easeOut' }}
-          >
-            {outlet}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-bg-primary/60">
+      <TopBar />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <Sidebar />
+        <main className="min-h-0 flex-1 overflow-hidden">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={location.pathname}
+              className="h-full overflow-y-auto overflow-x-hidden"
+              initial={animateRoute ? { opacity: 0, y: 3 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              exit={animateRoute ? { opacity: 0, y: -2 } : undefined}
+              transition={{ duration, ease: 'easeOut' }}
+            >
+              {outlet}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
     </div>
   )
 }

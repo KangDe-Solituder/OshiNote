@@ -4,6 +4,8 @@ import { getJournalCanvasSize, type JournalLayoutInput } from '../../../features
 import { JournalSticker } from './JournalSticker'
 import { useI18n } from '../../../i18n/useI18n'
 import { getPageBackground } from './journalCanvasStyle'
+import { StampOverlay } from '../stamps/StampOverlay'
+import type { Stamp, StampInput } from '../../../types'
 
 interface JournalCanvasProps {
   page: JournalPage | null
@@ -12,6 +14,7 @@ interface JournalCanvasProps {
   loading: boolean
   zoom: number
   zoomControlsRightOffset?: number
+  stamp?: Stamp | StampInput | null
   onZoomChange: (zoom: number) => void
   onSelectItem: (item: JournalItemWithNote | null) => void
   onCommitLayout: (itemId: string, layout: JournalLayoutInput) => void
@@ -24,6 +27,7 @@ export function JournalCanvas({
   loading,
   zoom,
   zoomControlsRightOffset = 16,
+  stamp = null,
   onZoomChange,
   onSelectItem,
   onCommitLayout,
@@ -89,6 +93,8 @@ export function JournalCanvas({
               onCommitLayout={onCommitLayout}
             />
           ))}
+
+          <StampOverlay stamp={stamp} />
         </div>
       </div>
     </div>

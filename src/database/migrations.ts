@@ -164,4 +164,39 @@ export const MIGRATIONS = [
 
   `CREATE INDEX IF NOT EXISTS idx_illustrations_oshi ON illustrations(oshi_id, category, favorite)`,
   `CREATE INDEX IF NOT EXISTS idx_illustrations_date ON illustrations(date)`,
+
+  `CREATE TABLE IF NOT EXISTS stamps (
+    id                TEXT PRIMARY KEY,
+    target_type       TEXT NOT NULL,
+    target_id         TEXT NOT NULL,
+    template_id       TEXT NOT NULL DEFAULT 'recorded',
+    template_snapshot TEXT NOT NULL DEFAULT '{}',
+    label             TEXT NOT NULL DEFAULT '',
+    color             TEXT NOT NULL DEFAULT '#8B5CF6',
+    position          TEXT NOT NULL DEFAULT 'bottom-right',
+    x                 REAL NOT NULL DEFAULT 84,
+    y                 REAL NOT NULL DEFAULT 82,
+    rotation          REAL NOT NULL DEFAULT -8,
+    size              REAL NOT NULL DEFAULT 1,
+    opacity           REAL NOT NULL DEFAULT 0.92,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  )`,
+
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_stamps_target ON stamps(target_type, target_id)`,
+
+  `CREATE TABLE IF NOT EXISTS templates (
+    id          TEXT PRIMARY KEY,
+    type        TEXT NOT NULL,
+    name        TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    source      TEXT NOT NULL DEFAULT 'user',
+    payload     TEXT NOT NULL DEFAULT '{}',
+    hidden      INTEGER NOT NULL DEFAULT 0,
+    deleted     INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS idx_templates_type ON templates(type, hidden, deleted)`,
 ]

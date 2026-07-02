@@ -10,6 +10,10 @@
 
 :root {
   --ui-motion-duration: 0.18s;
+  --color-shell-border: var(--color-border, rgba(236, 72, 153, 0.18));
+  --glass-highlight: rgba(255, 255, 255, 0.28);
+  --glass-highlight-hover: rgba(255, 255, 255, 0.34);
+  --glass-highlight-strong: rgba(255, 255, 255, 0.38);
   --journal-canvas-bg: color-mix(in srgb, var(--color-bg-primary, #fffdf8) 86%, white);
   --journal-canvas-dot: color-mix(in srgb, var(--color-accent, #EC4899) 28%, transparent);
   --journal-sticker-1: color-mix(in srgb, var(--color-bg-card, white) 78%, var(--color-accent-soft, #F9A8D4));

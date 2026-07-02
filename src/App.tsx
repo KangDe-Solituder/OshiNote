@@ -17,6 +17,9 @@ import { SettingsPage } from './pages/SettingsPage'
 import { NotesPage } from './pages/NotesPage'
 import { OshiIllustrationsPage } from './pages/OshiIllustrationsPage'
 import { IllustrationsPage } from './pages/IllustrationsPage'
+import { ResourcesPage } from './pages/ResourcesPage'
+import { ResourceTemplatesPage } from './pages/ResourceTemplatesPage'
+import { ResourceMaterialsPage } from './pages/ResourceMaterialsPage'
 import { UpdateNotifier } from './components/features/update/UpdateNotifier'
 
 export default function App() {
@@ -43,6 +46,9 @@ export default function App() {
               <Route path="journal" element={<JournalHomePage />} />
               <Route path="journal/create" element={<JournalEditorPage />} />
               <Route path="journal/pages/:pageId/edit" element={<JournalEditorPage />} />
+              <Route path="resources" element={<ResourcesPage />} />
+              <Route path="resources/templates" element={<ResourceTemplatesPage />} />
+              <Route path="resources/materials" element={<ResourceMaterialsPage />} />
               <Route path="illustrations" element={<IllustrationsPage />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="tags/:tagName" element={<TagDetailPage />} />

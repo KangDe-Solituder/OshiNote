@@ -9,6 +9,7 @@ import type {
   GlobalNoteSearchParams,
   NoteImage,
 } from '../../types'
+import { deleteStampForTarget } from '../stamps/stampService'
 
 interface NoteLibraryRow extends NoteRow {
   oshi_name: string | null
@@ -171,6 +172,7 @@ export async function deleteNote(id: string): Promise<void> {
   const db = await getDb()
   await db.execute('DELETE FROM note_images WHERE note_id = ?', [id])
   await db.execute('DELETE FROM notes WHERE id = ?', [id])
+  await deleteStampForTarget('note', id)
 }
 
 export async function fetchNoteImages(noteId: string): Promise<NoteImage[]> {

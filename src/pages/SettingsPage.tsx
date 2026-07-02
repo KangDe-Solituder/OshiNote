@@ -11,6 +11,7 @@ import { LOCALE_OPTIONS } from '../i18n/translations'
 import { useI18n } from '../i18n/useI18n'
 import { useLanguageStore } from '../stores/languageStore'
 import { SelectMenu } from '../components/ui/SelectMenu'
+import { useSidebarStore } from '../stores/sidebarStore'
 
 const THEMES: { id: ThemeId }[] = [
   { id: 'pink-cozy' },
@@ -39,6 +40,10 @@ export function SettingsPage() {
     uiMotionDuration, setUiMotionDuration,
   } = useThemeStore()
   const { checkOnStartup, setCheckOnStartup, loadFromDB: loadUpdateSettings } = useUpdateStore()
+  const dragEnabled = useSidebarStore((s) => s.dragEnabled)
+  const snapEnabled = useSidebarStore((s) => s.snapEnabled)
+  const setDragEnabled = useSidebarStore((s) => s.setDragEnabled)
+  const setSnapEnabled = useSidebarStore((s) => s.setSnapEnabled)
   const [appVersion, setAppVersion] = useState('')
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'none' | 'installing' | 'error'>('idle')
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null)
@@ -285,6 +290,24 @@ export function SettingsPage() {
       </section>
 
       <section className="mb-10">
+        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.sidebar')}</h2>
+        <Card className="space-y-4">
+          <SettingToggle
+            title={t('settings.sidebarDrag')}
+            description={t('settings.sidebarDragDescription')}
+            enabled={dragEnabled}
+            onToggle={() => setDragEnabled(!dragEnabled)}
+          />
+          <SettingToggle
+            title={t('settings.sidebarSnap')}
+            description={t('settings.sidebarSnapDescription')}
+            enabled={snapEnabled}
+            onToggle={() => setSnapEnabled(!snapEnabled)}
+          />
+        </Card>
+      </section>
+
+      <section className="mb-10">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.updates')}</h2>
         <Card className="space-y-5">
           <div className="flex items-center justify-between gap-4">
@@ -409,6 +432,32 @@ function FilterSlider({
         </span>
       </div>
     </div>
+  )
+}
+
+function SettingToggle({
+  title,
+  description,
+  enabled,
+  onToggle,
+}: {
+  title: string
+  description: string
+  enabled: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center justify-between gap-4 rounded-xl text-left"
+    >
+      <span>
+        <span className="block text-sm font-medium text-text-primary">{title}</span>
+        <span className="block text-xs text-text-muted">{description}</span>
+      </span>
+      <ToggleSwitch enabled={enabled} />
+    </button>
   )
 }
 

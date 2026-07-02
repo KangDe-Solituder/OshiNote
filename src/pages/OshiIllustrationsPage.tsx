@@ -49,6 +49,8 @@ import type {
   IllustrationSort,
   IllustrationTab,
   Oshi,
+  Stamp,
+  StampInput,
   UpdateIllustrationInput,
 } from '../types'
 import { formatDate, formatImageSize, getOshiName } from '../features/illustrations/illustrationFormat'
@@ -56,6 +58,9 @@ import { SelectMenu } from '../components/ui/SelectMenu'
 import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
 import { useI18n } from '../i18n/useI18n'
 import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
+import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
+import { StampControl } from '../components/features/stamps/StampControl'
+import { StampOverlay } from '../components/features/stamps/StampOverlay'
 
 const TABS: { id: IllustrationTab; labelKey: 'illustrations.all' | 'common.official' | 'common.fanart' | 'common.favorites' }[] = [
   { id: 'all', labelKey: 'illustrations.all' },
@@ -687,7 +692,7 @@ export function IllustrationDetailDrawer({
   illustration: Illustration
   oshis: Oshi[]
   onClose: () => void
-  onUpdate: (id: string, input: UpdateIllustrationInput) => void
+  onUpdate: (id: string, input: UpdateIllustrationInput) => void | Promise<void>
   onToggleFavorite: (id: string) => void
   onDelete: (illustration: Illustration) => void
 }) {
@@ -703,6 +708,7 @@ export function IllustrationDetailDrawer({
   const [tags, setTags] = useState(illustration.tags.join(', '))
   const [description, setDescription] = useState(illustration.description)
   const [showPreview, setShowPreview] = useState(false)
+  const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
 
   useEffect(() => {
     setEditing(false)
@@ -714,10 +720,11 @@ export function IllustrationDetailDrawer({
     setSourceUrl(illustration.source_url)
     setTags(illustration.tags.join(', '))
     setDescription(illustration.description)
+    fetchStampForTarget('illustration', illustration.id).then(setStampDraft).catch(() => setStampDraft(null))
   }, [illustration])
 
-  function handleSave() {
-    onUpdate(illustration.id, {
+  async function handleSave() {
+    await onUpdate(illustration.id, {
       title: title.trim() || t('common.untitled'),
       oshi_id: selectedOshiId || null,
       category,
@@ -727,6 +734,7 @@ export function IllustrationDetailDrawer({
       tags: parseTagInput(tags),
       description: description.trim(),
     })
+    setStampDraft(await persistStampForTarget('illustration', illustration.id, stampDraft))
     setEditing(false)
   }
 
@@ -769,7 +777,7 @@ export function IllustrationDetailDrawer({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: motionSeconds === 0 ? 1 : 0.98 }}
             transition={{ duration: motionSeconds, ease: 'easeOut' }}
-            className="max-h-full max-w-full"
+            className="relative max-h-full max-w-full"
             onClick={(event) => event.stopPropagation()}
           >
             <MediaImage
@@ -777,6 +785,7 @@ export function IllustrationDetailDrawer({
               alt={illustration.title || illustration.original_filename}
               className="max-h-[calc(100vh-56px)] max-w-[calc(100vw-56px)] rounded-xl object-contain shadow-2xl"
             />
+            <StampOverlay stamp={stampDraft} />
           </motion.div>
         </motion.div>
       )}
@@ -811,11 +820,12 @@ export function IllustrationDetailDrawer({
           <button
             type="button"
             onClick={() => setShowPreview(true)}
-            className="block w-full rounded-2xl focus:outline-none focus:ring-2 focus:ring-accent-soft"
+            className="relative block w-full rounded-2xl focus:outline-none focus:ring-2 focus:ring-accent-soft"
             title={t('illustrations.preview.open')}
             aria-label={t('illustrations.preview.open')}
           >
             <MediaImage path={illustration.original_path} alt={illustration.title} className="max-h-[420px] w-full rounded-2xl object-contain" />
+            <StampOverlay stamp={stampDraft} />
           </button>
         </div>
         <div className="space-y-5 p-5">
@@ -866,6 +876,11 @@ export function IllustrationDetailDrawer({
                 onSourceUrlChange={setSourceUrl}
                 onTagsChange={setTags}
                 onDescriptionChange={setDescription}
+              />
+              <StampControl
+                value={stampDraft}
+                onChange={setStampDraft}
+                onClear={() => setStampDraft(null)}
               />
               <Button className="w-full" onClick={handleSave}>
                 <Check size={16} />

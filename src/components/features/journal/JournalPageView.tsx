@@ -5,7 +5,7 @@ import { Button } from '../../ui/Button'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../../layout/pageShell'
 import { useJournalStore } from '../../../stores/journalStore'
 import { useNoteStore } from '../../../stores/noteStore'
-import type { JournalBook, JournalItemWithNote, JournalPage } from '../../../types'
+import type { JournalBook, JournalItemWithNote, JournalPage, Stamp } from '../../../types'
 import { autoArrangeNotes, clampLayout, getJournalCanvasSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { fetchJournalItems } from '../../../features/journal/journalService'
 import { JournalCanvas } from './JournalCanvas'
@@ -15,6 +15,8 @@ import { JournalIllustrationPicker } from './JournalIllustrationPicker'
 import { JournalStickerPopover } from './JournalStickerPopover'
 import { usePageTransition, usePanelTransition, usePopoverTransition } from '../themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
+import { fetchStampForTarget } from '../../../features/stamps/stampService'
+import { StampOverlay } from '../stamps/StampOverlay'
 
 interface JournalPageViewProps {
   oshiId: string
@@ -34,6 +36,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [viewingPageId, setViewingPageId] = useState<string | null>(standalonePostcard?.id || null)
   const [previewItemsByPageId, setPreviewItemsByPageId] = useState<Record<string, JournalItemWithNote[]>>({})
+  const [stampsByPageId, setStampsByPageId] = useState<Record<string, Stamp | null>>({})
   const [zoom, setZoom] = useState(1)
   const [showNotePicker, setShowNotePicker] = useState(false)
   const [showIllustrationPicker, setShowIllustrationPicker] = useState(false)
@@ -95,14 +98,20 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
     let alive = true
     if (pages.length === 0) {
       setPreviewItemsByPageId({})
+      setStampsByPageId({})
       return
     }
-    Promise.all(pages.map(async (page) => [page.id, await fetchJournalItems(page.id)] as const))
+    Promise.all(pages.map(async (page) => [page.id, await fetchJournalItems(page.id), await fetchStampForTarget('journal_page', page.id)] as const))
       .then((entries) => {
-        if (alive) setPreviewItemsByPageId(Object.fromEntries(entries))
+        if (!alive) return
+        setPreviewItemsByPageId(Object.fromEntries(entries.map(([pageId, pageItems]) => [pageId, pageItems])))
+        setStampsByPageId(Object.fromEntries(entries.map(([pageId, , stamp]) => [pageId, stamp])))
       })
       .catch(() => {
-        if (alive) setPreviewItemsByPageId({})
+        if (alive) {
+          setPreviewItemsByPageId({})
+          setStampsByPageId({})
+        }
       })
     return () => { alive = false }
   }, [pages])
@@ -409,6 +418,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 pages={pages}
                 activePageId={activePageId}
                 itemsByPageId={previewItemsByPageId}
+                stampsByPageId={stampsByPageId}
                 onCreate={handleCreatePage}
                 onSelect={handleOpenPage}
                 t={t}
@@ -425,6 +435,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                   selectedItemId={selectedItemId}
                   loading={loading}
                   zoom={zoom}
+                  stamp={activePage ? stampsByPageId[activePage.id] : null}
                   onZoomChange={setZoom}
                   onSelectItem={(item) => setSelectedItemId(item?.id || null)}
                   onCommitLayout={handleCommitLayout}
@@ -436,6 +447,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 pages={pages}
                 loading={loading}
                 itemsByPageId={previewItemsByPageId}
+                stampsByPageId={stampsByPageId}
                 transition={pageTransition}
                 onCreate={handleCreatePage}
                 onSelect={handleOpenPage}
@@ -520,6 +532,7 @@ function PageGallery({
   pages,
   loading,
   itemsByPageId,
+  stampsByPageId,
   transition,
   onCreate,
   onSelect,
@@ -528,6 +541,7 @@ function PageGallery({
   pages: JournalPage[]
   loading: boolean
   itemsByPageId: Record<string, JournalItemWithNote[]>
+  stampsByPageId: Record<string, Stamp | null>
   transition: ReturnType<typeof usePageTransition>
   onCreate: () => void
   onSelect: (pageId: string) => void
@@ -551,7 +565,7 @@ function PageGallery({
         ) : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {pages.map((page) => (
-              <PagePreviewCard key={page.id} page={page} items={itemsByPageId[page.id] || []} active={false} onSelect={() => onSelect(page.id)} t={t} />
+              <PagePreviewCard key={page.id} page={page} items={itemsByPageId[page.id] || []} stamp={stampsByPageId[page.id]} active={false} onSelect={() => onSelect(page.id)} t={t} />
             ))}
             <button
               type="button"
@@ -572,6 +586,7 @@ function PageSidebar({
   pages,
   activePageId,
   itemsByPageId,
+  stampsByPageId,
   onCreate,
   onSelect,
   t,
@@ -579,6 +594,7 @@ function PageSidebar({
   pages: JournalPage[]
   activePageId: string | null
   itemsByPageId: Record<string, JournalItemWithNote[]>
+  stampsByPageId: Record<string, Stamp | null>
   onCreate: () => void
   onSelect: (pageId: string) => void
   t: Translate
@@ -601,6 +617,7 @@ function PageSidebar({
             key={page.id}
             page={page}
             items={itemsByPageId[page.id] || []}
+            stamp={stampsByPageId[page.id]}
             active={page.id === activePageId}
             compact
             onSelect={() => onSelect(page.id)}
@@ -615,6 +632,7 @@ function PageSidebar({
 function PagePreviewCard({
   page,
   items,
+  stamp,
   active,
   compact = false,
   onSelect,
@@ -622,6 +640,7 @@ function PagePreviewCard({
 }: {
   page: JournalPage
   items: JournalItemWithNote[]
+  stamp?: Stamp | null
   active: boolean
   compact?: boolean
   onSelect: () => void
@@ -664,6 +683,7 @@ function PagePreviewCard({
             )}
           </span>
         ))}
+        <StampOverlay stamp={stamp || null} />
         <span className="absolute right-3 top-3 rounded-full bg-bg-card/90 px-2 py-0.5 text-xs font-semibold text-accent">
           {page.page_index + 1}
         </span>
