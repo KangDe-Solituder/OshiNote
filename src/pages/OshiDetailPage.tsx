@@ -1,53 +1,60 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { invoke } from '@tauri-apps/api/core'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, FileText, FolderArchive, Palette, Plus, Search, LayoutGrid, List, GitGraph, StickyNote, BookOpen, Loader2, Link2, X, Trash2 } from 'lucide-react'
+import { BookOpen, Check, GitGraph, LayoutGrid, List, Loader2, Palette, Plus, Search, StickyNote, Trash2, X } from 'lucide-react'
 import clsx from 'clsx'
 import { Button } from '../components/ui/Button'
 import { TagGraphView } from '../components/features/notes/TagGraphView'
-import { OshiModuleHeader } from '../components/layout/OshiModuleHeader'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
-import type { CardStyle, Oshi } from '../types'
+import { getOshiArchiveNoteCounts } from '../features/notes/noteService'
+import type { Archive, CardStyle, Oshi, OshiArchiveNoteCounts, OshiNoteArchiveFilter } from '../types'
 import { usePageTransition } from '../components/features/themes/uiMotion'
+import { useI18n } from '../i18n/useI18n'
+
+const ARCHIVE_FILTER_ALL = 'all'
+const ARCHIVE_FILTER_UNFILED = 'unfiled'
+const ARCHIVE_FILTER_PREFIX = 'archive:'
+const EMPTY_ARCHIVE_COUNTS: OshiArchiveNoteCounts = { all: 0, unfiled: 0, byArchiveId: {} }
+type NoteArchiveFilterValue = typeof ARCHIVE_FILTER_ALL | typeof ARCHIVE_FILTER_UNFILED | `${typeof ARCHIVE_FILTER_PREFIX}${string}`
 
 export function OshiDetailPage() {
+  const { t } = useI18n()
   const { oshiId } = useParams<{ oshiId: string }>()
   const [oshi, setOshi] = useState<Oshi | null>(null)
   const [loading, setLoading] = useState(true)
   const [newArchiveName, setNewArchiveName] = useState('')
   const [showAddArchive, setShowAddArchive] = useState(false)
-  const [showArchiveMenu, setShowArchiveMenu] = useState(false)
   const [showCardStyleMenu, setShowCardStyleMenu] = useState(false)
+  const [activeArchiveFilter, setActiveArchiveFilter] = useState<NoteArchiveFilterValue>(ARCHIVE_FILTER_ALL)
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [archiveCounts, setArchiveCounts] = useState<OshiArchiveNoteCounts>(EMPTY_ARCHIVE_COUNTS)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const pageTransition = usePageTransition()
 
-  const { archives, activeArchiveId, fetchByOshi, createArchive, deleteArchive, getArchiveNoteCount, setActiveArchive } = useArchiveStore()
+  const { archives, fetchByOshi: fetchArchivesByOshi, createArchive, deleteArchive } = useArchiveStore()
   const {
     notes, totalNotes, currentPage, viewMode, cardStyle, searchQuery, loading: notesLoading,
-    fetchByArchive, search, setViewMode, setCardStyle, setSearchQuery, setPage,
+    fetchByOshi: fetchNotesByOshi, setViewMode, setCardStyle, setSearchQuery, setPage,
   } = useNoteStore()
   const refreshOshis = useOshiStore((s) => s.fetchAll)
 
   useEffect(() => {
     if (!oshiId) return
+    setLoading(true)
+    setActiveArchiveFilter(ARCHIVE_FILTER_ALL)
+    setSubmittedQuery('')
+    setArchiveCounts(EMPTY_ARCHIVE_COUNTS)
+    setSearchQuery('')
     fetchOshiById(oshiId).then((o) => { setOshi(o); setLoading(false) })
-    fetchByOshi(oshiId)
-  }, [oshiId, fetchByOshi])
-
-  useEffect(() => {
-    if (activeArchiveId) {
-      fetchByArchive(activeArchiveId)
-    }
-  }, [activeArchiveId, fetchByArchive])
+    fetchArchivesByOshi(oshiId)
+  }, [oshiId, fetchArchivesByOshi, setSearchQuery])
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       if (!toolbarRef.current?.contains(event.target as Node)) {
-        setShowArchiveMenu(false)
         setShowCardStyleMenu(false)
         setShowAddArchive(false)
       }
@@ -57,51 +64,79 @@ export function OshiDetailPage() {
   }, [])
 
   const totalPages = Math.max(1, Math.ceil(totalNotes / useNoteStore.getState().pageSize))
-  const activeArchive = archives.find((archive) => archive.id === activeArchiveId)
+  const archiveTabs = buildArchiveTabs(archives, archiveCounts, t)
+
+  const refreshArchiveCounts = useCallback(async () => {
+    if (!oshiId) return
+    setArchiveCounts(await getOshiArchiveNoteCounts(oshiId))
+  }, [oshiId])
+
+  const loadNotes = useCallback(async (page = 1, filter: NoteArchiveFilterValue = activeArchiveFilter) => {
+    if (!oshiId) return
+    const archiveId = getArchiveIdFromFilter(filter)
+    await fetchNotesByOshi(oshiId, {
+      query: submittedQuery || undefined,
+      archiveFilter: getArchiveFilterKind(filter),
+      archiveId,
+      page,
+      pageSize: useNoteStore.getState().pageSize,
+    })
+  }, [activeArchiveFilter, fetchNotesByOshi, oshiId, submittedQuery])
 
   useEffect(() => {
     if (viewMode === 'journal') setViewMode('card')
   }, [setViewMode, viewMode])
 
-  function handleSearch() {
-    if (!oshiId) return
-    if (searchQuery.trim()) {
-      search(oshiId, { query: searchQuery, page: 1, pageSize: 20 })
-    } else if (activeArchiveId) {
-      fetchByArchive(activeArchiveId)
+  useEffect(() => {
+    loadNotes(1)
+    refreshArchiveCounts()
+  }, [loadNotes, refreshArchiveCounts])
+
+  useEffect(() => {
+    const activeArchiveId = getArchiveIdFromFilter(activeArchiveFilter)
+    if (activeArchiveId && !archives.some((archive) => archive.id === activeArchiveId)) {
+      setActiveArchiveFilter(ARCHIVE_FILTER_ALL)
     }
+    if (activeArchiveFilter === ARCHIVE_FILTER_UNFILED && archiveCounts.unfiled === 0) {
+      setActiveArchiveFilter(ARCHIVE_FILTER_ALL)
+    }
+  }, [activeArchiveFilter, archiveCounts.unfiled, archives])
+
+  function handleSearch() {
+    const nextQuery = searchQuery.trim()
+    if (nextQuery === submittedQuery) {
+      loadNotes(1)
+      return
+    }
+    setSubmittedQuery(nextQuery)
   }
 
-  function handleAddArchive() {
+  async function handleAddArchive() {
     if (!oshiId || !newArchiveName.trim()) return
-    createArchive(oshiId, newArchiveName.trim())
+    const archive = await createArchive(oshiId, newArchiveName.trim())
+    await fetchArchivesByOshi(oshiId)
+    await refreshArchiveCounts()
+    setActiveArchiveFilter(getArchiveFilterValue(archive.id))
     setNewArchiveName('')
     setShowAddArchive(false)
   }
 
   async function handleDeleteArchive(archiveId: string, archiveName: string) {
     if (!oshiId) return
-    const noteCount = await getArchiveNoteCount(archiveId)
+    const noteCount = archiveCounts.byArchiveId[archiveId] || 0
     const message = noteCount > 0
       ? `Delete archive "${archiveName}"? Its ${noteCount} note${noteCount === 1 ? '' : 's'} will be kept in All Notes as unfiled.`
       : `Delete empty archive "${archiveName}"?`
     if (!confirm(message)) return
+    const nextFilter = activeArchiveFilter === getArchiveFilterValue(archiveId) ? ARCHIVE_FILTER_ALL : activeArchiveFilter
     await deleteArchive(archiveId)
-    await fetchByOshi(oshiId)
+    await fetchArchivesByOshi(oshiId)
     await refreshOshis()
-    const nextArchive = useArchiveStore.getState().activeArchiveId
-    if (nextArchive) {
-      await fetchByArchive(nextArchive, 1)
-    }
-  }
-
-  async function handleOpenExternalLink(value: string) {
-    const url = normalizeWebUrl(value)
-    if (!url) return
-    try {
-      await invoke('open_external_url', { url })
-    } catch {
-      window.open(url, '_blank', 'noopener,noreferrer')
+    await refreshArchiveCounts()
+    if (nextFilter !== activeArchiveFilter) {
+      setActiveArchiveFilter(nextFilter)
+    } else {
+      await loadNotes(1, nextFilter)
     }
   }
 
@@ -128,147 +163,94 @@ export function OshiDetailPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <OshiModuleHeader
-        oshiId={oshiId!}
-        title="Notes"
-        subtitle={`${totalNotes} notes for ${oshi.name}`}
-        icon={FileText}
-        actions={oshi.activity_links.length > 0 && (
-          <div className="hidden max-w-[220px] shrink-0 flex-col gap-1 md:flex">
-            {oshi.activity_links.slice(0, 2).map((url) => (
+      <div
+        ref={toolbarRef}
+        className="relative z-40 border-b border-border-color bg-bg-primary/60 px-6 py-4 lg:px-10"
+      >
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-4 border-b border-border-color">
+          <div className="flex min-w-0 flex-wrap items-end gap-5">
+            {archiveTabs.map((tab) => (
+              <ArchiveTab
+                key={tab.id}
+                tab={tab}
+                active={activeArchiveFilter === tab.id}
+                onSelect={() => setActiveArchiveFilter(tab.id)}
+                onDelete={tab.archiveId ? () => handleDeleteArchive(tab.archiveId!, tab.label) : undefined}
+                deleteTitle={t('notes.archive.delete')}
+              />
+            ))}
+
+            {showAddArchive ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  handleAddArchive()
+                }}
+                className="flex items-center gap-1 pb-2"
+              >
+                <input
+                  autoFocus
+                  value={newArchiveName}
+                  onChange={(event) => setNewArchiveName(event.target.value)}
+                  placeholder={t('notes.archive.namePlaceholder')}
+                  className="h-8 min-w-0 rounded-lg border border-accent bg-bg-primary px-2 text-sm text-text-primary focus:outline-none"
+                />
+                <button type="submit" className="rounded-md p-1.5 text-accent hover:bg-accent-soft" title={t('notes.archive.create')}>
+                  <Check size={14} />
+                </button>
+                <button type="button" onClick={() => setShowAddArchive(false)} className="rounded-md p-1.5 text-text-muted hover:bg-bg-secondary hover:text-text-primary" title={t('common.cancel')}>
+                  <X size={14} />
+                </button>
+              </form>
+            ) : (
               <button
                 type="button"
-                key={url}
-                onClick={() => handleOpenExternalLink(url)}
-                className="flex min-w-0 items-center gap-1.5 text-xs text-accent transition-colors hover:text-accent-hover"
-                title={url}
+                onClick={() => setShowAddArchive(true)}
+                className="border-b-2 border-transparent px-1 pb-3 text-sm font-semibold text-text-muted transition-colors hover:text-accent"
               >
-                <Link2 size={13} className="shrink-0 text-text-muted" />
-                <span className="truncate">{formatLinkLabel(url)}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Plus size={14} />
+                  {t('notes.archive.create')}
+                </span>
+              </button>
+            )}
+          </div>
+
+          <p className="pb-3 text-sm text-text-muted">
+            {t('notes.archive.currentCount', { count: totalNotes, plural: totalNotes === 1 ? '' : 's' })}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap overflow-visible">
+          <div className="relative flex-1 min-w-[180px] max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              placeholder={t('notes.search')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-border-color bg-bg-secondary text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
+            />
+          </div>
+
+          <div className="flex gap-1 bg-bg-secondary rounded-xl p-1">
+            {[
+              { mode: 'card' as const, icon: LayoutGrid, title: t('notes.cardView') },
+              { mode: 'list' as const, icon: List, title: t('notes.listView') },
+              { mode: 'graph' as const, icon: GitGraph, title: t('notes.graphView') },
+            ].map(({ mode, icon: Icon, title }) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === mode ? 'bg-bg-primary text-accent shadow-sm' : 'text-text-muted hover:text-text-primary'
+                }`}
+                title={title}
+              >
+                <Icon size={18} />
               </button>
             ))}
           </div>
-        )}
-      />
-
-      {/* Toolbar */}
-      <div
-        ref={toolbarRef}
-        className="relative z-40 p-4 border-b border-border-color flex items-center gap-3 flex-wrap bg-bg-secondary/10 overflow-visible"
-      >
-        <div className="relative flex-1 min-w-[180px] max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-border-color bg-bg-secondary text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
-          />
-        </div>
-
-        <div className="flex gap-1 bg-bg-secondary rounded-xl p-1">
-          {[
-            { mode: 'card' as const, icon: LayoutGrid },
-            { mode: 'list' as const, icon: List },
-            { mode: 'graph' as const, icon: GitGraph },
-          ].map(({ mode, icon: Icon }) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === mode ? 'bg-bg-primary text-accent shadow-sm' : 'text-text-muted hover:text-text-primary'
-              }`}
-              title={mode}
-            >
-              <Icon size={18} />
-            </button>
-          ))}
-        </div>
-
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              setShowArchiveMenu(!showArchiveMenu)
-              setShowCardStyleMenu(false)
-            }}
-            className={clsx(
-              'flex items-center gap-1.5 rounded-lg border border-border-color bg-bg-secondary px-2.5 py-2 text-sm transition-colors',
-              showArchiveMenu ? 'text-accent ring-2 ring-accent-soft' : 'text-text-secondary hover:text-text-primary'
-            )}
-            title="Archives"
-          >
-            <FolderArchive size={17} />
-            <span className="max-w-24 truncate">{activeArchive?.name || 'Archive'}</span>
-            <ChevronDown size={14} />
-          </button>
-
-          {showArchiveMenu && (
-            <div className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-border-color bg-bg-primary p-2 shadow-xl">
-              <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Archives</p>
-              <div className="max-h-56 overflow-y-auto">
-                {archives.length === 0 ? (
-                  <p className="px-2 py-3 text-xs text-text-muted">No archives yet.</p>
-                ) : (
-                  archives.map((archive) => (
-                    <div
-                      key={archive.id}
-                      className={clsx(
-                        'group flex items-center gap-1 rounded-lg',
-                        archive.id === activeArchiveId ? 'bg-accent-soft text-accent' : 'text-text-secondary hover:bg-bg-secondary'
-                      )}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveArchive(archive.id)
-                          setShowArchiveMenu(false)
-                        }}
-                        className="min-w-0 flex-1 truncate px-2 py-2 text-left text-sm"
-                      >
-                        {archive.name}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteArchive(archive.id, archive.name)}
-                        className="mr-1 rounded-md p-1 text-text-muted opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-                        title="Delete archive"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="mt-2 border-t border-border-color pt-2">
-                {showAddArchive ? (
-                  <form onSubmit={(e) => { e.preventDefault(); handleAddArchive() }} className="flex items-center gap-1">
-                    <input
-                      autoFocus
-                      value={newArchiveName}
-                      onChange={(e) => setNewArchiveName(e.target.value)}
-                      placeholder="Archive name..."
-                      className="min-w-0 flex-1 rounded-lg border border-accent bg-bg-primary px-2 py-1.5 text-sm text-text-primary focus:outline-none"
-                    />
-                    <button type="submit" className="p-1.5 text-accent hover:text-accent-hover" title="Create archive"><Plus size={15} /></button>
-                    <button type="button" onClick={() => setShowAddArchive(false)} className="p-1.5 text-text-muted hover:text-text-primary" title="Cancel"><X size={15} /></button>
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddArchive(true)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-secondary hover:text-accent"
-                  >
-                    <Plus size={15} />
-                    New archive
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
 
         {viewMode === 'card' && (
           <div className="relative">
@@ -276,7 +258,6 @@ export function OshiDetailPage() {
               type="button"
               onClick={() => {
                 setShowCardStyleMenu(!showCardStyleMenu)
-                setShowArchiveMenu(false)
                 setShowAddArchive(false)
               }}
               className={clsx(
@@ -287,7 +268,6 @@ export function OshiDetailPage() {
             >
               <Palette size={17} />
               <span className="capitalize">{cardStyle}</span>
-              <ChevronDown size={14} />
             </button>
 
             {showCardStyleMenu && (
@@ -320,10 +300,11 @@ export function OshiDetailPage() {
         <Link to={`/oshis/${oshiId}/notes/new`}>
           <Button size="sm">
             <Plus size={16} />
-            New Note
+            {t('notes.new')}
           </Button>
         </Link>
 
+        </div>
       </div>
 
       {/* Content */}
@@ -343,12 +324,12 @@ export function OshiDetailPage() {
             {!notesLoading && notes.length === 0 && (
               <div className="text-center py-20">
                 <StickyNote size={48} className="mx-auto mb-4 text-accent-soft" />
-                <h3 className="text-lg font-semibold text-text-primary mb-2">No notes yet</h3>
-                <p className="text-text-muted mb-6">Write your first impression of this oshi.</p>
+                <h3 className="text-lg font-semibold text-text-primary mb-2">{t('notes.empty.title')}</h3>
+                <p className="text-text-muted mb-6">{t('notes.empty.body')}</p>
                 <Link to={`/oshis/${oshiId}/notes/new`}>
                   <Button size="lg">
                     <Plus size={18} />
-                    Write a Note
+                    {t('notes.new')}
                   </Button>
                 </Link>
               </div>
@@ -440,7 +421,7 @@ export function OshiDetailPage() {
                   disabled={currentPage <= 1}
                   onClick={() => {
                     setPage(currentPage - 1)
-                    if (activeArchiveId) fetchByArchive(activeArchiveId, currentPage - 1)
+                    loadNotes(currentPage - 1)
                   }}
                 >
                   Prev
@@ -454,7 +435,7 @@ export function OshiDetailPage() {
                   disabled={currentPage >= totalPages}
                   onClick={() => {
                     setPage(currentPage + 1)
-                    if (activeArchiveId) fetchByArchive(activeArchiveId, currentPage + 1)
+                    loadNotes(currentPage + 1)
                   }}
                 >
                   Next
@@ -468,6 +449,98 @@ export function OshiDetailPage() {
       </div>
     </div>
   )
+}
+
+interface ArchiveTabItem {
+  id: NoteArchiveFilterValue
+  label: string
+  count: number
+  archiveId?: string
+}
+
+function ArchiveTab({
+  tab,
+  active,
+  onSelect,
+  onDelete,
+  deleteTitle,
+}: {
+  tab: ArchiveTabItem
+  active: boolean
+  onSelect: () => void
+  onDelete?: () => void
+  deleteTitle: string
+}) {
+  return (
+    <div className="group flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onSelect}
+        className={clsx(
+          'border-b-2 px-1 pb-3 text-sm font-semibold transition-colors',
+          active ? 'border-accent text-accent' : 'border-transparent text-text-muted hover:text-text-primary'
+        )}
+      >
+        <span>{tab.label}</span>
+        <span className={clsx(
+          'ml-1.5 rounded-full px-1.5 py-0.5 text-[11px]',
+          active ? 'bg-accent-soft text-accent' : 'bg-bg-secondary text-text-muted'
+        )}>
+          {tab.count}
+        </span>
+      </button>
+
+      {active && onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="mb-2 rounded-md p-1 text-text-muted opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+          title={deleteTitle}
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function buildArchiveTabs(
+  archives: Archive[],
+  archiveCounts: OshiArchiveNoteCounts,
+  t: ReturnType<typeof useI18n>['t']
+): ArchiveTabItem[] {
+  const tabs: ArchiveTabItem[] = [
+    { id: ARCHIVE_FILTER_ALL, label: t('common.all'), count: archiveCounts.all },
+  ]
+
+  if (archiveCounts.unfiled > 0) {
+    tabs.push({ id: ARCHIVE_FILTER_UNFILED, label: t('common.unfiled'), count: archiveCounts.unfiled })
+  }
+
+  tabs.push(
+    ...archives.map((archive) => ({
+      id: getArchiveFilterValue(archive.id),
+      label: archive.name,
+      count: archiveCounts.byArchiveId[archive.id] || 0,
+      archiveId: archive.id,
+    }))
+  )
+
+  return tabs
+}
+
+function getArchiveFilterValue(archiveId: string): NoteArchiveFilterValue {
+  return `${ARCHIVE_FILTER_PREFIX}${archiveId}`
+}
+
+function getArchiveIdFromFilter(filter: NoteArchiveFilterValue): string | null {
+  return filter.startsWith(ARCHIVE_FILTER_PREFIX) ? filter.slice(ARCHIVE_FILTER_PREFIX.length) : null
+}
+
+function getArchiveFilterKind(filter: NoteArchiveFilterValue): OshiNoteArchiveFilter {
+  if (filter === ARCHIVE_FILTER_UNFILED) return 'unfiled'
+  if (getArchiveIdFromFilter(filter)) return 'archive'
+  return 'all'
 }
 
 function getNoteCardClass(cardStyle: CardStyle, index: number): string {
@@ -498,22 +571,3 @@ const CARD_STYLES: { id: CardStyle; label: string; icon: typeof Palette }[] = [
   { id: 'bookshelf', label: 'Bookshelf', icon: BookOpen },
   { id: 'postcard', label: 'Postcard', icon: Palette },
 ]
-
-function formatLinkLabel(value: string): string {
-  try {
-    const url = new URL(value)
-    return url.hostname.replace(/^www\./, '')
-  } catch {
-    return value
-  }
-}
-
-function normalizeWebUrl(value: string): string | null {
-  try {
-    const withProtocol = /^[a-z]+:\/\//i.test(value) ? value : `https://${value}`
-    const url = new URL(withProtocol)
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null
-  } catch {
-    return null
-  }
-}

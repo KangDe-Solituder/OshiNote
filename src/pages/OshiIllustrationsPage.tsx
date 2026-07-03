@@ -26,8 +26,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { PAGE_CONTENT_CLASS } from '../components/layout/pageShell'
-import { OshiModuleHeader } from '../components/layout/OshiModuleHeader'
-import { fetchAllOshis, fetchOshiById } from '../features/oshis/oshiService'
+import { fetchAllOshis } from '../features/oshis/oshiService'
 import {
   createIllustration,
   createIllustrationId,
@@ -74,7 +73,6 @@ type IllustrationViewMode = 'masonry' | 'grid' | 'list'
 export function OshiIllustrationsPage() {
   const { t } = useI18n()
   const { oshiId } = useParams<{ oshiId: string }>()
-  const [oshi, setOshi] = useState<Oshi | null>(null)
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
@@ -96,8 +94,7 @@ export function OshiIllustrationsPage() {
     if (!oshiId) return
     setLoading(true)
     try {
-      const [oshiRecord, oshiRows, rows, tagRows] = await Promise.all([
-        fetchOshiById(oshiId),
+      const [oshiRows, rows, tagRows] = await Promise.all([
         fetchAllOshis(),
         fetchIllustrations({
           oshiId,
@@ -109,7 +106,6 @@ export function OshiIllustrationsPage() {
         }),
         getIllustrationTags(oshiId),
       ])
-      setOshi(oshiRecord)
       setOshis(oshiRows)
       setIllustrations(rows)
       setTags(tagRows)
@@ -145,19 +141,6 @@ export function OshiIllustrationsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
-      <OshiModuleHeader
-        oshiId={oshiId}
-        title={t('illustrations.title')}
-        subtitle={oshi ? t('illustrations.oshiSubtitle', { oshi: oshi.name }) : t('illustrations.genericSubtitle')}
-        icon={ImageIcon}
-        actions={(
-          <Button onClick={() => setShowCreate(true)} className="rounded-2xl px-4">
-            <Plus size={16} />
-            {t('illustrations.add')}
-          </Button>
-        )}
-      />
-
       <main className={`${PAGE_CONTENT_CLASS} min-h-0`}>
         <div className="mx-auto flex h-full max-w-[1760px] flex-col">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-border-color">
@@ -235,6 +218,7 @@ export function OshiIllustrationsPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onToggleFavorite={handleToggleFavorite}
+              onCreate={() => setShowCreate(true)}
             />
           ) : viewMode === 'grid' ? (
             <IllustrationGrid
@@ -242,6 +226,7 @@ export function OshiIllustrationsPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onToggleFavorite={handleToggleFavorite}
+              onCreate={() => setShowCreate(true)}
             />
           ) : (
             <IllustrationList
@@ -249,6 +234,7 @@ export function OshiIllustrationsPage() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               onToggleFavorite={handleToggleFavorite}
+              onCreate={() => setShowCreate(true)}
             />
           )}
         </div>
@@ -289,11 +275,13 @@ function IllustrationMasonry({
   selectedId,
   onSelect,
   onToggleFavorite,
+  onCreate,
 }: {
   illustrations: Illustration[]
   selectedId: string | null
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
+  onCreate: () => void
 }) {
   const { t } = useI18n()
   return (
@@ -355,6 +343,7 @@ function IllustrationMasonry({
           </div>
         </article>
       ))}
+      <AddIllustrationTile onCreate={onCreate} variant="masonry" />
     </div>
   )
 }
@@ -364,11 +353,13 @@ function IllustrationGrid({
   selectedId,
   onSelect,
   onToggleFavorite,
+  onCreate,
 }: {
   illustrations: Illustration[]
   selectedId: string | null
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
+  onCreate: () => void
 }) {
   const { t } = useI18n()
   return (
@@ -419,6 +410,7 @@ function IllustrationGrid({
           </div>
         </article>
       ))}
+      <AddIllustrationTile onCreate={onCreate} variant="grid" />
     </div>
   )
 }
@@ -428,11 +420,13 @@ function IllustrationList({
   selectedId,
   onSelect,
   onToggleFavorite,
+  onCreate,
 }: {
   illustrations: Illustration[]
   selectedId: string | null
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
+  onCreate: () => void
 }) {
   const { t } = useI18n()
   return (
@@ -468,6 +462,7 @@ function IllustrationList({
           <FavoriteIconButton illustration={illustration} onToggleFavorite={onToggleFavorite} />
         </div>
       ))}
+      <AddIllustrationListRow onCreate={onCreate} />
     </div>
   )
 }
@@ -493,6 +488,44 @@ function IconToggle({ active, title, onClick, children }: { active: boolean; tit
   return (
     <button type="button" title={title} onClick={onClick} className={`rounded-lg p-2 transition-colors ${active ? 'bg-bg-primary text-accent shadow-sm' : 'text-text-muted hover:text-text-primary'}`}>
       {children}
+    </button>
+  )
+}
+
+function AddIllustrationTile({ onCreate, variant }: { onCreate: () => void; variant: 'masonry' | 'grid' }) {
+  const { t } = useI18n()
+  return (
+    <button
+      type="button"
+      onClick={onCreate}
+      className={clsx(
+        'flex min-h-48 w-full flex-col items-center justify-center rounded-xl border border-dashed border-border-color bg-bg-secondary/25 p-5 text-center text-text-muted transition-all hover:border-accent hover:bg-accent-soft/20 hover:text-accent',
+        variant === 'masonry' && 'mb-3 break-inside-avoid',
+        variant === 'grid' && 'aspect-[4/3]'
+      )}
+    >
+      <Plus size={28} />
+      <span className="mt-3 text-sm font-semibold">{t('illustrations.add')}</span>
+      <span className="mt-1 text-xs">{t('illustrations.addDescription')}</span>
+    </button>
+  )
+}
+
+function AddIllustrationListRow({ onCreate }: { onCreate: () => void }) {
+  const { t } = useI18n()
+  return (
+    <button
+      type="button"
+      onClick={onCreate}
+      className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border-color px-3 py-3 text-left text-text-muted transition-colors hover:border-accent hover:bg-accent-soft/20 hover:text-accent"
+    >
+      <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded-lg bg-bg-secondary/70">
+        <Plus size={22} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{t('illustrations.add')}</span>
+        <span className="mt-0.5 block text-xs">{t('illustrations.addDescription')}</span>
+      </span>
     </button>
   )
 }

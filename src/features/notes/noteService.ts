@@ -8,6 +8,7 @@ import type {
   SearchParams,
   GlobalNoteSearchParams,
   NoteImage,
+  OshiArchiveNoteCounts,
 } from '../../types'
 import { deleteStampForTarget } from '../stamps/stampService'
 
@@ -42,10 +43,97 @@ export async function fetchNotesByArchive(archiveId: string, page = 1, pageSize 
   }
 }
 
+export async function fetchNotesByOshi(oshiId: string, params: SearchParams): Promise<{ notes: Note[]; total: number }> {
+  const db = await getDb()
+  const conditions: string[] = ['n.oshi_id = ?']
+  const bindings: unknown[] = [oshiId]
+
+  applyArchiveFilter(conditions, bindings, params)
+
+  if (params.query?.trim()) {
+    const query = `%${escapeLike(params.query.trim())}%`
+    conditions.push(`(
+      n.title LIKE ? ESCAPE '\\' OR
+      n.plain_text LIKE ? ESCAPE '\\' OR
+      n.content LIKE ? ESCAPE '\\' OR
+      n.tags LIKE ? ESCAPE '\\'
+    )`)
+    bindings.push(query, query, query, query)
+  }
+
+  if (params.tag) {
+    conditions.push("n.tags LIKE ? ESCAPE '\\'")
+    bindings.push(buildTagLikePattern(params.tag))
+  }
+
+  if (params.dateFrom) {
+    conditions.push('n.created_at >= ?')
+    bindings.push(params.dateFrom)
+  }
+
+  if (params.dateTo) {
+    conditions.push('n.created_at <= ?')
+    bindings.push(params.dateTo)
+  }
+
+  const where = conditions.join(' AND ')
+  const offset = (params.page - 1) * params.pageSize
+  const countResult = await db.select<{ count: number }[]>(
+    `SELECT COUNT(*) as count FROM notes n WHERE ${where}`,
+    bindings
+  )
+  const rows = await db.select<NoteRow[]>(
+    `SELECT n.* FROM notes n WHERE ${where} ORDER BY n.created_at DESC LIMIT ? OFFSET ?`,
+    [...bindings, params.pageSize, offset]
+  )
+
+  return {
+    notes: rows.map(deserializeNote),
+    total: countResult[0]?.count || 0,
+  }
+}
+
+export async function getOshiArchiveNoteCounts(oshiId: string): Promise<OshiArchiveNoteCounts> {
+  const db = await getDb()
+  const totals = await db.select<{ all_count: number; unfiled_count: number | null }[]>(
+    `SELECT
+       COUNT(*) as all_count,
+       SUM(CASE WHEN archive_id IS NULL THEN 1 ELSE 0 END) as unfiled_count
+     FROM notes
+     WHERE oshi_id = ?`,
+    [oshiId]
+  )
+  const archiveRows = await db.select<{ archive_id: string; count: number }[]>(
+    `SELECT archive_id, COUNT(*) as count
+     FROM notes
+     WHERE oshi_id = ? AND archive_id IS NOT NULL
+     GROUP BY archive_id`,
+    [oshiId]
+  )
+
+  return {
+    all: totals[0]?.all_count || 0,
+    unfiled: totals[0]?.unfiled_count || 0,
+    byArchiveId: Object.fromEntries(archiveRows.map((row) => [row.archive_id, row.count])),
+  }
+}
+
 export async function fetchNoteById(id: string): Promise<Note | null> {
   const db = await getDb()
   const rows = await db.select<NoteRow[]>('SELECT * FROM notes WHERE id = ?', [id])
   return rows[0] ? deserializeNote(rows[0]) : null
+}
+
+function applyArchiveFilter(conditions: string[], bindings: unknown[], params: SearchParams) {
+  if (params.archiveFilter === 'archive' && params.archiveId) {
+    conditions.push('n.archive_id = ?')
+    bindings.push(params.archiveId)
+    return
+  }
+
+  if (params.archiveFilter === 'unfiled') {
+    conditions.push('n.archive_id IS NULL')
+  }
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {

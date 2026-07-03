@@ -8,7 +8,9 @@ import {
   ChevronRight,
   Check,
   ExternalLink,
+  FileText,
   FolderOpen,
+  Hash,
   ImagePlus,
   Link2,
   Loader2,
@@ -32,6 +34,8 @@ import type { Archive, Note, Oshi, Stamp, StampInput } from '../types'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { StampControl } from '../components/features/stamps/StampControl'
 import { StampOverlay } from '../components/features/stamps/StampOverlay'
+import { useI18n } from '../i18n/useI18n'
+import { countTextStats, type TextStats } from '../utils/textStats'
 
 export function NoteEditorPage() {
   const { oshiId, noteId } = useParams<{ oshiId: string; noteId: string }>()
@@ -59,6 +63,7 @@ export function NoteEditorPage() {
   const [imageError, setImageError] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
+  const [textStats, setTextStats] = useState<TextStats>(() => countTextStats(''))
 
   const editorRef = useRef<{ json: object; text: string }>({ json: createEmptyDoc(), text: '' })
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -85,6 +90,7 @@ export function NoteEditorPage() {
 
   useEffect(() => {
     if (isNew) {
+      setTextStats(countTextStats(''))
       markSaved()
       setLoading(false)
       return
@@ -103,6 +109,7 @@ export function NoteEditorPage() {
         setSourceUrl(n.source_url || '')
         setEditorContent(parsedContent)
         editorRef.current = { json: parsedContent, text: n.plain_text }
+        setTextStats(countTextStats(n.plain_text || ''))
         setImages(savedImages.map((image) => image.data_url))
         setStampDraft(savedStamp)
       }
@@ -376,11 +383,13 @@ export function NoteEditorPage() {
                         archiveName={selectedArchive?.name || 'Unfiled'}
                         sourceUrl={sourceUrl}
                         hasSourceUrl={Boolean(openedUrl)}
+                        textStats={textStats}
                       />
                     </div>
                   )}
                   onUpdate={(json, text) => {
                     editorRef.current = { json, text }
+                    setTextStats(countTextStats(text))
                   }}
                 />
               </div>
@@ -482,15 +491,19 @@ interface MetaSummaryProps {
   archiveName: string
   sourceUrl: string
   hasSourceUrl: boolean
+  textStats: TextStats
 }
 
-function MetaSummary({ createdAt, oshiName, archiveName, sourceUrl, hasSourceUrl }: MetaSummaryProps) {
+function MetaSummary({ createdAt, oshiName, archiveName, sourceUrl, hasSourceUrl, textStats }: MetaSummaryProps) {
+  const { t } = useI18n()
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
       <MetaChip icon={<CalendarClock size={15} />} label={formatDateTimeChip(createdAt)} />
       <MetaChip icon={<FolderOpen size={15} />} label={archiveName} />
       <MetaChip icon={<UserRound size={15} />} label={oshiName} />
       {sourceUrl && <MetaChip icon={<Link2 size={15} />} label={hasSourceUrl ? formatUrlHost(sourceUrl) : 'Invalid URL'} />}
+      <MetaChip icon={<Hash size={15} />} label={t('notes.stats.characters', { count: textStats.characters })} />
+      <MetaChip icon={<FileText size={15} />} label={t('notes.stats.words', { count: textStats.words })} />
     </div>
   )
 }

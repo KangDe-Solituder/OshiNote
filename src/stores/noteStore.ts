@@ -14,6 +14,7 @@ interface NoteState {
   loading: boolean
   error: string | null
 
+  fetchByOshi: (oshiId: string, params: SearchParams) => Promise<void>
   fetchByArchive: (archiveId: string, page?: number) => Promise<void>
   search: (oshiId: string, params: SearchParams) => Promise<void>
   createNote: (input: CreateNoteInput) => Promise<Note>
@@ -39,6 +40,21 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   tagFilter: null,
   loading: false,
   error: null,
+
+  fetchByOshi: async (oshiId, params) => {
+    set({ loading: true, error: null })
+    try {
+      const result = await noteService.fetchNotesByOshi(oshiId, params)
+      set({
+        notes: result.notes,
+        totalNotes: result.total,
+        currentPage: params.page,
+        loading: false,
+      })
+    } catch (e) {
+      set({ error: String(e), loading: false })
+    }
+  },
 
   fetchByArchive: async (archiveId, page) => {
     set({ loading: true, error: null })

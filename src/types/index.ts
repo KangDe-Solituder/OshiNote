@@ -332,6 +332,7 @@ export interface UpdateNoteInput {
 
 export type NoteOwnershipFilter = 'all' | 'unassigned' | 'unfiled' | 'untagged' | 'needs-sorting'
 export type NoteSort = 'newest' | 'oldest' | 'updated'
+export type OshiNoteArchiveFilter = 'all' | 'unfiled' | 'archive'
 
 export interface GlobalNoteSearchParams {
   query?: string
@@ -354,9 +355,17 @@ export interface NoteLibraryItem extends Note {
 
 export interface SearchParams {
   query?: string
+  archiveFilter?: OshiNoteArchiveFilter
+  archiveId?: string | null
   tag?: string
   dateFrom?: string
   dateTo?: string
   page: number
   pageSize: number
+}
+
+export interface OshiArchiveNoteCounts {
+  all: number
+  unfiled: number
+  byArchiveId: Record<string, number>
 }
