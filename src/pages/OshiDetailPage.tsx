@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
-import { BookOpen, Check, GitGraph, LayoutGrid, List, Loader2, Palette, Plus, Search, StickyNote, Trash2, X } from 'lucide-react'
+import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion'
+import { BookOpen, Check, GitGraph, GripVertical, LayoutGrid, List, Loader2, Palette, Pencil, Plus, Search, StickyNote, Trash2, X } from 'lucide-react'
 import clsx from 'clsx'
 import { Button } from '../components/ui/Button'
 import { TagGraphView } from '../components/features/notes/TagGraphView'
+import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
@@ -27,14 +28,17 @@ export function OshiDetailPage() {
   const [loading, setLoading] = useState(true)
   const [newArchiveName, setNewArchiveName] = useState('')
   const [showAddArchive, setShowAddArchive] = useState(false)
+  const [showManageArchives, setShowManageArchives] = useState(false)
   const [showCardStyleMenu, setShowCardStyleMenu] = useState(false)
   const [activeArchiveFilter, setActiveArchiveFilter] = useState<NoteArchiveFilterValue>(ARCHIVE_FILTER_ALL)
+  const [archiveDeleteTarget, setArchiveDeleteTarget] = useState<ArchiveDeleteTarget | null>(null)
+  const [deletingArchive, setDeletingArchive] = useState(false)
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [archiveCounts, setArchiveCounts] = useState<OshiArchiveNoteCounts>(EMPTY_ARCHIVE_COUNTS)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const pageTransition = usePageTransition()
 
-  const { archives, fetchByOshi: fetchArchivesByOshi, createArchive, deleteArchive } = useArchiveStore()
+  const { archives, fetchByOshi: fetchArchivesByOshi, createArchive, updateArchiveList, deleteArchive } = useArchiveStore()
   const {
     notes, totalNotes, currentPage, viewMode, cardStyle, searchQuery, loading: notesLoading,
     fetchByOshi: fetchNotesByOshi, setViewMode, setCardStyle, setSearchQuery, setPage,
@@ -121,23 +125,40 @@ export function OshiDetailPage() {
     setShowAddArchive(false)
   }
 
-  async function handleDeleteArchive(archiveId: string, archiveName: string) {
-    if (!oshiId) return
+  function requestDeleteArchive(archiveId: string, archiveName: string) {
     const noteCount = archiveCounts.byArchiveId[archiveId] || 0
-    const message = noteCount > 0
-      ? `Delete archive "${archiveName}"? Its ${noteCount} note${noteCount === 1 ? '' : 's'} will be kept in All Notes as unfiled.`
-      : `Delete empty archive "${archiveName}"?`
-    if (!confirm(message)) return
-    const nextFilter = activeArchiveFilter === getArchiveFilterValue(archiveId) ? ARCHIVE_FILTER_ALL : activeArchiveFilter
-    await deleteArchive(archiveId)
-    await fetchArchivesByOshi(oshiId)
-    await refreshOshis()
-    await refreshArchiveCounts()
-    if (nextFilter !== activeArchiveFilter) {
-      setActiveArchiveFilter(nextFilter)
-    } else {
-      await loadNotes(1, nextFilter)
+    setArchiveDeleteTarget({ id: archiveId, name: archiveName, noteCount })
+  }
+
+  async function handleConfirmDeleteArchive() {
+    if (!oshiId || !archiveDeleteTarget) return
+    setDeletingArchive(true)
+    const nextFilter = activeArchiveFilter === getArchiveFilterValue(archiveDeleteTarget.id) ? ARCHIVE_FILTER_ALL : activeArchiveFilter
+    try {
+      await deleteArchive(archiveDeleteTarget.id)
+      await fetchArchivesByOshi(oshiId)
+      await refreshOshis()
+      await refreshArchiveCounts()
+      if (nextFilter !== activeArchiveFilter) {
+        setActiveArchiveFilter(nextFilter)
+      } else {
+        await loadNotes(1, nextFilter)
+      }
+      setArchiveDeleteTarget(null)
+    } finally {
+      setDeletingArchive(false)
     }
+  }
+
+  async function handleSaveArchiveList(nextArchives: { id: string; name: string }[]) {
+    if (!oshiId) return
+    await updateArchiveList(oshiId, nextArchives)
+    await refreshArchiveCounts()
+    const activeArchiveId = getArchiveIdFromFilter(activeArchiveFilter)
+    if (activeArchiveId && !nextArchives.some((archive) => archive.id === activeArchiveId)) {
+      setActiveArchiveFilter(ARCHIVE_FILTER_ALL)
+    }
+    setShowManageArchives(false)
   }
 
   if (loading) {
@@ -175,7 +196,7 @@ export function OshiDetailPage() {
                 tab={tab}
                 active={activeArchiveFilter === tab.id}
                 onSelect={() => setActiveArchiveFilter(tab.id)}
-                onDelete={tab.archiveId ? () => handleDeleteArchive(tab.archiveId!, tab.label) : undefined}
+                onDelete={tab.archiveId ? () => requestDeleteArchive(tab.archiveId!, tab.label) : undefined}
                 deleteTitle={t('notes.archive.delete')}
               />
             ))}
@@ -214,6 +235,19 @@ export function OshiDetailPage() {
                 </span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setShowManageArchives(true)}
+              disabled={archives.length === 0}
+              className="border-b-2 border-transparent px-1 pb-3 text-sm font-semibold text-text-muted transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
+              title={t('notes.archive.manage')}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Pencil size={14} />
+                {t('notes.archive.manage')}
+              </span>
+            </button>
           </div>
 
           <p className="pb-3 text-sm text-text-muted">
@@ -447,6 +481,25 @@ export function OshiDetailPage() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {showManageArchives && (
+        <ArchiveManagerModal
+          archives={archives}
+          onClose={() => setShowManageArchives(false)}
+          onSave={handleSaveArchiveList}
+        />
+      )}
+
+      {archiveDeleteTarget && (
+        <ArchiveDeleteConfirmModal
+          target={archiveDeleteTarget}
+          saving={deletingArchive}
+          onClose={() => {
+            if (!deletingArchive) setArchiveDeleteTarget(null)
+          }}
+          onConfirm={handleConfirmDeleteArchive}
+        />
+      )}
     </div>
   )
 }
@@ -456,6 +509,189 @@ interface ArchiveTabItem {
   label: string
   count: number
   archiveId?: string
+}
+
+interface ArchiveDraft {
+  id: string
+  name: string
+}
+
+interface ArchiveDeleteTarget {
+  id: string
+  name: string
+  noteCount: number
+}
+
+function ArchiveDeleteConfirmModal({
+  target,
+  saving,
+  onClose,
+  onConfirm,
+}: {
+  target: ArchiveDeleteTarget
+  saving: boolean
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  const { t } = useI18n()
+  const body = target.noteCount > 0
+    ? t('notes.archive.deleteConfirmBody', {
+      name: target.name,
+      count: target.noteCount,
+      plural: target.noteCount === 1 ? '' : 's',
+    })
+    : t('notes.archive.deleteConfirmBodyEmpty', { name: target.name })
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-bg-primary/70 p-4 backdrop-blur-sm sm:p-6" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
+      <div className="w-[min(440px,calc(100vw-32px))] overflow-hidden rounded-3xl border border-border-color bg-bg-primary shadow-glass">
+        <div className="flex items-start gap-3 border-b border-border-color p-5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-red-500/10 text-red-400">
+            <Trash2 size={19} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-text-primary">{t('notes.archive.deleteConfirmTitle')}</h2>
+            <p className="mt-1 text-sm leading-6 text-text-secondary">{body}</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-xl p-2 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary disabled:pointer-events-none disabled:opacity-50" title={t('common.cancel')}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <p className="rounded-2xl border border-accent/25 bg-accent-soft/15 px-4 py-3 text-sm leading-6 text-text-secondary">
+            {t('notes.archive.deleteConfirmSafety')}
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-border-color bg-bg-primary px-5 py-4">
+          <Button variant="ghost" onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={onConfirm} disabled={saving}>
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            {t('notes.archive.deleteConfirmAction')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ArchiveManagerModal({
+  archives,
+  onClose,
+  onSave,
+}: {
+  archives: Archive[]
+  onClose: () => void
+  onSave: (archives: ArchiveDraft[]) => Promise<void>
+}) {
+  const { t } = useI18n()
+  const [drafts, setDrafts] = useState<ArchiveDraft[]>(() => archives.map((archive) => ({ id: archive.id, name: archive.name })))
+  const [saving, setSaving] = useState(false)
+  const hasEmptyName = drafts.some((draft) => draft.name.trim().length === 0)
+  const hasChanges = drafts.some((draft, index) => draft.id !== archives[index]?.id || draft.name.trim() !== archives[index]?.name)
+
+  function updateName(id: string, name: string) {
+    setDrafts((current) => current.map((draft) => draft.id === id ? { ...draft, name } : draft))
+  }
+
+  async function handleSave() {
+    if (hasEmptyName) return
+    setSaving(true)
+    try {
+      await onSave(drafts.map((draft) => ({ ...draft, name: draft.name.trim() })))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-bg-primary/70 p-4 backdrop-blur-sm sm:p-6" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
+      <div className="flex max-h-[min(680px,calc(100vh-48px))] w-[min(520px,calc(100vw-32px))] flex-col overflow-hidden rounded-3xl border border-border-color bg-bg-primary shadow-glass">
+        <div className="flex items-start gap-3 border-b border-border-color p-5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft/25 text-accent">
+            <Pencil size={19} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-text-primary">{t('notes.archive.manageTitle')}</h2>
+            <p className="mt-0.5 text-xs text-text-muted">{t('notes.archive.manageDescription')}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl p-2 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary" title={t('common.cancel')}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <Reorder.Group axis="y" values={drafts} onReorder={setDrafts} className="space-y-2">
+            {drafts.map((draft) => (
+              <ArchiveDraftRow
+                key={draft.id}
+                draft={draft}
+                dragTitle={t('notes.archive.drag')}
+                renameLabel={t('notes.archive.rename')}
+                onNameChange={updateName}
+              />
+            ))}
+          </Reorder.Group>
+          {hasEmptyName && <p className="mt-3 text-xs text-red-400">{t('notes.archive.emptyName')}</p>}
+        </div>
+
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border-color bg-bg-primary px-5 py-4">
+          <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={handleSave} disabled={saving || hasEmptyName || !hasChanges}>
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+            {saving ? t('journalEditor.setup.saving') : t('journalEditor.setup.save')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ArchiveDraftRow({
+  draft,
+  dragTitle,
+  renameLabel,
+  onNameChange,
+}: {
+  draft: ArchiveDraft
+  dragTitle: string
+  renameLabel: string
+  onNameChange: (id: string, name: string) => void
+}) {
+  const dragControls = useDragControls()
+
+  return (
+    <Reorder.Item
+      as="div"
+      value={draft}
+      dragListener={false}
+      dragControls={dragControls}
+      whileDrag={{
+        scale: 1.025,
+        zIndex: 30,
+      }}
+      className="archive-manager-row flex items-center gap-3 rounded-2xl border border-border-color px-3 py-2.5 transition-colors"
+    >
+      <button
+        type="button"
+        onPointerDown={(event) => {
+          event.preventDefault()
+          dragControls.start(event)
+        }}
+        className="flex h-9 w-8 shrink-0 touch-none cursor-grab items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary active:cursor-grabbing"
+        title={dragTitle}
+      >
+        <GripVertical size={17} />
+      </button>
+      <input
+        value={draft.name}
+        onChange={(event) => onNameChange(draft.id, event.target.value)}
+        className="archive-manager-input min-w-0 flex-1 rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-text-primary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft"
+        aria-label={renameLabel}
+      />
+    </Reorder.Item>
+  )
 }
 
 function ArchiveTab({

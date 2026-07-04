@@ -32,8 +32,19 @@ export async function updateArchive(id: string, name: string): Promise<void> {
   await db.execute('UPDATE archives SET name = ? WHERE id = ?', [name, id])
 }
 
+export async function updateArchiveList(archives: { id: string; name: string }[]): Promise<void> {
+  const db = await getDb()
+  for (const [sortOrder, archive] of archives.entries()) {
+    await db.execute(
+      'UPDATE archives SET name = ?, sort_order = ? WHERE id = ?',
+      [archive.name, sortOrder, archive.id]
+    )
+  }
+}
+
 export async function deleteArchive(id: string): Promise<void> {
   const db = await getDb()
+  // Removing an archive keeps its notes and moves them back to the default unfiled state.
   await db.execute("UPDATE notes SET archive_id = NULL, updated_at = datetime('now', 'localtime') WHERE archive_id = ?", [id])
   await db.execute('DELETE FROM archives WHERE id = ?', [id])
 }

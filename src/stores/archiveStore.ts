@@ -10,6 +10,7 @@ interface ArchiveState {
   fetchByOshi: (oshiId: string) => Promise<void>
   createArchive: (oshiId: string, name: string) => Promise<Archive>
   updateArchive: (id: string, name: string) => Promise<void>
+  updateArchiveList: (oshiId: string, archives: { id: string; name: string }[]) => Promise<void>
   deleteArchive: (id: string) => Promise<void>
   getArchiveNoteCount: (id: string) => Promise<number>
   setActiveArchive: (id: string | null) => void
@@ -45,6 +46,11 @@ export const useArchiveStore = create<ArchiveState>((set, get) => ({
   updateArchive: async (id, name) => {
     await archiveService.updateArchive(id, name)
     // re-fetch is implied
+  },
+
+  updateArchiveList: async (oshiId, archives) => {
+    await archiveService.updateArchiveList(archives)
+    await get().fetchByOshi(oshiId)
   },
 
   deleteArchive: async (id) => {
