@@ -145,6 +145,20 @@ export interface IllustrationSearchParams {
 export type StampTargetType = 'note' | 'illustration' | 'journal_page' | 'postcard'
 export type StampPosition = 'top-left' | 'top-right' | 'center' | 'bottom-left' | 'bottom-right'
 export type StampTemplateId = 'recorded' | 'favorite' | 'collected' | 'precious' | 'anniversary'
+export type StampMaterialId = 'round' | 'oval' | 'date' | 'ticket' | 'wax' | 'paper-label' | 'seal-script' | 'running-script' | 'flourish' | 'calligraphy'
+
+export interface StampSnapshotV2 {
+  version: 2
+  template_id: StampTemplateId | string
+  label_key?: string
+  default_label: string
+  color: string
+  rotation: number
+  material_id: StampMaterialId
+  shape: 'round' | 'oval' | 'date' | 'ticket' | 'wax' | 'paper-label' | 'seal-script' | 'running-script' | 'flourish' | 'calligraphy'
+  texture: 'ink' | 'paper' | 'wax' | 'ticket' | 'seal'
+  border_style: 'double' | 'solid' | 'dashed' | 'perforated'
+}
 
 export type ResourceTemplateType = 'note' | 'journal_page' | 'stamp' | 'material'
 
@@ -210,6 +224,19 @@ export interface StampInput {
   rotation?: number
   size?: number
   opacity?: number
+}
+
+export interface StampPreset {
+  id: string
+  name: string
+  template_id: StampTemplateId | string
+  material_id: StampMaterialId
+  label: string
+  color: string
+  size: number
+  rotation: number
+  opacity: number
+  updated_at: string
 }
 
 export type ThemeId = 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'

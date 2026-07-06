@@ -8,68 +8,167 @@
   <a href="./README.ja.md">日本語</a>
 </p>
 
-OshiNote is a local-first desktop app for recording and organizing oshi memories.
+OshiNote is a local-first desktop app for keeping, arranging, and revisiting memories about your oshi.
 
-It aims to create a quiet, warm, and long-lasting private space where you can keep profiles for your oshis, write down feelings after streams, collect meaningful illustrations, and gradually turn notes, loose pages, and journals into your own memory archive.
+It is not meant to be a generic note app or a social posting tool. Its core is a private memory studio: you create oshi spaces, write notes after streams or events, collect illustrations, arrange journal pages, and gradually turn scattered feelings into a personal archive.
 
-> Record memories, emotions, and stream impressions for your oshi.
+> The product goal: help oshi-life memories become searchable, beautiful, and worth keeping.
 
-## Current Status
+## What OshiNote Is For
 
-OshiNote is currently in an early but usable stage. The desktop shell, local SQLite database, oshi spaces, rich-text notes, illustration library, top-level journal module, and trilingual UI are already in place.
+- Record feelings, stream impressions, event memories, and daily oshi-life fragments.
+- Keep notes, images, tags, archives, and journal pages connected to each oshi.
+- Build handmade-style journal pages with notes, images, stamps, and later tape, paper notes, stickers, and postcard templates.
+- Keep data local by default, with privacy and long-term ownership as a first principle.
+- Support English, Simplified Chinese, and Japanese as first-class UI languages.
 
-The project is currently moving in three directions:
+## Current Stage
 
-- Stabilizing the framework, animation smoothness, resource loading, memory usage, and build checks.
-- Improving the creative and organizing experience for Notes, Illustrations, Journals, Books, and Postcards.
-- Adding more oshi-life-inspired features, such as template/material management, a stamp system, and freer journal creation.
+OshiNote is in an early but usable desktop stage.
 
-## Features
+The main app shell, local SQLite storage, oshi spaces, note editor, illustration library, journal module, resource skeleton, stamp workflow, themes, and trilingual UI are already in place. The next stage is shifting from basic management toward a richer handmade journal experience.
 
-### Oshi Spaces
+## Implemented
 
-- Create and manage oshi profiles with avatar, description, theme color, and related links.
-- View notes, illustrations, and tags under each oshi space.
-- See recent notes and recent illustrations on the oshi homepage.
+### App Shell
 
-### Notes
-
-- Rich-text editor powered by TipTap.
-- Supports bold, italic, underline, strike, font size, font family, text color, highlight, and emoji controls.
-- Supports metadata such as date, category, related oshi, and source link.
-- Supports favorite, delete, save, archive status, tags, and keyword search.
-
-### Illustrations
-
-- Import local PNG, JPEG, and WebP images.
-- Imported files are copied into the app's local data directory and tracked in the database.
-- Browse illustrations globally or inside a specific oshi space.
-- Switch between card, dense grid, and list layouts.
-- Open a right-side detail panel with metadata, favorite, edit, and delete actions.
-- Click the detail image to open a fullscreen preview.
-- Deleting an illustration also deletes the copied local media files.
-
-### Journals
-
-- Journal is now a top-level module instead of being locked inside a specific oshi space.
-- The journal management page organizes books and loose pages in a bookshelf-style view.
-- The journal creation desk can be opened directly from the sidebar.
-- Notes and illustrations can be arranged on a canvas-like page.
-- A right drawer handles page title, date, description, background, and collection settings.
-- Pages can be saved into a Book or kept as loose pages.
-- Old oshi-journal routes are redirected to the new top-level journal module for compatibility.
+- Tauri desktop shell with a custom top window bar.
+- Resizable sidebar for My Oshis.
+- Bottom sidebar entries for Home, Export, and Settings.
+- Top-level navigation for Journal and Resources.
+- Multiple themes, glass effect, font size controls, and motion speed controls.
 
 ### Internationalization
 
-- Supports English, Simplified Chinese, and Japanese.
-- English is the default language.
-- The selected language is saved locally and restored the next time the app opens.
+- English, Simplified Chinese, and Japanese UI.
+- Language selection is saved locally.
+- New features are expected to ship with all three languages.
 
-### Appearance And Motion
+### Oshi Spaces
 
-- Multiple visual themes.
-- Adjustable UI font size and animation speed.
-- Dropdowns, drawers, dialogs, detail panels, and fullscreen previews share a unified overlay and motion behavior.
+- Create and manage oshi profiles.
+- Store avatar, description, color, and related links.
+- View overview, notes, images, and tags for each oshi.
+- Oshi overview shows recent notes, recent images, and basic counts.
+
+### Notes
+
+- TipTap rich-text editor.
+- Formatting controls for bold, italic, underline, strike, size, font, color, highlight, and emoji.
+- Metadata for date, archive, oshi, source URL, tags, and attachments.
+- Real-time character and word count.
+- Tag suggestions from historical tags while typing.
+- Archive tabs and archive management on oshi note pages.
+- Search, grid/list style browsing, favorite, save, delete, and image attachments.
+
+### Illustrations / Images
+
+- Import PNG, JPEG, and WebP images.
+- Store copied media files in the local app data directory.
+- Browse images globally or by oshi.
+- Filter by all / official / fanart / favorite.
+- Card, grid, and list layouts.
+- Detail panel and fullscreen preview.
+- Delete image metadata and copied local media together.
+
+### Journal
+
+- Top-level Journal module.
+- Books and loose pages.
+- Journal editor canvas for arranging notes and images.
+- Page setup drawer for title, date, description, background, oshi, and collection settings.
+- Basic save and reload flow for journal pages.
+- Legacy oshi-journal paths redirect to the top-level journal module.
+
+### Resources And Templates
+
+- Resource routes are present:
+  - `/resources`
+  - `/resources/templates`
+  - `/resources/materials`
+- Template foundation exists with read-only built-in template cards.
+- A `templates` table exists through non-destructive migration.
+- Materials is still a placeholder direction rather than a complete library.
+
+### Stamp System
+
+- Single stamp per target for Note, Illustration, and Journal Page.
+- Modal-based stamp settings.
+- Stamp materials such as round, date, wax seal, paper label, seal script, flourish, and calligraphy-gated styles.
+- Free placement flow: configure, click Stamp, move ghost stamp, left-click to place.
+- Size, rotation, opacity, color, and text controls.
+- Preview inside the modal.
+- Stamps can be saved, cleared, and reloaded.
+- Optional stamp fonts can be downloaded from Settings into the app data directory.
+- PNG stamp import is planned but not implemented yet.
+
+## Not Implemented Yet
+
+- Handmade journal elements:
+  - tape
+  - paper notes / memo blocks
+  - stickers
+  - reusable visual materials
+- Postcard templates and postcard gacha.
+- LLM-assisted tag pool understanding and quote extraction.
+- User-imported PNG stamps.
+- Full material library management.
+- Advanced journal templates with fixed slots.
+- Full export / backup / restore workflow.
+- Search normalization for Japanese readings, aliases, and kana/kanji expansion.
+- Route-level code splitting and deeper performance audits.
+
+## Next Direction
+
+### 1. Journal Handmade Elements
+
+The next product direction is to make Journal feel more like a real handmade page.
+
+Recommended order:
+
+1. Tape v1
+2. Paper Note / Memo v1
+3. Sticker / Material v1
+
+Tape should be first because it is simple, visually effective, and a good test for free placement, rotation, scaling, and persistence.
+
+### 2. Template Foundation For Postcards
+
+Postcard gacha should not start as random collage. It should be built on templates.
+
+A postcard template should define slots such as:
+
+- image
+- note excerpt
+- date
+- tags
+- decoration
+- blank space
+
+Only after those layout rules exist should the app randomly fill them from notes, images, tags, archives, favorites, or time ranges.
+
+### 3. Postcard Gacha
+
+The gacha flow should eventually:
+
+- choose a template
+- choose a card pool
+- randomly fill the template
+- preview the postcard
+- reroll
+- save the result to a Journal page
+
+### 4. LLM Pool Understanding
+
+LLM support should be a later enhancement, not a v1 dependency.
+
+Good LLM tasks include:
+
+- group related tags into themed pools
+- extract postcard-friendly quotes from long notes
+- recommend templates
+- generate short postcard titles
+- identify content themes such as anniversary, healing, live recap, movie memory, or monthly review
 
 ## Tech Stack
 
@@ -84,73 +183,40 @@ The project is currently moving in three directions:
 | Desktop capabilities | Tauri Dialog / FS / Process / SQL / Updater plugins |
 | Large lists | TanStack React Virtual |
 
-## Installation
+## Development
 
-### Prerequisites
-
-Install:
-
-- Node.js and pnpm
-- Rust
-- System dependencies required by Tauri
-
-See [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/) for platform-specific requirements.
-
-On Windows, Microsoft C++ Build Tools and WebView2 Runtime may also be required. Modern Windows systems usually include WebView2, but the official Tauri documentation should be treated as the source of truth.
-
-### Clone
+Install dependencies:
 
 ```bash
-git clone https://github.com/KangDe-Solituder/OshiNote.git
-cd OshiNote
 pnpm install
 ```
 
-SSH works as well:
-
-```bash
-git clone git@github.com:KangDe-Solituder/OshiNote.git
-cd OshiNote
-pnpm install
-```
-
-### Development
-
-Run the full desktop app:
+Run the desktop app:
 
 ```bash
 pnpm tauri dev
 ```
 
-Run only the Vite frontend:
+Run frontend preview only:
 
 ```bash
 pnpm dev
 ```
 
-Some pages depend on Tauri's SQLite and filesystem APIs. For real feature testing, use `pnpm tauri dev`; the standalone Vite server is mainly useful for quick UI checks.
+Some features depend on Tauri SQLite, filesystem, and window APIs. Use `pnpm tauri dev` for real feature testing.
 
-### Quality Check
+Quality checks:
+
+```bash
+pnpm lint
+pnpm build
+```
+
+or:
 
 ```bash
 pnpm quality
 ```
-
-This runs:
-
-```bash
-pnpm lint
-pnpm build
-```
-
-You can also run them separately:
-
-```bash
-pnpm lint
-pnpm build
-```
-
-### Build
 
 Build the desktop app:
 
@@ -158,75 +224,32 @@ Build the desktop app:
 pnpm tauri build
 ```
 
-Verify the desktop binary without generating installers:
-
-```bash
-pnpm tauri build --no-bundle
-```
-
-Build only the frontend static assets:
-
-```bash
-pnpm build
-```
-
-Desktop build output is generated under `src-tauri/target/` and should not be committed.
-
 ## Data And Privacy
 
-- OshiNote stores data locally by default.
-- Profiles, notes, tags, journals, and settings are stored in a local SQLite database.
-- Imported illustration files are copied into the app data directory, for example `media/illustrations/originals/{year}` and `media/illustrations/thumbnails/{year}`.
-- Deleting an illustration also deletes the copied local media files.
-- Do not commit local databases, personal media files, temporary logs, or build output.
+- Data is stored locally by default.
+- Profiles, notes, tags, journals, templates, stamps, and settings live in SQLite or local app preferences.
+- Imported images are copied into the local app data directory.
+- Optional stamp fonts are saved into the app data directory.
+- Local databases, personal media, logs, and build outputs should not be committed.
 
 ## Project Structure
 
 ```text
 OshiNote/
 |-- src/
-|   |-- components/        # Shared UI and layout components
-|   |-- features/          # Feature modules
-|   |-- i18n/              # Trilingual translations and language helpers
+|   |-- components/        # UI, layout, editor, journal, stamp components
+|   |-- features/          # Feature services and domain logic
+|   |-- i18n/              # English / Chinese / Japanese translations
 |   |-- pages/             # Route pages
-|   |-- services/          # Data, media, and app services
+|   |-- services/          # Media, export, update, AI services
 |   |-- stores/            # Zustand stores
-|   `-- styles/            # Global styles and design tokens
-|-- public/                # Static web assets
-|-- src-tauri/
-|   |-- src/               # Rust / Tauri entry
-|   |-- capabilities/      # Tauri permission configuration
-|   |-- icons/             # Desktop app icons
-|   |-- Cargo.toml
-|   `-- tauri.conf.json
+|   `-- styles/            # Themes and global styles
+|-- public/                # Static assets and optional font placeholders
+|-- src-tauri/             # Rust / Tauri app
+|-- local-dev-plan/        # Local planning notes, not meant for release docs
 |-- package.json
 `-- vite.config.ts
 ```
-
-## Development Notes
-
-- Prefer running `pnpm quality` before pushing.
-- Features involving the database, media, filesystem, or desktop permissions should be tested inside the Tauri runtime.
-- Keep local plans, temporary test logs, personal media, local databases, and build output out of Git.
-- Route compatibility matters: old journal paths should continue to redirect smoothly to the new top-level journal module.
-- After UI changes, check dropdowns, drawers, dialogs, detail panels, and fullscreen previews across themes and animation speeds.
-
-## Search Notes
-
-Current note search matches the literal text stored in titles, rich-text content, plain text content, and tags.
-
-It does not yet perform Japanese reading normalization or kana/kanji expansion. For example, a note containing `お疲れ様` will not currently match a search for `おつ`.
-
-Future search improvements may add reading dictionaries or custom aliases so common expressions such as `おつ` and `お疲れ様` can be matched together.
-
-## Roadmap
-
-- Resource management: centralize notes, illustrations, templates, and reusable materials.
-- Template system: save template snapshots when a Note or Journal uses a template, so old content remains stable even if the source template changes.
-- Stamp system: add save-time or free-position stamps for Notes, Illustrations, Postcards, and Journal Pages.
-- Journal improvements: richer page templates, book/postcard collection flows, and better canvas editing.
-- Export and backup: JSON, Markdown, TXT, media export, and restore flows.
-- Performance polish: route-level code splitting, large-list virtualization, media loading checks, and memory/resource audits.
 
 ## License
 
@@ -234,6 +257,6 @@ This project is released under the [MIT License](./LICENSE).
 
 ## Thanks
 
-Thanks to Rust, Tauri, React, Vite, SQLite, TipTap, and all open-source maintainers behind the project's dependencies.
+Thanks to Rust, Tauri, React, Vite, SQLite, TipTap, and the open-source maintainers behind the project.
 
-OshiNote grows through a very personal kind of vibe coding: real oshi-life experience decides the direction, implementation keeps iterating, and daily use tells us whether it truly feels useful, beautiful, and worth keeping.
+OshiNote is shaped by actual oshi-life usage: build a little, use it, feel what is missing, and then make the next piece more useful and more personal.

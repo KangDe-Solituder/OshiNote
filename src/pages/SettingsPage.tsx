@@ -4,7 +4,7 @@ import { useThemeStore } from '../stores/themeStore'
 import { useUpdateStore } from '../stores/updateStore'
 import type { ThemeId, UiMotionDuration } from '../types'
 import { checkForUpdate, getCurrentAppVersion, installPendingUpdate, type UpdateInfo, type UpdateInstallProgress } from '../services/update/updateService'
-import { Download, RefreshCw, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Download, Loader2, RefreshCw, Sparkles, Trash2, Upload, Volume2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { LOCALE_OPTIONS } from '../i18n/translations'
@@ -12,6 +12,9 @@ import { useI18n } from '../i18n/useI18n'
 import { useLanguageStore } from '../stores/languageStore'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { useSidebarStore } from '../stores/sidebarStore'
+import { useStampSettingsStore } from '../stores/stampSettingsStore'
+import { downloadStampFont, STAMP_FONT_DEFINITIONS, type StampFontDefinition, type StampFontId } from '../features/stamps/stampFonts'
+import { useStampFontStore } from '../stores/stampFontStore'
 
 const THEMES: { id: ThemeId }[] = [
   { id: 'pink-cozy' },
@@ -44,17 +47,29 @@ export function SettingsPage() {
   const snapEnabled = useSidebarStore((s) => s.snapEnabled)
   const setDragEnabled = useSidebarStore((s) => s.setDragEnabled)
   const setSnapEnabled = useSidebarStore((s) => s.setSnapEnabled)
+  const stampSoundEnabled = useStampSettingsStore((s) => s.soundEnabled)
+  const setStampSoundEnabled = useStampSettingsStore((s) => s.setSoundEnabled)
+  const stampFontAvailability = useStampFontStore((s) => s.availability)
+  const stampFontsChecked = useStampFontStore((s) => s.checked)
+  const stampFontsChecking = useStampFontStore((s) => s.checking)
+  const refreshStampFonts = useStampFontStore((s) => s.refresh)
   const [appVersion, setAppVersion] = useState('')
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'none' | 'installing' | 'error'>('idle')
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null)
   const [updateError, setUpdateError] = useState('')
   const [updateProgress, setUpdateProgress] = useState<UpdateInstallProgress | null>(null)
+  const [fontDownloadProgress, setFontDownloadProgress] = useState<Partial<Record<StampFontId, number | null>>>({})
+  const [fontDownloadErrors, setFontDownloadErrors] = useState<Partial<Record<StampFontId, string>>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadUpdateSettings()
     getCurrentAppVersion().then(setAppVersion).catch(() => setAppVersion(''))
   }, [loadUpdateSettings])
+
+  useEffect(() => {
+    if (!stampFontsChecked && !stampFontsChecking) void refreshStampFonts()
+  }, [refreshStampFonts, stampFontsChecked, stampFontsChecking])
 
   const handleCheckUpdate = async () => {
     setUpdateStatus('checking')
@@ -82,6 +97,28 @@ export function SettingsPage() {
     } catch (error) {
       setUpdateError(error instanceof Error ? error.message : t('settings.updateInstallError'))
       setUpdateStatus('error')
+    }
+  }
+
+  async function handleDownloadFont(font: StampFontDefinition) {
+    setFontDownloadErrors((current) => ({ ...current, [font.id]: '' }))
+    setFontDownloadProgress((current) => ({ ...current, [font.id]: null }))
+    try {
+      await downloadStampFont(font, (percent) => {
+        setFontDownloadProgress((current) => ({ ...current, [font.id]: percent }))
+      })
+      await refreshStampFonts()
+    } catch (error) {
+      setFontDownloadErrors((current) => ({
+        ...current,
+        [font.id]: error instanceof Error ? error.message : t('settings.stampFontDownloadError'),
+      }))
+    } finally {
+      setFontDownloadProgress((current) => {
+        const next = { ...current }
+        delete next[font.id]
+        return next
+      })
     }
   }
 
@@ -115,26 +152,78 @@ export function SettingsPage() {
 
       <section className="mb-10">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.appearance')}</h2>
-        <button
-          onClick={() => setGlassEnabled(!glassEnabled)}
-          className={clsx(
-            'w-full rounded-2xl border p-5 text-left transition-all flex items-center justify-between gap-4',
-            glassEnabled
-              ? 'border-accent bg-accent/5 text-accent'
-              : 'border-border-color bg-bg-secondary text-text-secondary hover:border-border-hover hover:text-accent'
-          )}
-        >
-          <span className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border-color bg-bg-primary">
-              <Sparkles size={22} />
+        <div className="space-y-3">
+          <button
+            onClick={() => setGlassEnabled(!glassEnabled)}
+            className={clsx(
+              'w-full rounded-2xl border p-5 text-left transition-all flex items-center justify-between gap-4',
+              glassEnabled
+                ? 'border-accent bg-accent/5 text-accent'
+                : 'border-border-color bg-bg-secondary text-text-secondary hover:border-border-hover hover:text-accent'
+            )}
+          >
+            <span className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border-color bg-bg-primary">
+                <Sparkles size={22} />
+              </span>
+              <span>
+                <span className="block font-medium text-text-primary">{t('settings.glassEffect')}</span>
+                <span className="block text-sm text-text-muted">{t('settings.glassEffectDescription')}</span>
+              </span>
             </span>
-            <span>
-              <span className="block font-medium text-text-primary">{t('settings.glassEffect')}</span>
-              <span className="block text-sm text-text-muted">{t('settings.glassEffectDescription')}</span>
+            <ToggleSwitch enabled={glassEnabled} />
+          </button>
+          <button
+            onClick={() => setStampSoundEnabled(!stampSoundEnabled)}
+            className={clsx(
+              'w-full rounded-2xl border p-5 text-left transition-all flex items-center justify-between gap-4',
+              stampSoundEnabled
+                ? 'border-accent bg-accent/5 text-accent'
+                : 'border-border-color bg-bg-secondary text-text-secondary hover:border-border-hover hover:text-accent'
+            )}
+          >
+            <span className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border-color bg-bg-primary">
+                <Volume2 size={22} />
+              </span>
+              <span>
+                <span className="block font-medium text-text-primary">{t('settings.stampSound')}</span>
+                <span className="block text-sm text-text-muted">{t('settings.stampSoundDescription')}</span>
+              </span>
             </span>
-          </span>
-          <ToggleSwitch enabled={glassEnabled} />
-        </button>
+            <ToggleSwitch enabled={stampSoundEnabled} />
+          </button>
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">{t('settings.stampFonts')}</h2>
+            <p className="mt-1 text-sm text-text-muted">{t('settings.stampFontsDescription')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshStampFonts()}
+            disabled={stampFontsChecking}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-border-color bg-bg-secondary px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={15} className={clsx(stampFontsChecking && 'animate-spin')} />
+            {stampFontsChecking ? t('settings.stampFontsChecking') : t('settings.stampFontsCheck')}
+          </button>
+        </div>
+        <Card className="space-y-4">
+          {STAMP_FONT_DEFINITIONS.map((font) => (
+            <StampFontRow
+              key={font.id}
+              font={font}
+              available={stampFontAvailability[font.id]}
+              downloadProgress={fontDownloadProgress[font.id]}
+              downloadError={fontDownloadErrors[font.id] || ''}
+              onDownload={() => void handleDownloadFont(font)}
+            />
+          ))}
+        </Card>
       </section>
 
       <section className="mb-10">
@@ -394,6 +483,71 @@ export function SettingsPage() {
 }
 
 // ── Filter Slider ─────────────────────────────────────────────────────
+
+function StampFontRow({
+  font,
+  available,
+  downloadProgress,
+  downloadError,
+  onDownload,
+}: {
+  font: StampFontDefinition
+  available: boolean
+  downloadProgress?: number | null
+  downloadError: string
+  onDownload: () => void
+}) {
+  const { t } = useI18n()
+  const downloading = downloadProgress !== undefined
+  return (
+    <div className="rounded-xl border border-border-color bg-bg-secondary/50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-text-primary">{t(font.labelKey as never)}</p>
+            <span
+              className={clsx(
+                'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                available ? 'bg-green-500/12 text-green-500' : 'bg-amber-500/12 text-amber-500'
+              )}
+            >
+              {available ? t('settings.stampFontAvailable') : t('settings.stampFontMissing')}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-text-muted">{t(font.descriptionKey as never)}</p>
+          <p className="mt-2 break-all rounded-lg bg-bg-primary/70 px-2 py-1.5 font-mono text-[11px] text-text-muted">
+            {t('settings.stampFontSavePath', { path: font.appDataPath })}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDownload}
+          disabled={downloading}
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-border-color bg-bg-primary px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          {downloading
+            ? downloadProgress
+              ? t('settings.stampFontDownloadingProgress', { percent: downloadProgress })
+              : t('settings.stampFontDownloading')
+            : t('settings.stampFontDownload')}
+        </button>
+      </div>
+      {downloading && (
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-bg-tertiary">
+          <div
+            className={clsx(
+              'h-full rounded-full bg-accent transition-all',
+              downloadProgress == null && 'w-1/3 animate-pulse'
+            )}
+            style={downloadProgress == null ? undefined : { width: `${downloadProgress}%` }}
+          />
+        </div>
+      )}
+      {downloadError && <p className="mt-2 text-xs text-red-400">{downloadError}</p>}
+    </div>
+  )
+}
 
 function FilterSlider({
   label,

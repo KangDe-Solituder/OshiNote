@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::path::Path;
 use std::process::Command;
 use tauri::Manager;
 
@@ -26,6 +27,38 @@ fn open_external_url(url: String) -> Result<(), String> {
             Err("Could not open the system browser.".to_string())
         }
     })
+}
+
+#[tauri::command]
+async fn download_stamp_font(
+    app: tauri::AppHandle,
+    url: String,
+    relative_path: String,
+) -> Result<(), String> {
+    let trimmed_url = url.trim();
+    if !trimmed_url.starts_with("https://raw.githubusercontent.com/google/fonts/") {
+        return Err("Only bundled stamp font sources can be downloaded.".to_string());
+    }
+
+    let normalized_path = relative_path.replace('\\', "/");
+    if !normalized_path.starts_with("fonts/stamps/") || normalized_path.contains("..") {
+        return Err("Invalid stamp font path.".to_string());
+    }
+
+    let response = reqwest::get(trimmed_url)
+        .await
+        .map_err(|error| error.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("Font download failed: {}", response.status()));
+    }
+    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
+
+    let app_data_dir = app.path().app_data_dir().map_err(|error| error.to_string())?;
+    let target_path = app_data_dir.join(Path::new(&normalized_path));
+    if let Some(parent) = target_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    std::fs::write(target_path, bytes).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -154,6 +187,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             post_local_ai_chat,
+            download_stamp_font,
             open_external_url
         ])
         .run(tauri::generate_context!())

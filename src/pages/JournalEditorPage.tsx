@@ -34,6 +34,7 @@ import { useI18n } from '../i18n/useI18n'
 import { StampControl } from '../components/features/stamps/StampControl'
 import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
 import type { Stamp, StampInput } from '../types'
+import { useStampSettingsStore } from '../stores/stampSettingsStore'
 
 interface PageDraft {
   title: string
@@ -60,6 +61,7 @@ export function JournalEditorPage() {
   const [showIllustrationPicker, setShowIllustrationPicker] = useState(false)
   const [pageDraft, setPageDraft] = useState<PageDraft>(createDefaultPageDraft())
   const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
+  const [stampPlacementDraft, setStampPlacementDraft] = useState<StampInput | null>(null)
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [selectedOshiId, setSelectedOshiId] = useState(oshiId)
   const [savingPage, setSavingPage] = useState(false)
@@ -83,6 +85,7 @@ export function JournalEditorPage() {
     removeItem,
     refreshItems,
   } = useJournalStore()
+  const stampSoundEnabled = useStampSettingsStore((s) => s.soundEnabled)
   const toggleFavorite = useNoteStore((state) => state.toggleFavorite)
   const updateNote = useNoteStore((state) => state.updateNote)
   const backTo = '/journal'
@@ -115,6 +118,7 @@ export function JournalEditorPage() {
     setSelectedItemId(null)
     setPageDraft(createDefaultPageDraft())
     setStampDraft(null)
+    setStampPlacementDraft(null)
     return () => {
       cancelled = true
     }
@@ -126,6 +130,10 @@ export function JournalEditorPage() {
     }
     setSelectedOshiId(oshiId)
   }, [oshiId, pageId])
+
+  useEffect(() => {
+    if (!detailsOpen) setStampPlacementDraft(null)
+  }, [detailsOpen])
 
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) || null,
@@ -153,14 +161,21 @@ export function JournalEditorPage() {
     let alive = true
     if (!activePageStampTargetId) {
       setStampDraft(null)
+      setStampPlacementDraft(null)
       return
     }
     fetchStampForTarget('journal_page', activePageStampTargetId)
       .then((stamp) => {
-        if (alive) setStampDraft(stamp)
+        if (alive) {
+          setStampDraft(stamp)
+          setStampPlacementDraft(null)
+        }
       })
       .catch(() => {
-        if (alive) setStampDraft(null)
+        if (alive) {
+          setStampDraft(null)
+          setStampPlacementDraft(null)
+        }
       })
     return () => { alive = false }
   }, [activePageStampTargetId])
@@ -171,6 +186,10 @@ export function JournalEditorPage() {
       ...layout,
       z_index: item?.z_index,
     })
+  }
+
+  function handleStampPlace(value: StampInput) {
+    setStampDraft(value)
   }
 
   async function handleInspectorLayout(item: JournalItemWithNote, layout: JournalLayoutInput & { z_index?: number }) {
@@ -465,12 +484,17 @@ export function JournalEditorPage() {
             zoom={zoom}
             zoomControlsRightOffset={72}
             stamp={stampDraft}
+            stampPlacementDraft={stampPlacementDraft}
+            stampSoundEnabled={stampSoundEnabled}
             onZoomChange={setZoom}
             onSelectItem={(item) => {
               setSelectedItemId(item?.id || null)
               if (item) setDetailsOpen(true)
             }}
             onCommitLayout={handleCommitLayout}
+            onStampPlace={handleStampPlace}
+            onStampPlacementComplete={() => setStampPlacementDraft(null)}
+            onStampPlacementCancel={() => setStampPlacementDraft(null)}
           />
         </main>
 
@@ -504,8 +528,13 @@ export function JournalEditorPage() {
                 saving={savingPage}
                 oshiLocked={!isDraftPage}
                 stampDraft={stampDraft}
-                onStampChange={setStampDraft}
-                onStampClear={() => setStampDraft(null)}
+                onStampClear={() => {
+                  setStampDraft(null)
+                  setStampPlacementDraft(null)
+                }}
+                stampPlacing={Boolean(stampPlacementDraft)}
+                onStartStampPlacement={setStampPlacementDraft}
+                onCancelStampPlacement={() => setStampPlacementDraft(null)}
               />
               <section className="overflow-hidden rounded-2xl border border-border-color bg-bg-primary/75 shadow-sm shadow-black/5">
                 <JournalInspector
@@ -557,8 +586,10 @@ function PageSetupPanel({
   saving,
   oshiLocked,
   stampDraft,
-  onStampChange,
   onStampClear,
+  stampPlacing,
+  onStartStampPlacement,
+  onCancelStampPlacement,
 }: {
   draft: PageDraft
   oshis: Oshi[]
@@ -570,8 +601,10 @@ function PageSetupPanel({
   saving: boolean
   oshiLocked: boolean
   stampDraft: Stamp | StampInput | null
-  onStampChange: (stamp: StampInput) => void
   onStampClear: () => void
+  stampPlacing: boolean
+  onStartStampPlacement: (stamp: StampInput) => void
+  onCancelStampPlacement: () => void
 }) {
   const { t } = useI18n()
   return (
@@ -651,7 +684,13 @@ function PageSetupPanel({
             ))}
           </div>
         </section>
-        <StampControl value={stampDraft} onChange={onStampChange} onClear={onStampClear} />
+        <StampControl
+          value={stampDraft}
+          onClear={onStampClear}
+          onStartPlacement={onStartStampPlacement}
+          onCancelPlacement={onCancelStampPlacement}
+          placing={stampPlacing}
+        />
       </div>
     </section>
   )

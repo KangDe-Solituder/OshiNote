@@ -26,7 +26,7 @@ import { TipTapEditor } from '../components/editor/TipTapEditor'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 import { useEditorStore } from '../stores/editorStore'
 import { useNoteStore } from '../stores/noteStore'
-import { fetchNoteById, fetchNoteImages, replaceNoteImages } from '../features/notes/noteService'
+import { fetchNoteById, fetchNoteImages, getAllTags, replaceNoteImages } from '../features/notes/noteService'
 import { createArchive as createArchiveRecord, fetchArchivesByOshi } from '../features/oshis/archiveService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
@@ -34,8 +34,10 @@ import type { Archive, Note, Oshi, Stamp, StampInput } from '../types'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { StampControl } from '../components/features/stamps/StampControl'
 import { StampOverlay } from '../components/features/stamps/StampOverlay'
+import { StampPlacementLayer } from '../components/features/stamps/StampPlacementLayer'
 import { useI18n } from '../i18n/useI18n'
 import { countTextStats, type TextStats } from '../utils/textStats'
+import { useStampSettingsStore } from '../stores/stampSettingsStore'
 
 export function NoteEditorPage() {
   const { oshiId, noteId } = useParams<{ oshiId: string; noteId: string }>()
@@ -45,6 +47,7 @@ export function NoteEditorPage() {
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
+  const [tagSuggestions, setTagSuggestions] = useState<{ tag: string; count: number }[]>([])
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
@@ -63,6 +66,7 @@ export function NoteEditorPage() {
   const [imageError, setImageError] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
+  const [stampPlacementDraft, setStampPlacementDraft] = useState<StampInput | null>(null)
   const [textStats, setTextStats] = useState<TextStats>(() => countTextStats(''))
 
   const editorRef = useRef<{ json: object; text: string }>({ json: createEmptyDoc(), text: '' })
@@ -71,6 +75,7 @@ export function NoteEditorPage() {
   const isDirty = useEditorStore((s) => s.isDirty)
   const markSaved = useEditorStore((s) => s.markSaved)
   const markDirty = useEditorStore((s) => s.markDirty)
+  const stampSoundEnabled = useStampSettingsStore((s) => s.soundEnabled)
 
   const selectedOshi = oshis.find((oshi) => oshi.id === selectedOshiId)
   const selectedArchive = archives.find((archive) => archive.id === archiveId)
@@ -78,6 +83,7 @@ export function NoteEditorPage() {
 
   useEffect(() => {
     fetchAllOshis().then(setOshis).catch(() => {})
+    getAllTags().then(setTagSuggestions).catch(() => setTagSuggestions([]))
   }, [])
 
   useEffect(() => {
@@ -91,6 +97,8 @@ export function NoteEditorPage() {
   useEffect(() => {
     if (isNew) {
       setTextStats(countTextStats(''))
+      setStampDraft(null)
+      setStampPlacementDraft(null)
       markSaved()
       setLoading(false)
       return
@@ -112,6 +120,7 @@ export function NoteEditorPage() {
         setTextStats(countTextStats(n.plain_text || ''))
         setImages(savedImages.map((image) => image.data_url))
         setStampDraft(savedStamp)
+        setStampPlacementDraft(null)
       }
       markSaved()
       setLoading(false)
@@ -174,6 +183,11 @@ export function NoteEditorPage() {
     setStampDraft(await persistStampForTarget('note', targetId, stampDraft))
   }
 
+  function handleStampPlace(value: StampInput) {
+    setStampDraft(value)
+    markDirty()
+  }
+
   async function handleDelete() {
     if (!note) return
     if (!confirm('Delete this note?')) return
@@ -219,15 +233,20 @@ export function NoteEditorPage() {
     }
   }
 
+  function addTag(tag: string) {
+    const newTag = tag.trim()
+    if (!newTag) return
+    if (!tags.includes(newTag)) {
+      setTags([...tags, newTag])
+      markDirty()
+    }
+    setTagInput('')
+  }
+
   function handleAddTag(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && tagInput.trim()) {
       e.preventDefault()
-      const newTag = tagInput.trim()
-      if (!tags.includes(newTag)) {
-        setTags([...tags, newTag])
-        markDirty()
-      }
-      setTagInput('')
+      addTag(tagInput)
     }
   }
 
@@ -371,7 +390,7 @@ export function NoteEditorPage() {
             )}
 
             <section className="relative overflow-hidden rounded-2xl border border-border-color bg-bg-primary/70 shadow-sm shadow-black/5">
-              <div className="h-[calc(100vh-184px)] min-h-[560px]">
+              <div className="relative h-[calc(100vh-184px)] min-h-[560px]">
                 <TipTapEditor
                   key={isNew ? 'new' : note?.id}
                   content={editorContent}
@@ -392,8 +411,18 @@ export function NoteEditorPage() {
                     setTextStats(countTextStats(text))
                   }}
                 />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[112px] overflow-hidden">
+                  <StampOverlay stamp={stampDraft} />
+                  <StampPlacementLayer
+                    active={Boolean(stampPlacementDraft)}
+                    stamp={stampPlacementDraft}
+                    soundEnabled={stampSoundEnabled}
+                    onPlace={handleStampPlace}
+                    onComplete={() => setStampPlacementDraft(null)}
+                    onCancel={() => setStampPlacementDraft(null)}
+                  />
+                </div>
               </div>
-              <StampOverlay stamp={stampDraft} />
             </section>
           </div>
         </main>
@@ -453,8 +482,10 @@ export function NoteEditorPage() {
               <TagsPanel
                 tags={tags}
                 tagInput={tagInput}
+                suggestions={tagSuggestions}
                 onTagInputChange={setTagInput}
                 onAddTag={handleAddTag}
+                onSelectSuggestion={addTag}
                 onRemoveTag={removeTag}
               />
 
@@ -468,14 +499,14 @@ export function NoteEditorPage() {
 
               <StampControl
                 value={stampDraft}
-                onChange={(value) => {
-                  setStampDraft(value)
-                  markDirty()
-                }}
                 onClear={() => {
                   setStampDraft(null)
+                  setStampPlacementDraft(null)
                   markDirty()
                 }}
+                onStartPlacement={setStampPlacementDraft}
+                onCancelPlacement={() => setStampPlacementDraft(null)}
+                placing={Boolean(stampPlacementDraft)}
               />
             </div>
           </div>
@@ -639,12 +670,24 @@ function DetailsPanel(props: DetailsPanelProps) {
 interface TagsPanelProps {
   tags: string[]
   tagInput: string
+  suggestions: { tag: string; count: number }[]
   onTagInputChange: (value: string) => void
   onAddTag: (event: React.KeyboardEvent) => void
+  onSelectSuggestion: (tag: string) => void
   onRemoveTag: (tag: string) => void
 }
 
-function TagsPanel({ tags, tagInput, onTagInputChange, onAddTag, onRemoveTag }: TagsPanelProps) {
+function TagsPanel({ tags, tagInput, suggestions, onTagInputChange, onAddTag, onSelectSuggestion, onRemoveTag }: TagsPanelProps) {
+  const { t } = useI18n()
+  const filteredSuggestions = suggestions
+    .filter(({ tag }) => {
+      const query = tagInput.trim().toLowerCase()
+      if (tags.includes(tag)) return false
+      if (!query) return false
+      return tag.toLowerCase().includes(query)
+    })
+    .slice(0, 5)
+
   return (
     <Panel title="Tags">
       <div className="flex flex-wrap gap-2">
@@ -665,6 +708,24 @@ function TagsPanel({ tags, tagInput, onTagInputChange, onAddTag, onRemoveTag }: 
         onKeyDown={onAddTag}
         className={`${fieldClassName} border-dashed`}
       />
+      {filteredSuggestions.length > 0 && (
+        <div className="rounded-xl border border-border-color bg-bg-secondary/60 p-2">
+          <p className="mb-1.5 text-[11px] font-medium text-text-muted">{t('notes.tagSuggestions')}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {filteredSuggestions.map(({ tag, count }) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => onSelectSuggestion(tag)}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border-color bg-bg-primary/70 px-2.5 py-1 text-xs text-text-secondary transition-colors hover:border-accent hover:text-accent"
+              >
+                <span className="truncate">#{tag}</span>
+                <span className="text-text-muted">({count})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </Panel>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useUiMotionSeconds } from '../features/themes/uiMotion'
@@ -9,9 +10,10 @@ interface ModalProps {
   onClose: () => void
   title: string
   children: ReactNode
+  contentClassName?: string
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, contentClassName }: ModalProps) {
   const motionSeconds = useUiMotionSeconds()
 
   useEffect(() => {
@@ -24,7 +26,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
     }
   }, [open, onClose])
 
-  return (
+  const modal = (
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
@@ -36,7 +38,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             onClick={onClose}
           />
           <motion.div
-            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4 bg-bg-primary border border-border-color rounded-2xl shadow-2xl p-6"
+            className={`relative mx-4 max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-6 shadow-2xl ${contentClassName || 'max-w-lg'}`}
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -54,4 +56,6 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       )}
     </AnimatePresence>
   )
+
+  return typeof document === 'undefined' ? modal : createPortal(modal, document.body)
 }

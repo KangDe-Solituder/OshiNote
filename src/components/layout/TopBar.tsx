@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ArrowLeft, ArrowRight, BookOpen, Copy, Layers3, Minus, Square, X } from 'lucide-react'
 import clsx from 'clsx'
@@ -95,6 +96,7 @@ function WindowControls({
   const [isMaximized, setIsMaximized] = useState(false)
 
   useEffect(() => {
+    if (!isTauri()) return
     let unlisten: (() => void) | undefined
     let mounted = true
 
@@ -164,6 +166,7 @@ function WindowControlButton({ label, danger, onClick, children }: { label: stri
 }
 
 async function handleWindowAction(action: 'minimize' | 'toggleMaximize' | 'close') {
+  if (!isTauri()) return
   try {
     const win = getCurrentWindow()
     if (action === 'minimize') await win.minimize()

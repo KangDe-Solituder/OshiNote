@@ -60,6 +60,8 @@ import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
 import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
 import { StampControl } from '../components/features/stamps/StampControl'
 import { StampOverlay } from '../components/features/stamps/StampOverlay'
+import { StampPlacementLayer } from '../components/features/stamps/StampPlacementLayer'
+import { useStampSettingsStore } from '../stores/stampSettingsStore'
 
 const TABS: { id: IllustrationTab; labelKey: 'illustrations.all' | 'common.official' | 'common.fanart' | 'common.favorites' }[] = [
   { id: 'all', labelKey: 'illustrations.all' },
@@ -742,6 +744,8 @@ export function IllustrationDetailDrawer({
   const [description, setDescription] = useState(illustration.description)
   const [showPreview, setShowPreview] = useState(false)
   const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
+  const [stampPlacementDraft, setStampPlacementDraft] = useState<StampInput | null>(null)
+  const stampSoundEnabled = useStampSettingsStore((s) => s.soundEnabled)
 
   useEffect(() => {
     setEditing(false)
@@ -753,6 +757,7 @@ export function IllustrationDetailDrawer({
     setSourceUrl(illustration.source_url)
     setTags(illustration.tags.join(', '))
     setDescription(illustration.description)
+    setStampPlacementDraft(null)
     fetchStampForTarget('illustration', illustration.id).then(setStampDraft).catch(() => setStampDraft(null))
   }, [illustration])
 
@@ -769,6 +774,10 @@ export function IllustrationDetailDrawer({
     })
     setStampDraft(await persistStampForTarget('illustration', illustration.id, stampDraft))
     setEditing(false)
+  }
+
+  function handleStampPlace(value: StampInput) {
+    setStampDraft(value)
   }
 
   async function handleOpenSource() {
@@ -810,7 +819,7 @@ export function IllustrationDetailDrawer({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: motionSeconds === 0 ? 1 : 0.98 }}
             transition={{ duration: motionSeconds, ease: 'easeOut' }}
-            className="relative max-h-full max-w-full"
+            className="relative max-h-full max-w-full overflow-hidden rounded-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <MediaImage
@@ -853,12 +862,22 @@ export function IllustrationDetailDrawer({
           <button
             type="button"
             onClick={() => setShowPreview(true)}
-            className="relative block w-full rounded-2xl focus:outline-none focus:ring-2 focus:ring-accent-soft"
+            className="relative block w-full overflow-hidden rounded-2xl focus:outline-none focus:ring-2 focus:ring-accent-soft"
             title={t('illustrations.preview.open')}
             aria-label={t('illustrations.preview.open')}
           >
             <MediaImage path={illustration.original_path} alt={illustration.title} className="max-h-[420px] w-full rounded-2xl object-contain" />
             <StampOverlay stamp={stampDraft} />
+            {editing && (
+              <StampPlacementLayer
+                active={Boolean(stampPlacementDraft)}
+                stamp={stampPlacementDraft}
+                soundEnabled={stampSoundEnabled}
+                onPlace={handleStampPlace}
+                onComplete={() => setStampPlacementDraft(null)}
+                onCancel={() => setStampPlacementDraft(null)}
+              />
+            )}
           </button>
         </div>
         <div className="space-y-5 p-5">
@@ -876,7 +895,14 @@ export function IllustrationDetailDrawer({
               <Heart size={16} fill={illustration.favorite ? 'currentColor' : 'none'} />
               {t('illustrations.favorite')}
             </button>
-            <Button variant="secondary" size="sm" onClick={() => setEditing(!editing)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setStampPlacementDraft(null)
+                setEditing(!editing)
+              }}
+            >
               {editing ? <X size={15} /> : <Palette size={15} />}
               {editing ? t('illustrations.cancelEdit') : t('illustrations.edit')}
             </Button>
@@ -912,8 +938,13 @@ export function IllustrationDetailDrawer({
               />
               <StampControl
                 value={stampDraft}
-                onChange={setStampDraft}
-                onClear={() => setStampDraft(null)}
+                onClear={() => {
+                  setStampDraft(null)
+                  setStampPlacementDraft(null)
+                }}
+                onStartPlacement={setStampPlacementDraft}
+                onCancelPlacement={() => setStampPlacementDraft(null)}
+                placing={Boolean(stampPlacementDraft)}
               />
               <Button className="w-full" onClick={handleSave}>
                 <Check size={16} />

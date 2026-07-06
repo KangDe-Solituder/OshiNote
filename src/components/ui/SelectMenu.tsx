@@ -25,6 +25,7 @@ interface SelectMenuProps {
   menuAlign?: 'left' | 'right'
   size?: 'sm' | 'md'
   preserveFocusOnMouseDown?: boolean
+  menuZIndex?: number
 }
 
 export function SelectMenu({
@@ -40,6 +41,7 @@ export function SelectMenu({
   menuAlign = 'left',
   size = 'md',
   preserveFocusOnMouseDown = false,
+  menuZIndex = OVERLAY_Z_INDEX.dropdown,
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false)
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null)
@@ -121,7 +123,7 @@ export function SelectMenu({
           top: menuRect.top,
           left: menuRect.left,
           transform: menuAlign === 'right' ? 'translateX(-100%)' : undefined,
-          zIndex: OVERLAY_Z_INDEX.dropdown,
+          zIndex: menuZIndex,
         }}
       >
         <motion.div

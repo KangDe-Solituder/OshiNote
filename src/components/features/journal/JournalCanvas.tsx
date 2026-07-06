@@ -5,6 +5,7 @@ import { JournalSticker } from './JournalSticker'
 import { useI18n } from '../../../i18n/useI18n'
 import { getPageBackground } from './journalCanvasStyle'
 import { StampOverlay } from '../stamps/StampOverlay'
+import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
 import type { Stamp, StampInput } from '../../../types'
 
 interface JournalCanvasProps {
@@ -15,9 +16,14 @@ interface JournalCanvasProps {
   zoom: number
   zoomControlsRightOffset?: number
   stamp?: Stamp | StampInput | null
+  stampPlacementDraft?: StampInput | null
+  stampSoundEnabled?: boolean
   onZoomChange: (zoom: number) => void
   onSelectItem: (item: JournalItemWithNote | null) => void
   onCommitLayout: (itemId: string, layout: JournalLayoutInput) => void
+  onStampPlace?: (stamp: StampInput) => void
+  onStampPlacementComplete?: () => void
+  onStampPlacementCancel?: () => void
 }
 
 export function JournalCanvas({
@@ -28,9 +34,14 @@ export function JournalCanvas({
   zoom,
   zoomControlsRightOffset = 16,
   stamp = null,
+  stampPlacementDraft = null,
+  stampSoundEnabled = false,
   onZoomChange,
   onSelectItem,
   onCommitLayout,
+  onStampPlace,
+  onStampPlacementComplete,
+  onStampPlacementCancel,
 }: JournalCanvasProps) {
   const { t } = useI18n()
   const canvasSize = getJournalCanvasSize(items)
@@ -94,7 +105,17 @@ export function JournalCanvas({
             />
           ))}
 
-          <StampOverlay stamp={stamp} />
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <StampOverlay stamp={stamp} />
+            <StampPlacementLayer
+              active={Boolean(stampPlacementDraft)}
+              stamp={stampPlacementDraft}
+              soundEnabled={stampSoundEnabled}
+              onPlace={(nextStamp) => onStampPlace?.(nextStamp)}
+              onComplete={() => onStampPlacementComplete?.()}
+              onCancel={() => onStampPlacementCancel?.()}
+            />
+          </div>
         </div>
       </div>
     </div>
