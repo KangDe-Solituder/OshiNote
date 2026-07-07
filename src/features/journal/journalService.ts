@@ -6,16 +6,23 @@ import type {
   JournalBook,
   JournalCoverDecoration,
   JournalCoverStyle,
+  JournalDraftItem,
   JournalPage,
+  JournalPageOrientation,
   JournalPageType,
+  JournalItemStyle,
+  JournalItemType,
   JournalStickerStyle,
+  JournalTapeStyle,
   Illustration,
   IllustrationRow,
   Note,
   NoteRow,
+  StampInput,
 } from '../../types'
 import { createInitialLayout } from './journalLayout'
-import { deleteStampForTarget } from '../stamps/stampService'
+import { deleteStampForTarget, persistStampForTarget } from '../stamps/stampService'
+import { getJournalMaterialDefinition, getMaterialSnapshot } from './journalMaterials'
 
 interface JoinedJournalItemRow extends JournalItemRow {
   note_oshi_id: string | null
@@ -60,14 +67,31 @@ export interface JournalLayoutUpdate {
 }
 
 export interface JournalStyleUpdate {
-  sticker_style?: JournalStickerStyle
+  sticker_style?: JournalItemStyle
   color?: string | null
   border_style?: string | null
+  style_payload?: string
 }
 
-interface JournalPageRow extends Omit<JournalPage, 'page_type' | 'standalone'> {
+export interface CreateJournalPageDraftInput {
+  oshiId: string
+  bookId?: string | null
+  title: string
+  description: string
+  dateLabel: string
+  background: string
+  orientation?: JournalPageOrientation
+  items?: JournalDraftItem[]
+  noteIds?: string[]
+  illustrationIds?: string[]
+  materialIds?: string[]
+  stamp: StampInput | null
+}
+
+interface JournalPageRow extends Omit<JournalPage, 'page_type' | 'standalone' | 'orientation'> {
   page_type: string
   standalone: number
+  orientation: string
 }
 
 export async function fetchJournalBooks(oshiId: string): Promise<JournalBook[]> {
@@ -189,8 +213,8 @@ export async function createJournalPage(bookId: string, title?: string): Promise
   const id = generateId()
   const pageIndex = rows[0]?.next_index ?? 0
   await db.execute(
-    `INSERT INTO journal_pages (id, book_id, oshi_id, page_type, title, page_index, background, standalone)
-     VALUES (?, ?, ?, 'book_page', ?, ?, 'paper', 0)`,
+    `INSERT INTO journal_pages (id, book_id, oshi_id, page_type, title, page_index, background, orientation, standalone)
+     VALUES (?, ?, ?, 'book_page', ?, ?, 'paper', 'portrait', 0)`,
     [id, bookId, oshiId, title || `Page ${pageIndex + 1}`, pageIndex]
   )
   return (await fetchJournalPageById(id))!
@@ -202,16 +226,61 @@ export async function createStandalonePostcard(oshiId: string, title: string): P
   const label = String(new Date().getFullYear())
   await db.execute(
     `INSERT INTO journal_pages
-     (id, book_id, oshi_id, page_type, title, description, date_label, page_index, background, standalone)
-     VALUES (?, NULL, ?, 'postcard', ?, '', ?, 0, 'postcard', 1)`,
+     (id, book_id, oshi_id, page_type, title, description, date_label, page_index, background, orientation, standalone)
+     VALUES (?, NULL, ?, 'postcard', ?, '', ?, 0, 'postcard', 'portrait', 1)`,
     [id, oshiId, title, label]
   )
   return (await fetchJournalPageById(id))!
 }
 
+export async function createJournalPageFromDraft(input: CreateJournalPageDraftInput): Promise<JournalPage> {
+  const title = input.title.trim() || 'Untitled page'
+  const page = input.bookId
+    ? await createJournalPage(input.bookId, title)
+    : await createStandalonePostcard(input.oshiId, title)
+  await updateJournalPage(page.id, {
+    title,
+    description: input.description.trim(),
+    date_label: input.dateLabel.trim(),
+    background: input.background || 'paper',
+    orientation: input.orientation || 'portrait',
+  })
+
+  let zIndex = 1
+  if (input.items) {
+    for (const item of input.items) {
+      const layout = draftItemToLayout(item)
+      if (item.itemType === 'note' && item.sourceId) {
+        const created = await createJournalItemForNote(page.id, item.sourceId, layout)
+        if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
+      } else if (item.itemType === 'illustration' && item.sourceId) {
+        const created = await createJournalItemForIllustration(page.id, item.sourceId, layout)
+        if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
+      } else if (item.itemType === 'material' && item.materialId) {
+        await createJournalItemForMaterial(page.id, item.materialId, layout, item.stylePayload)
+      }
+    }
+  } else {
+    for (const [index, noteId] of (input.noteIds || []).slice(0, 12).entries()) {
+      await createJournalItemForNote(page.id, noteId, createDraftNoteLayout(index, zIndex++))
+    }
+    for (const [index, illustrationId] of (input.illustrationIds || []).slice(0, 12).entries()) {
+      await createJournalItemForIllustration(page.id, illustrationId, createDraftIllustrationLayout(index, zIndex++))
+    }
+    for (const [index, materialId] of (input.materialIds || []).slice(0, 24).entries()) {
+      await createJournalItemForMaterial(page.id, materialId, createDraftMaterialLayout(materialId, index, zIndex++))
+    }
+  }
+  if (input.stamp) {
+    await persistStampForTarget('journal_page', page.id, input.stamp)
+  }
+
+  return (await fetchJournalPageById(page.id)) || page
+}
+
 export async function updateJournalPage(
   id: string,
-  input: Partial<Pick<JournalPage, 'title' | 'description' | 'date_label' | 'background'>>
+  input: Partial<Pick<JournalPage, 'title' | 'description' | 'date_label' | 'background' | 'orientation'>>
 ): Promise<void> {
   const db = await getDb()
   const sets: string[] = []
@@ -220,6 +289,7 @@ export async function updateJournalPage(
   if (input.description !== undefined) { sets.push('description = ?'); params.push(input.description) }
   if (input.date_label !== undefined) { sets.push('date_label = ?'); params.push(input.date_label) }
   if (input.background !== undefined) { sets.push('background = ?'); params.push(input.background) }
+  if (input.orientation !== undefined) { sets.push('orientation = ?'); params.push(input.orientation) }
   sets.push("updated_at = datetime('now', 'localtime')")
   await db.execute(`UPDATE journal_pages SET ${sets.join(', ')} WHERE id = ?`, [...params, id])
 }
@@ -335,7 +405,7 @@ export async function ensureJournalItemsForNotes(pageId: string, notes: Note[]):
   }
 }
 
-export async function createJournalItemForNote(pageId: string, noteId: string): Promise<JournalItem> {
+export async function createJournalItemForNote(pageId: string, noteId: string, initialLayout?: JournalLayoutUpdate): Promise<JournalItem> {
   const db = await getDb()
   const existing = await db.select<JournalItemRow[]>(
     'SELECT * FROM journal_items WHERE page_id = ? AND note_id = ?',
@@ -347,12 +417,13 @@ export async function createJournalItemForNote(pageId: string, noteId: string): 
     'SELECT COUNT(*) as count FROM journal_items WHERE page_id = ?',
     [pageId]
   )
-  const layout = createInitialLayout(rows[0]?.count || 0)
+  const baseLayout = createInitialLayout(rows[0]?.count || 0)
+  const layout = initialLayout ? { ...baseLayout, ...initialLayout } : baseLayout
   const id = generateId()
   await db.execute(
     `INSERT INTO journal_items
-     (id, page_id, note_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color)
-     VALUES (?, ?, ?, 'note', ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (id, page_id, note_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, material_snapshot, style_payload)
+     VALUES (?, ?, ?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, '{}', '{}')`,
     [
       id,
       pageId,
@@ -370,7 +441,7 @@ export async function createJournalItemForNote(pageId: string, noteId: string): 
   return (await fetchJournalItemById(id))!
 }
 
-export async function createJournalItemForIllustration(pageId: string, illustrationId: string): Promise<JournalItem> {
+export async function createJournalItemForIllustration(pageId: string, illustrationId: string, initialLayout?: JournalLayoutUpdate): Promise<JournalItem> {
   const db = await getDb()
   const existing = await db.select<JournalItemRow[]>(
     'SELECT * FROM journal_items WHERE page_id = ? AND illustration_id = ?',
@@ -382,12 +453,13 @@ export async function createJournalItemForIllustration(pageId: string, illustrat
     'SELECT COUNT(*) as count FROM journal_items WHERE page_id = ?',
     [pageId]
   )
-  const layout = createInitialLayout(rows[0]?.count || 0)
+  const baseLayout = createInitialLayout(rows[0]?.count || 0)
+  const layout = initialLayout ? { ...baseLayout, ...initialLayout } : baseLayout
   const id = generateId()
   await db.execute(
     `INSERT INTO journal_items
-     (id, page_id, illustration_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color)
-     VALUES (?, ?, ?, 'illustration', ?, ?, ?, ?, ?, ?, 'memo', ?)`,
+     (id, page_id, illustration_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, material_snapshot, style_payload)
+     VALUES (?, ?, ?, 'illustration', ?, ?, ?, ?, ?, ?, 'memo', ?, '{}', '{}')`,
     [
       id,
       pageId,
@@ -400,6 +472,71 @@ export async function createJournalItemForIllustration(pageId: string, illustrat
       layout.z_index,
       '#eef6ff',
     ]
+  )
+  return (await fetchJournalItemById(id))!
+}
+
+export async function createJournalItemForMaterial(pageId: string, materialId: string, initialLayout?: JournalLayoutUpdate, stylePayloadOverride?: string): Promise<JournalItem> {
+  const material = getJournalMaterialDefinition(materialId)
+  if (!material) throw new Error(`Unknown journal material: ${materialId}`)
+
+  const db = await getDb()
+  const rows = await db.select<{ count: number; max_z: number | null }[]>(
+    'SELECT COUNT(*) as count, MAX(z_index) as max_z FROM journal_items WHERE page_id = ?',
+    [pageId]
+  )
+  const count = rows[0]?.count || 0
+  const layout = {
+    x: 130 + (count % 5) * 34,
+    y: 150 + (count % 6) * 28,
+    width: material.defaultWidth,
+    height: material.defaultHeight,
+    rotation: material.defaultRotation,
+    z_index: (rows[0]?.max_z ?? count) + 1,
+    ...initialLayout,
+  }
+  const stylePayload = stylePayloadOverride || JSON.stringify(material.defaultStyle)
+  const styleColor = getStylePayloadColor(stylePayload) || (typeof material.defaultStyle.color === 'string' ? material.defaultStyle.color : null)
+  const id = generateId()
+
+  await db.execute(
+    `INSERT INTO journal_items
+     (id, page_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, material_id, material_snapshot, style_payload)
+     VALUES (?, ?, 'material', ?, ?, ?, ?, ?, ?, 'sticky', ?, NULL, ?, ?, ?)`,
+    [
+      id,
+      pageId,
+      layout.x,
+      layout.y,
+      layout.width,
+      layout.height,
+      layout.rotation,
+      layout.z_index,
+      styleColor,
+      material.id,
+      getMaterialSnapshot(material),
+      stylePayload,
+    ]
+  )
+  return (await fetchJournalItemById(id))!
+}
+
+export async function createJournalItemForTape(pageId: string): Promise<JournalItem> {
+  const db = await getDb()
+  const rows = await db.select<{ count: number; max_z: number | null }[]>(
+    'SELECT COUNT(*) as count, MAX(z_index) as max_z FROM journal_items WHERE page_id = ?',
+    [pageId]
+  )
+  const count = rows[0]?.count || 0
+  const id = generateId()
+  const x = 120 + (count % 4) * 36
+  const y = 150 + (count % 5) * 30
+  const zIndex = (rows[0]?.max_z ?? count) + 1
+  await db.execute(
+    `INSERT INTO journal_items
+     (id, page_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, material_snapshot, style_payload)
+     VALUES (?, ?, 'tape', ?, ?, 260, 42, -6, ?, 'washi', ?, 'soft', '{}', '{}')`,
+    [id, pageId, x, y, zIndex, '#d9c4ff']
   )
   return (await fetchJournalItemById(id))!
 }
@@ -454,6 +591,7 @@ export async function updateJournalItemStyle(id: string, input: JournalStyleUpda
   if (input.sticker_style !== undefined) { sets.push('sticker_style = ?'); params.push(input.sticker_style) }
   if (input.color !== undefined) { sets.push('color = ?'); params.push(input.color) }
   if (input.border_style !== undefined) { sets.push('border_style = ?'); params.push(input.border_style) }
+  if (input.style_payload !== undefined) { sets.push('style_payload = ?'); params.push(input.style_payload) }
   sets.push("updated_at = datetime('now', 'localtime')")
   await db.execute(`UPDATE journal_items SET ${sets.join(', ')} WHERE id = ?`, [...params, id])
 }
@@ -489,6 +627,7 @@ function deserializePage(row: JournalPageRow): JournalPage {
     standalone: row.standalone === 1,
     description: row.description || '',
     date_label: row.date_label || '',
+    orientation: row.orientation === 'landscape' ? 'landscape' : 'portrait',
   }
 }
 
@@ -550,10 +689,14 @@ function deserializeJoinedItem(row: JoinedJournalItemRow): JournalItemWithNote {
 }
 
 function deserializeItem(row: JournalItemRow): JournalItem {
+  const itemType = isJournalItemType(row.item_type) ? row.item_type : 'note'
   return {
     ...row,
-    item_type: row.item_type === 'illustration' ? 'illustration' : 'note',
-    sticker_style: isStickerStyle(row.sticker_style) ? row.sticker_style : 'sticky',
+    item_type: itemType,
+    sticker_style: normalizeJournalItemStyle(itemType, row.sticker_style),
+    material_id: row.material_id || null,
+    material_snapshot: row.material_snapshot || '{}',
+    style_payload: row.style_payload || '{}',
   }
 }
 
@@ -595,6 +738,95 @@ function deserializeBook(row: JournalBook): JournalBook {
 
 function isStickerStyle(value: string): value is JournalStickerStyle {
   return value === 'sticky' || value === 'memo' || value === 'ticket'
+}
+
+function isTapeStyle(value: string): value is JournalTapeStyle {
+  return value === 'washi' || value === 'grid' || value === 'dots' || value === 'stripe' || value === 'torn'
+}
+
+function isJournalItemType(value: string): value is JournalItemType {
+  return value === 'note' || value === 'illustration' || value === 'tape' || value === 'material' || value === 'memo'
+}
+
+function normalizeJournalItemStyle(itemType: JournalItemType, value: string): JournalItemStyle {
+  if (itemType === 'tape') return isTapeStyle(value) ? value : 'washi'
+  if (itemType === 'material') return isTapeStyle(value) ? value : isStickerStyle(value) ? value : 'sticky'
+  return isStickerStyle(value) ? value : 'sticky'
+}
+
+function draftItemToLayout(item: JournalDraftItem): JournalLayoutUpdate {
+  return {
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    height: item.height,
+    rotation: item.rotation,
+    z_index: item.zIndex,
+  }
+}
+
+function getStylePayloadColor(stylePayload: string): string | null {
+  try {
+    const parsed = JSON.parse(stylePayload)
+    return parsed && typeof parsed.color === 'string' ? parsed.color : null
+  } catch {
+    return null
+  }
+}
+
+function createDraftNoteLayout(index: number, zIndex: number): JournalLayoutUpdate {
+  return {
+    x: 88 + (index % 2) * 42,
+    y: 172 + index * 34,
+    width: 260,
+    height: 178,
+    rotation: [-3, 2, -1][index % 3],
+    z_index: zIndex,
+  }
+}
+
+function createDraftIllustrationLayout(index: number, zIndex: number): JournalLayoutUpdate {
+  return {
+    x: 560 - (index % 2) * 38,
+    y: 120 + index * 46,
+    width: 300,
+    height: 230,
+    rotation: [2, -2, 3][index % 3],
+    z_index: zIndex,
+  }
+}
+
+function createDraftMaterialLayout(materialId: string, index: number, zIndex: number): JournalLayoutUpdate {
+  const material = getJournalMaterialDefinition(materialId)
+  const kind = material?.kind || 'sticker'
+  if (kind === 'tape') {
+    return {
+      x: index % 2 === 0 ? 118 : 544,
+      y: index % 2 === 0 ? 142 + index * 14 : 104 + index * 16,
+      width: material?.defaultWidth || 260,
+      height: material?.defaultHeight || 42,
+      rotation: material?.defaultRotation ?? -5,
+      z_index: zIndex,
+    }
+  }
+  if (kind === 'paper' || kind === 'label') {
+    return {
+      x: 190 + (index % 3) * 160,
+      y: 500 + (index % 2) * 34,
+      width: material?.defaultWidth || 160,
+      height: material?.defaultHeight || 90,
+      rotation: material?.defaultRotation ?? 0,
+      z_index: zIndex,
+    }
+  }
+  return {
+    x: [72, 842, 760, 458][index % 4],
+    y: [110, 156, 492, 96][index % 4],
+    width: material?.defaultWidth || 72,
+    height: material?.defaultHeight || 72,
+    rotation: material?.defaultRotation ?? 0,
+    z_index: zIndex,
+  }
 }
 
 function isPageType(value: string): value is JournalPageType {

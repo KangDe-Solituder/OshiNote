@@ -44,7 +44,8 @@ export function JournalCanvas({
   onStampPlacementCancel,
 }: JournalCanvasProps) {
   const { t } = useI18n()
-  const canvasSize = getJournalCanvasSize(items)
+  const orientation = page?.orientation || 'portrait'
+  const canvasSize = getJournalCanvasSize(items, orientation)
 
   return (
     <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-auto bg-[var(--journal-canvas-bg)]">
@@ -60,6 +61,7 @@ export function JournalCanvas({
           <Plus size={15} />
         </button>
       </div>
+      <div className="flex min-h-[calc(100%-56px)] min-w-full justify-center p-6 pt-2">
       <div style={{ width: canvasSize.width * zoom, height: Math.max(canvasSize.height * zoom, 1) }}>
         <div
           className="relative overflow-visible bg-[var(--journal-canvas-bg)]"
@@ -100,6 +102,7 @@ export function JournalCanvas({
               item={item}
               selected={selectedItemId === item.id}
               zoom={zoom}
+              orientation={orientation}
               onSelect={onSelectItem}
               onCommitLayout={onCommitLayout}
             />
@@ -117,6 +120,7 @@ export function JournalCanvas({
             />
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

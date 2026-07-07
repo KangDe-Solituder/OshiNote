@@ -34,7 +34,9 @@ async function runMigrations(db: Database): Promise<void> {
   await ensureOptionalNoteOwnership(db)
   await ensureJournalBooksSchema(db)
   await ensureJournalPagesPostcardSchema(db)
+  await ensureJournalPagesOrientationSchema(db)
   await ensureJournalItemsAssetSchema(db)
+  await ensureJournalItemsMaterialSchema(db)
   await rebuildNoteSearchIndex(db)
 }
 
@@ -116,14 +118,15 @@ async function ensureJournalBooksSchema(db: Database): Promise<void> {
         standalone  INTEGER NOT NULL DEFAULT 0,
         page_index  INTEGER NOT NULL DEFAULT 0,
         background  TEXT NOT NULL DEFAULT 'paper',
+        orientation TEXT NOT NULL DEFAULT 'portrait',
         created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
         updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
         FOREIGN KEY (book_id) REFERENCES journal_books(id) ON DELETE CASCADE,
         FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE
       )`)
       await db.execute(`INSERT INTO journal_pages_v2
-        (id, book_id, oshi_id, page_type, title, page_index, background, created_at, updated_at)
-        SELECT p.id, p.archive_id, COALESCE(a.oshi_id, ''), 'book_page', p.title, p.page_index, p.background, p.created_at, p.updated_at
+        (id, book_id, oshi_id, page_type, title, page_index, background, orientation, created_at, updated_at)
+        SELECT p.id, p.archive_id, COALESCE(a.oshi_id, ''), 'book_page', p.title, p.page_index, p.background, 'portrait', p.created_at, p.updated_at
         FROM journal_pages p
         LEFT JOIN archives a ON a.id = p.archive_id`)
       await db.execute('DROP TABLE journal_pages')
@@ -147,6 +150,7 @@ async function ensureJournalPagesPostcardSchema(db: Database): Promise<void> {
     columnNames.has('description') &&
     columnNames.has('date_label') &&
     columnNames.has('standalone') &&
+    columnNames.has('orientation') &&
     bookId?.notnull === 0
 
   if (!compatible) {
@@ -155,6 +159,7 @@ async function ensureJournalPagesPostcardSchema(db: Database): Promise<void> {
     const descriptionSelect = columnNames.has('description') ? "COALESCE(p.description, '')" : "''"
     const dateLabelSelect = columnNames.has('date_label') ? "COALESCE(p.date_label, '')" : "''"
     const standaloneSelect = columnNames.has('standalone') ? 'COALESCE(p.standalone, 0)' : '0'
+    const orientationSelect = columnNames.has('orientation') ? "COALESCE(p.orientation, 'portrait')" : "'portrait'"
     await db.execute('PRAGMA foreign_keys = OFF')
     try {
       await db.execute('DROP TABLE IF EXISTS journal_pages_v2')
@@ -169,13 +174,14 @@ async function ensureJournalPagesPostcardSchema(db: Database): Promise<void> {
         standalone  INTEGER NOT NULL DEFAULT 0,
         page_index  INTEGER NOT NULL DEFAULT 0,
         background  TEXT NOT NULL DEFAULT 'paper',
+        orientation TEXT NOT NULL DEFAULT 'portrait',
         created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
         updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
         FOREIGN KEY (book_id) REFERENCES journal_books(id) ON DELETE CASCADE,
         FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE
       )`)
       await db.execute(`INSERT INTO journal_pages_v2
-        (id, book_id, oshi_id, page_type, title, description, date_label, standalone, page_index, background, created_at, updated_at)
+        (id, book_id, oshi_id, page_type, title, description, date_label, standalone, page_index, background, orientation, created_at, updated_at)
         SELECT
           p.id,
           p.book_id,
@@ -187,6 +193,7 @@ async function ensureJournalPagesPostcardSchema(db: Database): Promise<void> {
           ${standaloneSelect},
           p.page_index,
           p.background,
+          ${orientationSelect},
           p.created_at,
           p.updated_at
         FROM journal_pages p
@@ -204,6 +211,15 @@ async function ensureJournalPagesPostcardSchema(db: Database): Promise<void> {
   await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_pages_book ON journal_pages(book_id, page_index)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_pages_oshi ON journal_pages(oshi_id, standalone, updated_at)')
   await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_pages_type ON journal_pages(page_type, standalone)')
+}
+
+async function ensureJournalPagesOrientationSchema(db: Database): Promise<void> {
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_pages)')
+  if (columns.length === 0) return
+  const columnNames = new Set(columns.map((column) => column.name))
+  if (!columnNames.has('orientation')) {
+    await db.execute("ALTER TABLE journal_pages ADD COLUMN orientation TEXT NOT NULL DEFAULT 'portrait'")
+  }
 }
 
 async function ensureOptionalNoteOwnership(db: Database): Promise<void> {
@@ -290,6 +306,9 @@ async function ensureJournalItemsAssetSchema(db: Database): Promise<void> {
       sticker_style   TEXT NOT NULL DEFAULT 'sticky',
       color           TEXT,
       border_style    TEXT,
+      material_id     TEXT,
+      material_snapshot TEXT NOT NULL DEFAULT '{}',
+      style_payload   TEXT NOT NULL DEFAULT '{}',
       created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       updated_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (page_id) REFERENCES journal_pages(id) ON DELETE CASCADE,
@@ -297,8 +316,8 @@ async function ensureJournalItemsAssetSchema(db: Database): Promise<void> {
       FOREIGN KEY (illustration_id) REFERENCES illustrations(id) ON DELETE CASCADE
     )`)
     await db.execute(`INSERT INTO journal_items_v2
-      (id, page_id, note_id, illustration_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, created_at, updated_at)
-      SELECT id, page_id, note_id, NULL, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, created_at, updated_at
+      (id, page_id, note_id, illustration_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, material_id, material_snapshot, style_payload, created_at, updated_at)
+      SELECT id, page_id, note_id, NULL, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, NULL, '{}', '{}', created_at, updated_at
       FROM journal_items`)
     await db.execute('DROP TABLE journal_items')
     await db.execute('ALTER TABLE journal_items_v2 RENAME TO journal_items')
@@ -309,6 +328,22 @@ async function ensureJournalItemsAssetSchema(db: Database): Promise<void> {
     await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_items_page_illustration ON journal_items(page_id, illustration_id)')
   } finally {
     await db.execute('PRAGMA foreign_keys = ON')
+  }
+}
+
+async function ensureJournalItemsMaterialSchema(db: Database): Promise<void> {
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_items)')
+  if (columns.length === 0) return
+  const columnNames = new Set(columns.map((column) => column.name))
+
+  if (!columnNames.has('material_id')) {
+    await db.execute('ALTER TABLE journal_items ADD COLUMN material_id TEXT')
+  }
+  if (!columnNames.has('material_snapshot')) {
+    await db.execute("ALTER TABLE journal_items ADD COLUMN material_snapshot TEXT NOT NULL DEFAULT '{}'")
+  }
+  if (!columnNames.has('style_payload')) {
+    await db.execute("ALTER TABLE journal_items ADD COLUMN style_payload TEXT NOT NULL DEFAULT '{}'")
   }
 }
 

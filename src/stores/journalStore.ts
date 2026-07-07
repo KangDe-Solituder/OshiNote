@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Illustration, JournalBook, JournalCoverDecoration, JournalCoverStyle, JournalItemWithNote, JournalPage, JournalStickerStyle, Note } from '../types'
+import type { Illustration, JournalBook, JournalCoverDecoration, JournalCoverStyle, JournalItemStyle, JournalItemWithNote, JournalPage, Note } from '../types'
 import * as journalService from '../features/journal/journalService'
 
 interface LayoutInput {
@@ -12,9 +12,10 @@ interface LayoutInput {
 }
 
 interface StyleInput {
-  sticker_style?: JournalStickerStyle
+  sticker_style?: JournalItemStyle
   color?: string | null
   border_style?: string | null
+  style_payload?: string
 }
 
 interface BookInput {
@@ -65,6 +66,8 @@ interface JournalState {
   deletePage: (pageId: string, bookId: string) => Promise<void>
   placeNote: (noteId: string, oshiId: string) => Promise<void>
   placeIllustration: (illustrationId: string, oshiId: string) => Promise<void>
+  placeTape: () => Promise<void>
+  placeMaterial: (materialId: string) => Promise<void>
   loadUnplacedNotes: (oshiId: string) => Promise<void>
   loadUnplacedIllustrations: (oshiId: string) => Promise<void>
   updateItemLayout: (itemId: string, layout: LayoutInput) => Promise<void>
@@ -351,6 +354,22 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       journalService.fetchUnplacedIllustrations(activePageId, oshiId),
     ])
     set({ items, unplacedIllustrations })
+  },
+
+  placeTape: async () => {
+    const activePageId = get().activePageId
+    if (!activePageId) return
+    await journalService.createJournalItemForTape(activePageId)
+    const items = await journalService.fetchJournalItems(activePageId)
+    set({ items })
+  },
+
+  placeMaterial: async (materialId) => {
+    const activePageId = get().activePageId
+    if (!activePageId) return
+    await journalService.createJournalItemForMaterial(activePageId, materialId)
+    const items = await journalService.fetchJournalItems(activePageId)
+    set({ items })
   },
 
   loadUnplacedNotes: async (oshiId) => {

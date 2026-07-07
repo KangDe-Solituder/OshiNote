@@ -1,17 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ImageIcon,
   LayoutGrid,
   Loader2,
   Palette,
-  Plus,
   RotateCcw,
   Save,
 } from 'lucide-react'
@@ -19,22 +14,29 @@ import { Button } from '../components/ui/Button'
 import { PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 import { useJournalStore } from '../stores/journalStore'
 import { useNoteStore } from '../stores/noteStore'
-import type { JournalItemWithNote, Oshi } from '../types'
+import type { JournalDraftItem, JournalItemWithNote, JournalPage, Oshi, Stamp, StampInput } from '../types'
 import { autoArrangeNotes, clampLayout, type JournalLayoutInput } from '../features/journal/journalLayout'
-import { createStandalonePostcard, fetchJournalPageById, updateJournalPage } from '../features/journal/journalService'
+import {
+  createJournalItemForIllustration,
+  createJournalItemForMaterial,
+  createJournalItemForNote,
+  createStandalonePostcard,
+  fetchJournalPageById,
+  removeJournalItem,
+  updateJournalItemStyle,
+  updateJournalPage,
+} from '../features/journal/journalService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import { JournalCanvas } from '../components/features/journal/JournalCanvas'
-import { JournalIllustrationPicker } from '../components/features/journal/JournalIllustrationPicker'
+import { JournalCreationFlow } from '../components/features/journal/JournalCreationFlow'
 import { JournalInspector } from '../components/features/journal/JournalInspector'
-import { JournalNotePicker } from '../components/features/journal/JournalNotePicker'
-import { usePopoverTransition, useUiMotionSeconds } from '../components/features/themes/uiMotion'
+import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
 import { SelectMenu } from '../components/ui/SelectMenu'
-import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
 import { useI18n } from '../i18n/useI18n'
 import { StampControl } from '../components/features/stamps/StampControl'
 import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
-import type { Stamp, StampInput } from '../types'
 import { useStampSettingsStore } from '../stores/stampSettingsStore'
+import { JOURNAL_BACKGROUND_PRESETS } from '../features/journal/journalBackgrounds'
 
 interface PageDraft {
   title: string
@@ -47,18 +49,14 @@ export function JournalEditorPage() {
   const { t } = useI18n()
   const { oshiId = '', pageId = '' } = useParams<{ oshiId: string; pageId: string }>()
   const navigate = useNavigate()
-  const popoverTransition = usePopoverTransition()
+  const [searchParams] = useSearchParams()
   const motionSeconds = useUiMotionSeconds()
   const isDraftPage = !pageId
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [showAddMenu, setShowAddMenu] = useState(false)
-  const [addMenuRect, setAddMenuRect] = useState<{ top: number; right: number; width: number } | null>(null)
-  const addMenuRootRef = useRef<HTMLDivElement>(null)
-  const addMenuRef = useRef<HTMLDivElement>(null)
-  const [showNotePicker, setShowNotePicker] = useState(false)
-  const [showIllustrationPicker, setShowIllustrationPicker] = useState(false)
+  const [compositionOpen, setCompositionOpen] = useState(false)
+  const [compositionInitialStep, setCompositionInitialStep] = useState<'setup' | 'draft'>('draft')
   const [pageDraft, setPageDraft] = useState<PageDraft>(createDefaultPageDraft())
   const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
   const [stampPlacementDraft, setStampPlacementDraft] = useState<StampInput | null>(null)
@@ -69,17 +67,11 @@ export function JournalEditorPage() {
     pages,
     activePageId,
     items,
-    unplacedNotes,
-    unplacedIllustrations,
     loading,
     error,
     openPageForEditing,
     closeBook,
     updatePage,
-    placeNote,
-    placeIllustration,
-    loadUnplacedNotes,
-    loadUnplacedIllustrations,
     updateItemLayout,
     updateItemStyle,
     removeItem,
@@ -158,6 +150,14 @@ export function JournalEditorPage() {
   }, [activePage])
 
   useEffect(() => {
+    if (!activePage || searchParams.get('setup') !== '1') return
+    setDetailsOpen(false)
+    setSelectedItemId(null)
+    setCompositionInitialStep('setup')
+    setCompositionOpen(true)
+  }, [activePage, searchParams])
+
+  useEffect(() => {
     let alive = true
     if (!activePageStampTargetId) {
       setStampDraft(null)
@@ -210,43 +210,68 @@ export function JournalEditorPage() {
     }))
   }
 
-  async function handleOpenNotePicker() {
+  async function handleOpenCompositionEditor(initialStep: 'setup' | 'draft' = 'draft') {
     const preparedPage = await ensurePageForAdding()
     if (!preparedPage) {
       setDetailsOpen(true)
       return
     }
-    await loadUnplacedNotes(preparedPage.oshiId)
-    setShowIllustrationPicker(false)
-    setShowNotePicker(true)
+    setDetailsOpen(false)
+    setSelectedItemId(null)
+    setCompositionInitialStep(initialStep)
+    setCompositionOpen(true)
   }
 
-  async function handlePlaceNote(noteId: string) {
-    await placeNote(noteId, activePage?.oshi_id || selectedOshiId || oshiId)
-    const placedItem = useJournalStore.getState().items.find((item) => item.note?.id === noteId)
-    if (placedItem) {
-      setSelectedItemId(placedItem.id)
-      setDetailsOpen(true)
+  async function handleSaveCompositionDraft(draft: {
+    oshiId: string
+    title: string
+    dateLabel: string
+    description: string
+    background: string
+    orientation: JournalPage['orientation']
+    items: JournalDraftItem[]
+    stamp: Stamp | StampInput | null
+  }) {
+    if (!activePage) return
+    await updateJournalPage(activePage.id, {
+      title: draft.title.trim() || t('journalEditor.defaultPageTitle'),
+      description: draft.description.trim(),
+      date_label: draft.dateLabel.trim(),
+      background: draft.background,
+      orientation: draft.orientation,
+    })
+
+    const draftOriginIds = new Set(draft.items.map((item) => item.originItemId).filter(Boolean))
+    const supportedExistingItems = canvasItems.filter((item) => isCompositionItem(item))
+    await Promise.all(supportedExistingItems
+      .filter((item) => !draftOriginIds.has(item.id))
+      .map((item) => removeJournalItem(item.id)))
+
+    for (const item of draft.items) {
+      const layout = draftItemToLayout(item)
+      if (item.originItemId) {
+        await updateItemLayout(item.originItemId, layout)
+        if (item.stylePayload !== undefined) {
+          await updateItemStyle(item.originItemId, { style_payload: item.stylePayload })
+        }
+        continue
+      }
+      if (item.itemType === 'note' && item.sourceId) {
+        const created = await createJournalItemForNote(activePage.id, item.sourceId, layout)
+        if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
+      } else if (item.itemType === 'illustration' && item.sourceId) {
+        const created = await createJournalItemForIllustration(activePage.id, item.sourceId, layout)
+        if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
+      } else if (item.itemType === 'material' && item.materialId) {
+        await createJournalItemForMaterial(activePage.id, item.materialId, layout, item.stylePayload)
+      }
     }
-  }
 
-  async function handleOpenIllustrationPicker() {
-    const preparedPage = await ensurePageForAdding()
-    if (!preparedPage) {
-      setDetailsOpen(true)
-      return
-    }
-    await loadUnplacedIllustrations(preparedPage.oshiId)
-    setShowNotePicker(false)
-    setShowIllustrationPicker(true)
-  }
-
-  async function handlePlaceIllustration(illustrationId: string) {
-    await placeIllustration(illustrationId, activePage?.oshi_id || selectedOshiId || oshiId)
-    const placedItem = useJournalStore.getState().items.find((item) => item.illustration?.id === illustrationId)
-    if (placedItem) {
-      setSelectedItemId(placedItem.id)
-      setDetailsOpen(true)
+    setStampDraft(await persistStampForTarget('journal_page', activePage.id, draft.stamp))
+    await openPageForEditing(activePage.id, activePage.oshi_id)
+    setCompositionOpen(false)
+    if (searchParams.get('setup') === '1') {
+      navigate(`/journal/pages/${activePage.id}/edit`, { replace: true })
     }
   }
 
@@ -332,96 +357,26 @@ export function JournalEditorPage() {
     }
   }
 
-  function measureAddMenuRect() {
-    const rect = addMenuRootRef.current?.getBoundingClientRect()
-    if (!rect) return null
-    return {
-      top: rect.bottom + 8,
-      right: window.innerWidth - rect.right,
-      width: rect.width,
-    }
+  if (isDraftPage) {
+    return <JournalCreationFlow />
   }
 
-  function toggleAddMenu() {
-    if (showAddMenu) {
-      setShowAddMenu(false)
-      return
-    }
-    const rect = measureAddMenuRect()
-    if (!rect) return
-    setAddMenuRect(rect)
-    setShowAddMenu(true)
+  if (compositionOpen && activePage) {
+    return (
+      <JournalCreationFlow
+        mode="edit"
+        initialStep={compositionInitialStep}
+        initialDraft={createCompositionDraft(activePage, canvasItems, stampDraft)}
+        onSaveDraft={handleSaveCompositionDraft}
+        onCancelEdit={() => {
+          setCompositionOpen(false)
+          if (searchParams.get('setup') === '1') {
+            navigate(`/journal/pages/${activePage.id}/edit`, { replace: true })
+          }
+        }}
+      />
+    )
   }
-
-  useEffect(() => {
-    if (!showAddMenu) return
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node
-      if (!addMenuRootRef.current?.contains(target) && !addMenuRef.current?.contains(target)) {
-        setShowAddMenu(false)
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setShowAddMenu(false)
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showAddMenu])
-
-  useLayoutEffect(() => {
-    if (!showAddMenu) return
-
-    function updatePosition() {
-      const rect = measureAddMenuRect()
-      if (rect) setAddMenuRect(rect)
-    }
-
-    updatePosition()
-    window.addEventListener('resize', updatePosition)
-    window.addEventListener('scroll', updatePosition, true)
-    return () => {
-      window.removeEventListener('resize', updatePosition)
-      window.removeEventListener('scroll', updatePosition, true)
-    }
-  }, [showAddMenu])
-
-  const addMenu = addMenuRect ? (
-    <AnimatePresence initial={false} onExitComplete={() => setAddMenuRect(null)}>
-      {showAddMenu && (
-        <div
-          className="fixed"
-          style={{
-            top: addMenuRect.top,
-            right: addMenuRect.right,
-            zIndex: OVERLAY_Z_INDEX.popover,
-          }}
-        >
-          <motion.div
-            ref={addMenuRef}
-            {...popoverTransition}
-            className="w-56 overflow-hidden rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl transform-gpu will-change-[transform,opacity]"
-            style={{ minWidth: addMenuRect.width }}
-          >
-            <button type="button" onClick={() => { handleOpenNotePicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
-              <Plus size={14} className="text-accent" />
-              {t('journalEditor.addNote')}
-            </button>
-            <button type="button" onClick={() => { handleOpenIllustrationPicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
-              <ImageIcon size={14} className="text-accent" />
-              {t('journalEditor.addIllustration')}
-            </button>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  ) : null
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
@@ -454,13 +409,10 @@ export function JournalEditorPage() {
           {t('journalEditor.autoArrange')}
         </Button>
 
-        <div ref={addMenuRootRef} className="relative">
-          <Button variant="primary" size="sm" onClick={toggleAddMenu}>
-            <Plus size={15} />
-            {t('journalEditor.add')}
-            <ChevronDown size={14} />
-          </Button>
-        </div>
+        <Button variant="primary" size="sm" onClick={() => handleOpenCompositionEditor('draft')}>
+          <LayoutGrid size={15} />
+          {t('journalCreate.editPage')}
+        </Button>
 
         <button
           type="button"
@@ -471,8 +423,6 @@ export function JournalEditorPage() {
           {detailsOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </button>
       </header>
-
-      {addMenu ? createPortal(addMenu, document.body) : null}
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <main className="min-w-0 flex-1">
@@ -541,6 +491,7 @@ export function JournalEditorPage() {
                   oshiId={oshiId}
                   selectedItem={selectedItem}
                   items={canvasItems}
+                  orientation={activePage?.orientation || 'portrait'}
                   onUpdateLayout={handleInspectorLayout}
                   onUpdateStyle={updateItemStyle}
                   onRemove={handleRemove}
@@ -552,27 +503,105 @@ export function JournalEditorPage() {
           </div>
         </aside>
 
-        <AnimatePresence>
-          {showNotePicker && (
-            <JournalNotePicker
-              notes={unplacedNotes}
-              onPlaceNote={handlePlaceNote}
-              onClose={() => setShowNotePicker(false)}
-            />
-          )}
-        </AnimatePresence>
-        <AnimatePresence>
-          {showIllustrationPicker && (
-            <JournalIllustrationPicker
-              illustrations={unplacedIllustrations}
-              onPlaceIllustration={handlePlaceIllustration}
-              onClose={() => setShowIllustrationPicker(false)}
-            />
-          )}
-        </AnimatePresence>
       </div>
     </div>
   )
+}
+
+function createCompositionDraft(page: JournalPage, items: JournalItemWithNote[], stamp: Stamp | StampInput | null) {
+  return {
+    oshiId: page.oshi_id,
+    title: page.title || '',
+    dateLabel: page.date_label || '',
+    description: page.description || '',
+    background: page.background || 'paper',
+    orientation: page.orientation || 'portrait',
+    items: items.flatMap(itemToDraftItem),
+    stamp,
+  }
+}
+
+function itemToDraftItem(item: JournalItemWithNote): JournalDraftItem[] {
+  if (!isCompositionItem(item)) return []
+  const base = {
+    draftId: `existing-${item.id}`,
+    originItemId: item.id,
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    height: item.height,
+    rotation: item.rotation,
+    zIndex: item.z_index,
+  }
+  if (item.item_type === 'note') {
+    if (!item.note_id) return []
+    return [{
+      ...base,
+      itemType: 'note',
+      sourceId: item.note_id,
+      stylePayload: item.style_payload && item.style_payload !== '{}' ? item.style_payload : JSON.stringify({
+        noteCard: {
+          titleVisible: true,
+          titleText: item.note?.title || '',
+          bodyText: (item.note?.plain_text || '').slice(0, 200),
+          fontFamily: 'system',
+          fontSize: 14,
+          fontWeight: 500,
+          lineHeight: 1.45,
+          textColor: '#1f2f4d',
+          backgroundColor: item.color || '#fff7d6',
+          padding: 16,
+          radius: 16,
+          showTags: true,
+        },
+      }),
+    }]
+  }
+  if (item.item_type === 'illustration') {
+    if (!item.illustration_id) return []
+    return [{
+      ...base,
+      itemType: 'illustration',
+      sourceId: item.illustration_id,
+      stylePayload: item.style_payload && item.style_payload !== '{}' ? item.style_payload : JSON.stringify({
+        imageStyle: {
+          fit: 'contain',
+          frame: 'none',
+          borderWidth: 0,
+          borderColor: '#ffffff',
+          radius: 12,
+          shadow: 0,
+          backgroundColor: 'transparent',
+        },
+      }),
+    }]
+  }
+  return [{
+    ...base,
+    itemType: 'material',
+    materialId: item.material_id || 'washi-lilac',
+    materialSnapshot: item.material_snapshot,
+    stylePayload: item.style_payload && item.style_payload !== '{}' ? item.style_payload : JSON.stringify({
+      color: item.color || undefined,
+      variant: item.sticker_style,
+      glassStrength: 0,
+    }),
+  }]
+}
+
+function isCompositionItem(item: JournalItemWithNote) {
+  return item.item_type === 'note' || item.item_type === 'illustration' || item.item_type === 'material' || item.item_type === 'tape'
+}
+
+function draftItemToLayout(item: JournalDraftItem) {
+  return {
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    height: item.height,
+    rotation: item.rotation,
+    z_index: item.zIndex,
+  }
 }
 
 function PageSetupPanel({
@@ -668,7 +697,7 @@ function PageSetupPanel({
             {t('journalEditor.setup.background')}
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {PAGE_BACKGROUNDS.map((background) => (
+            {JOURNAL_BACKGROUND_PRESETS.map((background) => (
               <button
                 key={background.id}
                 type="button"
@@ -697,15 +726,6 @@ function PageSetupPanel({
 }
 
 const fieldClassName = 'min-w-0 rounded-xl border border-border-color bg-bg-secondary px-3 py-2 text-sm text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-50'
-
-const PAGE_BACKGROUNDS = [
-  { id: 'paper', labelKey: 'journalEditor.background.paper' },
-  { id: 'grid', labelKey: 'journalEditor.background.grid' },
-  { id: 'blush', labelKey: 'journalEditor.background.blush' },
-  { id: 'blue', labelKey: 'journalEditor.background.blue' },
-  { id: 'mint', labelKey: 'journalEditor.background.mint' },
-  { id: 'postcard', labelKey: 'journalEditor.background.loose' },
-] as const
 
 function createDefaultPageDraft(): PageDraft {
   return { title: '', description: '', date_label: '', background: 'paper' }

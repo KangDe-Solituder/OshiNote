@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, BookOpen, Check, ChevronDown, FileImage, ImageIcon, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, FileImage, ImageIcon, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../../layout/pageShell'
 import { useJournalStore } from '../../../stores/journalStore'
 import { useNoteStore } from '../../../stores/noteStore'
 import type { JournalBook, JournalItemWithNote, JournalPage, Stamp } from '../../../types'
 import { autoArrangeNotes, clampLayout, getJournalCanvasSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
-import { fetchJournalItems } from '../../../features/journal/journalService'
+import { fetchJournalBooks, fetchJournalItems } from '../../../features/journal/journalService'
 import { JournalCanvas } from './JournalCanvas'
 import { getPageBackground } from './journalCanvasStyle'
-import { JournalNotePicker } from './JournalNotePicker'
-import { JournalIllustrationPicker } from './JournalIllustrationPicker'
 import { JournalStickerPopover } from './JournalStickerPopover'
 import { usePageTransition, usePanelTransition, usePopoverTransition } from '../themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
 import { fetchStampForTarget } from '../../../features/stamps/stampService'
 import { StampOverlay } from '../stamps/StampOverlay'
+import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
 
 interface JournalPageViewProps {
   oshiId: string
@@ -30,6 +30,7 @@ type Translate = ReturnType<typeof useI18n>['t']
 
 export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard = null, onBack }: JournalPageViewProps) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const pageTransition = usePageTransition()
   const panelTransition = usePanelTransition()
   const popoverTransition = usePopoverTransition()
@@ -38,34 +39,24 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   const [previewItemsByPageId, setPreviewItemsByPageId] = useState<Record<string, JournalItemWithNote[]>>({})
   const [stampsByPageId, setStampsByPageId] = useState<Record<string, Stamp | null>>({})
   const [zoom, setZoom] = useState(1)
-  const [showNotePicker, setShowNotePicker] = useState(false)
-  const [showIllustrationPicker, setShowIllustrationPicker] = useState(false)
   const [showPageEditor, setShowPageEditor] = useState(false)
   const [showPageSidebar, setShowPageSidebar] = useState(false)
-  const [showAddMenu, setShowAddMenu] = useState(false)
   const [showPageActions, setShowPageActions] = useState(false)
   const [pageDraft, setPageDraft] = useState({ title: '', description: '', date_label: '', background: 'paper' })
+  const [availableBooks, setAvailableBooks] = useState<JournalBook[]>([])
   const {
-    books,
     pages,
     activePageId,
     items,
-    unplacedNotes,
-    unplacedIllustrations,
     loading,
     error,
     openBook,
     setActivePage,
     updatePage,
-    createPage,
     deletePage,
     collectPostcard,
     detachPage,
     deletePostcard,
-    placeNote,
-    placeIllustration,
-    loadUnplacedNotes,
-    loadUnplacedIllustrations,
     updateItemLayout,
     updateItemStyle,
     removeItem,
@@ -77,6 +68,18 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   useEffect(() => {
     if (bookId) openBook(bookId, oshiId)
   }, [bookId, openBook, oshiId])
+
+  useEffect(() => {
+    let alive = true
+    fetchJournalBooks(oshiId)
+      .then((rows) => {
+        if (alive) setAvailableBooks(rows)
+      })
+      .catch(() => {
+        if (alive) setAvailableBooks([])
+      })
+    return () => { alive = false }
+  }, [oshiId])
 
   useEffect(() => {
     setViewingPageId(standalonePostcard?.id || null)
@@ -162,32 +165,6 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
     await refreshItems()
   }
 
-  async function handleOpenNotePicker() {
-    await loadUnplacedNotes(oshiId)
-    setShowIllustrationPicker(false)
-    setShowNotePicker(true)
-  }
-
-  async function handlePlaceNote(noteId: string) {
-    if (!showPageCanvas) return
-    await placeNote(noteId, oshiId)
-    const placedItem = useJournalStore.getState().items.find((item) => item.note?.id === noteId)
-    if (placedItem) setSelectedItemId(placedItem.id)
-  }
-
-  async function handleOpenIllustrationPicker() {
-    await loadUnplacedIllustrations(oshiId)
-    setShowNotePicker(false)
-    setShowIllustrationPicker(true)
-  }
-
-  async function handlePlaceIllustration(illustrationId: string) {
-    if (!showPageCanvas) return
-    await placeIllustration(illustrationId, oshiId)
-    const placedItem = useJournalStore.getState().items.find((item) => item.illustration?.id === illustrationId)
-    if (placedItem) setSelectedItemId(placedItem.id)
-  }
-
   async function handleUpdateNote(noteId: string, input: Parameters<typeof updateNote>[1]) {
     await updateNote(noteId, input)
     await refreshItems()
@@ -226,9 +203,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
 
   async function handleCreatePage() {
     if (!bookId) return
-    await createPage(bookId)
-    const nextPageId = useJournalStore.getState().activePageId
-    if (nextPageId) setViewingPageId(nextPageId)
+    navigate(`/journal/create?bookId=${encodeURIComponent(bookId)}&oshiId=${encodeURIComponent(oshiId)}`)
   }
 
   function handleOpenPage(pageId: string) {
@@ -240,10 +215,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   function handleBack() {
     if (bookId && showPageCanvas && !standalonePostcard) {
       setSelectedItemId(null)
-      setShowNotePicker(false)
-      setShowIllustrationPicker(false)
       setShowPageEditor(false)
-      setShowAddMenu(false)
       setShowPageActions(false)
       setViewingPageId(null)
       return
@@ -274,40 +246,16 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
           )}
           {showPageCanvas ? (
             <>
-              <Button variant="secondary" size="sm" onClick={() => setShowPageEditor(!showPageEditor)}>
+              <Button variant="secondary" size="sm" onClick={() => activePage && navigate(`/journal/pages/${activePage.id}/edit?setup=1`)}>
                 <Palette size={15} />
                 {t('journalPage.pageSetup')}
               </Button>
-              <div className="relative">
-                <Button variant="secondary" size="sm" onClick={() => setShowAddMenu(!showAddMenu)}>
-                  <Plus size={15} />
-                  {t('journalPage.add')}
-                  <ChevronDown size={14} />
-                </Button>
-                <AnimatePresence>
-                  {showAddMenu && (
-                    <motion.div
-                      {...popoverTransition}
-                      className="absolute right-0 top-10 z-50 w-56 rounded-xl border border-border-color bg-bg-primary p-1.5 shadow-xl"
-                    >
-                      <button type="button" onClick={() => { handleOpenNotePicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
-                        <Plus size={14} className="text-accent" />
-                        {t('journalPage.note')}
-                      </button>
-                      <button type="button" onClick={() => { handleOpenIllustrationPicker(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
-                        <ImageIcon size={14} className="text-accent" />
-                        {t('journalPage.illustration')}
-                      </button>
-                      {!standalonePostcard && bookId && (
-                        <button type="button" onClick={() => { handleCreatePage(); setShowAddMenu(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
-                          <FileImage size={14} className="text-accent" />
-                          {t('journalPage.page')}
-                        </button>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              {activePage && (
+              <Button variant="primary" size="sm" onClick={() => navigate(`/journal/pages/${activePage.id}/edit`)}>
+                <LayoutGrid size={15} />
+                {t('journalCreate.editPage')}
+              </Button>
+              )}
             </>
           ) : (
             bookId && (
@@ -357,7 +305,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
           )}
           {standalonePostcard && activePage && (
             <>
-              <CollectMenu books={books} onCollect={(targetBookId) => collectPostcard(activePage.id, targetBookId, oshiId).then(onBack)} t={t} />
+              <CollectMenu books={availableBooks} onCollect={(targetBookId) => collectPostcard(activePage.id, targetBookId, oshiId).then(onBack)} t={t} />
               <Button variant="secondary" size="sm" onClick={handleDeleteStandalonePostcard}>
                 <Trash2 size={15} />
                 {t('journalPage.delete')}
@@ -393,7 +341,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 aria-label={t('journalPage.pageDescription')}
               />
               <div className="flex flex-wrap gap-1">
-                {PAGE_BACKGROUNDS.map((background) => (
+                {JOURNAL_BACKGROUND_PRESETS.map((background) => (
                   <button
                     key={background.id}
                     type="button"
@@ -452,24 +400,6 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 onCreate={handleCreatePage}
                 onSelect={handleOpenPage}
                 t={t}
-              />
-            )}
-          </AnimatePresence>
-          <AnimatePresence>
-            {showNotePicker && (
-              <JournalNotePicker
-                notes={unplacedNotes}
-                onPlaceNote={handlePlaceNote}
-                onClose={() => setShowNotePicker(false)}
-              />
-            )}
-          </AnimatePresence>
-          <AnimatePresence>
-            {showIllustrationPicker && (
-              <JournalIllustrationPicker
-                illustrations={unplacedIllustrations}
-                onPlaceIllustration={handlePlaceIllustration}
-                onClose={() => setShowIllustrationPicker(false)}
               />
             )}
           </AnimatePresence>
@@ -646,7 +576,8 @@ function PagePreviewCard({
   onSelect: () => void
   t: Translate
 }) {
-  const canvasSize = getJournalCanvasSize(items)
+  const canvasSize = getJournalCanvasSize(items, page.orientation || 'portrait')
+  const pageAspect = page.orientation === 'landscape' ? '1.4 / 1' : '1 / 1.4'
   return (
     <button
       type="button"
@@ -655,18 +586,18 @@ function PagePreviewCard({
         active ? 'border-accent ring-2 ring-accent-soft/30' : 'border-border-color hover:border-border-hover'
       }`}
     >
-      <div className="relative aspect-[1.4] overflow-hidden rounded-xl border border-border-color" style={getPageBackground(page.background || 'paper')}>
+      <div className="relative overflow-hidden rounded-xl border border-border-color" style={{ aspectRatio: pageAspect, ...getPageBackground(page.background || 'paper') }}>
         {items.map((item) => (
           <span
             key={item.id}
-            className="absolute overflow-hidden rounded-md border shadow-sm"
+            className={`absolute overflow-hidden rounded-md border ${item.item_type === 'tape' ? 'shadow-none' : 'shadow-sm'}`}
             style={{
               left: `${(item.x / canvasSize.width) * 100}%`,
               top: `${(item.y / canvasSize.height) * 100}%`,
               width: `${(item.width / canvasSize.width) * 100}%`,
               height: `${(item.height / canvasSize.height) * 100}%`,
               transform: `rotate(${item.rotation}deg)`,
-              backgroundColor: item.item_type === 'illustration' ? 'var(--color-bg-card)' : getPreviewStickerBackground(item.color),
+              backgroundColor: item.item_type === 'illustration' ? 'var(--color-bg-card)' : item.item_type === 'tape' ? item.color || '#d9c4ff' : getPreviewStickerBackground(item.color),
               borderColor: 'color-mix(in srgb, var(--color-accent) 24%, transparent)',
             }}
           >
@@ -674,6 +605,8 @@ function PagePreviewCard({
               <span className="flex h-full w-full items-center justify-center bg-bg-tertiary text-text-muted">
                 <ImageIcon size={compact ? 12 : 16} />
               </span>
+            ) : item.item_type === 'tape' ? (
+              <span className="block h-full w-full opacity-75 [background-image:linear-gradient(90deg,rgba(255,255,255,0.22),transparent_35%,rgba(0,0,0,0.06)),radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.55)_0_1px,transparent_1.5px)] [background-size:auto,12px_10px]" />
             ) : (
               <span className="flex h-full flex-col gap-1 p-1.5">
                 <span className="h-1.5 w-2/3 rounded-full bg-text-primary/35" />
@@ -698,12 +631,3 @@ function getPreviewStickerBackground(color: string | null): string {
   const paletteIndex = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed'].indexOf(color || '#fff1f5')
   return paletteIndex >= 0 ? `var(--journal-sticker-${paletteIndex + 1})` : color || 'var(--journal-sticker-1)'
 }
-
-const PAGE_BACKGROUNDS = [
-  { id: 'paper', labelKey: 'journalEditor.background.paper' },
-  { id: 'grid', labelKey: 'journalEditor.background.grid' },
-  { id: 'blush', labelKey: 'journalEditor.background.blush' },
-  { id: 'blue', labelKey: 'journalEditor.background.blue' },
-  { id: 'mint', labelKey: 'journalEditor.background.mint' },
-  { id: 'postcard', labelKey: 'journalEditor.background.loose' },
-] as const

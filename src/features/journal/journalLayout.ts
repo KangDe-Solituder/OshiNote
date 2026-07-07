@@ -1,11 +1,16 @@
-import type { JournalItem, JournalStickerStyle, Note } from '../../types'
+import type { JournalItem, JournalPageOrientation, JournalStickerStyle, Note } from '../../types'
 
 export const JOURNAL_PAGE = {
-  width: 980,
-  height: 700,
+  width: 700,
+  height: 980,
   padding: 36,
   maxWidth: 2200,
   maxHeight: 1600,
+}
+
+export const JOURNAL_PAGE_LANDSCAPE = {
+  width: 980,
+  height: 700,
 }
 
 export const DEFAULT_STICKER = {
@@ -45,6 +50,12 @@ export function createInitialLayout(index: number): JournalLayoutInput & {
   }
 }
 
+export function getJournalPageSize(orientation: JournalPageOrientation = 'portrait'): { width: number; height: number } {
+  return orientation === 'landscape'
+    ? { width: JOURNAL_PAGE_LANDSCAPE.width, height: JOURNAL_PAGE_LANDSCAPE.height }
+    : { width: JOURNAL_PAGE.width, height: JOURNAL_PAGE.height }
+}
+
 export function autoArrangeNotes(notes: Note[]): Map<string, JournalLayoutInput> {
   const layouts = new Map<string, JournalLayoutInput>()
   notes.forEach((note, index) => {
@@ -60,13 +71,18 @@ export function autoArrangeNotes(notes: Note[]): Map<string, JournalLayoutInput>
   return layouts
 }
 
-export function clampLayout(input: JournalLayoutInput): JournalLayoutInput {
-  const minWidth = 180
-  const minHeight = 130
-  const width = Math.min(Math.max(input.width, minWidth), JOURNAL_PAGE.maxWidth - JOURNAL_PAGE.padding * 2)
-  const height = Math.min(Math.max(input.height, minHeight), JOURNAL_PAGE.maxHeight - JOURNAL_PAGE.padding * 2)
-  const x = Math.min(Math.max(input.x, JOURNAL_PAGE.padding / 2), JOURNAL_PAGE.maxWidth - width - JOURNAL_PAGE.padding / 2)
-  const y = Math.min(Math.max(input.y, JOURNAL_PAGE.padding / 2), JOURNAL_PAGE.maxHeight - height - JOURNAL_PAGE.padding / 2)
+export function clampLayout(
+  input: JournalLayoutInput,
+  constraints: { minWidth?: number; minHeight?: number } = {},
+  orientation: JournalPageOrientation = 'portrait'
+): JournalLayoutInput {
+  const pageSize = getJournalPageSize(orientation)
+  const minWidth = constraints.minWidth ?? 180
+  const minHeight = constraints.minHeight ?? 130
+  const width = Math.min(Math.max(input.width, minWidth), Math.min(JOURNAL_PAGE.maxWidth, pageSize.width) - JOURNAL_PAGE.padding)
+  const height = Math.min(Math.max(input.height, minHeight), Math.min(JOURNAL_PAGE.maxHeight, pageSize.height) - JOURNAL_PAGE.padding)
+  const x = Math.min(Math.max(input.x, JOURNAL_PAGE.padding / 2), pageSize.width - width - JOURNAL_PAGE.padding / 2)
+  const y = Math.min(Math.max(input.y, JOURNAL_PAGE.padding / 2), pageSize.height - height - JOURNAL_PAGE.padding / 2)
 
   return {
     x,
@@ -77,13 +93,17 @@ export function clampLayout(input: JournalLayoutInput): JournalLayoutInput {
   }
 }
 
-export function getJournalCanvasSize(items: Pick<JournalItem, 'x' | 'y' | 'width' | 'height'>[]): { width: number; height: number } {
-  const contentWidth = items.reduce((max, item) => Math.max(max, item.x + item.width + JOURNAL_PAGE.padding), JOURNAL_PAGE.width)
-  const contentHeight = items.reduce((max, item) => Math.max(max, item.y + item.height + JOURNAL_PAGE.padding), JOURNAL_PAGE.height)
+export function getJournalCanvasSize(
+  items: Pick<JournalItem, 'x' | 'y' | 'width' | 'height'>[],
+  orientation: JournalPageOrientation = 'portrait'
+): { width: number; height: number } {
+  const pageSize = getJournalPageSize(orientation)
+  const contentWidth = items.reduce((max, item) => Math.max(max, item.x + item.width + JOURNAL_PAGE.padding), pageSize.width)
+  const contentHeight = items.reduce((max, item) => Math.max(max, item.y + item.height + JOURNAL_PAGE.padding), pageSize.height)
 
   return {
-    width: Math.min(Math.max(JOURNAL_PAGE.width, Math.ceil(contentWidth)), JOURNAL_PAGE.maxWidth),
-    height: Math.min(Math.max(JOURNAL_PAGE.height, Math.ceil(contentHeight)), JOURNAL_PAGE.maxHeight),
+    width: Math.min(Math.max(pageSize.width, Math.ceil(contentWidth)), JOURNAL_PAGE.maxWidth),
+    height: Math.min(Math.max(pageSize.height, Math.ceil(contentHeight)), JOURNAL_PAGE.maxHeight),
   }
 }
 

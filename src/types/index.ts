@@ -247,8 +247,12 @@ export type UiMotionDuration = 'off' | 'fast' | 'normal' | 'slow'
 export type ViewMode = 'card' | 'list' | 'graph' | 'journal'
 export type CardStyle = 'basic' | 'sticky' | 'bookshelf' | 'postcard'
 export type JournalStickerStyle = 'sticky' | 'memo' | 'ticket'
-export type JournalItemType = 'note' | 'illustration'
+export type JournalTapeStyle = 'washi' | 'grid' | 'dots' | 'stripe' | 'torn'
+export type JournalItemStyle = JournalStickerStyle | JournalTapeStyle
+export type JournalItemType = 'note' | 'illustration' | 'tape' | 'material' | 'memo'
+export type JournalMaterialKind = 'tape' | 'sticker' | 'paper' | 'label' | 'frame'
 export type JournalPageType = 'book_page' | 'postcard'
+export type JournalPageOrientation = 'portrait' | 'landscape'
 export type JournalCoverStyle = 'classic' | 'cloth' | 'paper' | 'night' | 'postcard' | 'minimal'
 export type JournalCoverDecoration = 'none' | 'flower' | 'moon' | 'heart' | 'camera' | 'ticket'
 
@@ -278,6 +282,7 @@ export interface JournalPage {
   standalone: boolean
   page_index: number
   background: string
+  orientation: JournalPageOrientation
   created_at: string
   updated_at: string
 }
@@ -294,11 +299,32 @@ export interface JournalItem {
   height: number
   rotation: number
   z_index: number
-  sticker_style: JournalStickerStyle
+  sticker_style: JournalItemStyle
   color: string | null
   border_style: string | null
+  material_id: string | null
+  material_snapshot: string
+  style_payload: string
   created_at: string
   updated_at: string
+}
+
+export type JournalDraftItemType = 'note' | 'illustration' | 'material'
+
+export interface JournalDraftItem {
+  draftId: string
+  originItemId?: string
+  itemType: JournalDraftItemType
+  sourceId?: string
+  materialId?: string
+  materialSnapshot?: string
+  stylePayload?: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  zIndex: number
 }
 
 export interface JournalItemRow extends Omit<JournalItem, 'item_type' | 'sticker_style'> {

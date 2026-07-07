@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import clsx from 'clsx'
-import { Calendar, Heart, ImageIcon } from 'lucide-react'
-import type { JournalItemWithNote } from '../../../types'
+import { Camera, Calendar, Flower2, Heart, ImageIcon, Music2, Sparkles, Star } from 'lucide-react'
+import type { JournalItemWithNote, JournalPageOrientation } from '../../../types'
 import { clampLayout, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
 import { useI18n } from '../../../i18n/useI18n'
+import { getJournalMaterialDefinition, parseMaterialStyle } from '../../../features/journal/journalMaterials'
 
 interface JournalStickerProps {
   item: JournalItemWithNote
   selected: boolean
   zoom: number
+  orientation?: JournalPageOrientation
   onSelect: (item: JournalItemWithNote) => void
   onCommitLayout: (itemId: string, layout: JournalLayoutInput) => void
 }
@@ -22,10 +24,14 @@ interface DragState {
   moved: boolean
 }
 
-export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout }: JournalStickerProps) {
+export function JournalSticker({ item, selected, zoom, orientation = 'portrait', onSelect, onCommitLayout }: JournalStickerProps) {
   const { t } = useI18n()
   const dragRef = useRef<DragState | null>(null)
   const [imageSrc, setImageSrc] = useState('')
+  const isTape = item.item_type === 'tape'
+  const isMaterial = item.item_type === 'material'
+  const material = isMaterial ? getJournalMaterialDefinition(item.material_id) : null
+  const materialKind = material?.kind
 
   useEffect(() => {
     if (item.item_type !== 'illustration') return
@@ -87,7 +93,7 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
       ...drag.startLayout,
       x: drag.startLayout.x + dx,
       y: drag.startLayout.y + dy,
-    })
+    }, getLayoutConstraints(item, materialKind), orientation)
     e.currentTarget.style.left = `${layout.x}px`
     e.currentTarget.style.top = `${layout.y}px`
   }
@@ -103,7 +109,7 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
       ...drag.startLayout,
       x: drag.startLayout.x + (e.clientX - drag.startClientX) / zoom,
       y: drag.startLayout.y + (e.clientY - drag.startClientY) / zoom,
-    })
+    }, getLayoutConstraints(item, materialKind), orientation)
     onCommitLayout(item.id, layout)
   }
 
@@ -116,12 +122,19 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
       onPointerUp={handlePointerUp}
       onPointerCancel={() => { dragRef.current = null }}
       className={clsx(
-        'absolute overflow-hidden text-left rounded-lg border shadow-md transition-shadow touch-none',
+        'absolute text-left touch-none',
         'focus:outline-none focus:ring-2 focus:ring-accent-soft',
-        selected ? 'ring-2 ring-accent shadow-xl' : 'hover:shadow-lg',
+        isTape
+          ? 'overflow-visible rounded-md border-0 shadow-none transition-[filter]'
+          : isMaterial
+            ? 'overflow-visible rounded-lg border-0 shadow-sm transition-[filter,box-shadow]'
+          : 'overflow-hidden rounded-lg border shadow-md transition-shadow',
+        selected
+          ? isTape ? 'ring-2 ring-accent/80' : 'ring-2 ring-accent shadow-xl'
+          : isTape || isMaterial ? 'hover:brightness-105' : 'hover:shadow-lg',
         item.item_type === 'illustration' && 'bg-bg-card',
-        item.sticker_style === 'memo' && 'bg-[linear-gradient(#0000_23px,rgba(120,130,180,0.18)_24px)] bg-[length:100%_24px]',
-        item.sticker_style === 'ticket' && 'border-dashed',
+        !isTape && item.sticker_style === 'memo' && 'bg-[linear-gradient(#0000_23px,rgba(120,130,180,0.18)_24px)] bg-[length:100%_24px]',
+        !isTape && item.sticker_style === 'ticket' && 'border-dashed',
       )}
       style={{
         left: item.x,
@@ -130,11 +143,15 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
         height: item.height,
         zIndex: item.z_index,
         transform: `rotate(${item.rotation}deg)`,
-        backgroundColor: item.item_type === 'illustration' ? 'var(--color-bg-card)' : getStickerBackground(item.color),
+        backgroundColor: isTape || isMaterial ? 'transparent' : item.item_type === 'illustration' ? 'var(--color-bg-card)' : getStickerBackground(item.color),
         borderColor: selected ? 'var(--color-accent)' : 'rgba(120, 100, 120, 0.22)',
       }}
     >
-      {item.item_type === 'illustration' ? (
+      {isTape ? (
+        <TapeBody item={item} />
+      ) : isMaterial ? (
+        <MaterialBody item={item} />
+      ) : item.item_type === 'illustration' ? (
         <div className="flex h-full flex-col">
           <div className="min-h-0 flex-1 bg-bg-tertiary">
             {imageSrc ? (
@@ -192,9 +209,164 @@ export function JournalSticker({ item, selected, zoom, onSelect, onCommitLayout 
   )
 }
 
+function TapeBody({ item }: { item: JournalItemWithNote }) {
+  const color = item.color || '#d9c4ff'
+  const style = item.sticker_style
+  return <TapeShape color={color} styleId={style} />
+}
+
+function MaterialBody({ item }: { item: JournalItemWithNote }) {
+  const material = getJournalMaterialDefinition(item.material_id)
+  const style = {
+    ...(material?.defaultStyle || {}),
+    ...parseMaterialStyle(item.style_payload),
+  }
+  const color = asString(style.color) || item.color || '#d9c4ff'
+  const glassStrength = asNumber(style.glassStrength)
+  const glassStyle = getMaterialGlassStyle(glassStrength, color)
+
+  if (material?.kind === 'tape') {
+    return <TapeShape color={color} styleId={asString(style.tapeStyle) || 'washi'} extraStyle={glassStyle} />
+  }
+
+  if (material?.kind === 'paper') {
+    return (
+      <span
+        className="pointer-events-none relative block h-full w-full overflow-hidden rounded-lg border border-white/55 shadow-sm"
+        style={{ backgroundColor: color, ...glassStyle }}
+      >
+        <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.35),transparent_48%,rgba(0,0,0,0.05))]" />
+        {style.line === true && (
+          <span className="absolute inset-x-3 top-7 bottom-3 bg-[linear-gradient(transparent_21px,rgba(100,110,140,0.18)_22px)] bg-[length:100%_22px]" />
+        )}
+      </span>
+    )
+  }
+
+  if (material?.kind === 'label') {
+    return (
+      <span
+        className={clsx(
+          'pointer-events-none relative flex h-full w-full items-center justify-center overflow-hidden border border-black/10 px-3 shadow-sm',
+          style.shape === 'ticket' ? 'rounded-md border-dashed' : 'rounded-full'
+        )}
+        style={{ backgroundColor: color, ...glassStyle }}
+      >
+        <span className="h-2 w-2 rounded-full bg-white/70 shadow-inner" />
+        <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.26),transparent_50%,rgba(0,0,0,0.05))]" />
+      </span>
+    )
+  }
+
+  return (
+    <span
+        className={clsx(
+          'pointer-events-none flex h-full w-full items-center justify-center rounded-full',
+          glassStrength > 0 ? 'border border-white/60 shadow-sm' : 'border border-transparent bg-transparent shadow-none'
+        )}
+        style={{ color, ...glassStyle }}
+    >
+      <MaterialIcon icon={asString(style.icon)} />
+    </span>
+  )
+}
+
+function MaterialIcon({ icon }: { icon: string }) {
+  const size = 42
+  if (icon === 'heart') return <Heart size={size} fill="currentColor" />
+  if (icon === 'star') return <Star size={size} fill="currentColor" />
+  if (icon === 'flower') return <Flower2 size={size} />
+  if (icon === 'music') return <Music2 size={size} />
+  if (icon === 'camera') return <Camera size={size} />
+  return <Sparkles size={size} />
+}
+
+function TapeShape({ color, styleId, extraStyle }: { color: string; styleId: string; extraStyle?: CSSProperties }) {
+  const style = isTapeStyleId(styleId) ? styleId : 'washi'
+  const tapeStyle: CSSProperties = {
+    backgroundColor: color,
+    ...getTapePattern(style, color),
+    ...extraStyle,
+    clipPath: style === 'torn'
+      ? 'polygon(0 9%, 4% 0, 9% 8%, 14% 0, 20% 10%, 27% 0, 34% 8%, 42% 0, 51% 9%, 60% 0, 69% 8%, 78% 0, 87% 9%, 94% 0, 100% 8%, 98% 91%, 94% 100%, 87% 92%, 78% 100%, 70% 91%, 60% 100%, 52% 92%, 43% 100%, 35% 91%, 27% 100%, 19% 92%, 11% 100%, 4% 91%, 0 100%)'
+      : undefined,
+  }
+
+  return (
+    <span
+      className={clsx(
+        'pointer-events-none relative block h-full w-full overflow-hidden border border-white/25',
+        style === 'torn' ? 'rounded-[5px]' : 'rounded-md'
+      )}
+      style={tapeStyle}
+    >
+      <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.18),rgba(255,255,255,0.03)_28%,rgba(0,0,0,0.05)_70%,rgba(255,255,255,0.12))]" />
+      <span className="absolute inset-0 opacity-35 mix-blend-soft-light bg-[radial-gradient(circle_at_18%_35%,rgba(255,255,255,0.9)_0_1px,transparent_1.5px),radial-gradient(circle_at_72%_64%,rgba(0,0,0,0.45)_0_1px,transparent_1.5px)] bg-[length:18px_14px,22px_16px]" />
+      <span className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-white/20" />
+    </span>
+  )
+}
+
+function getTapePattern(style: JournalItemWithNote['sticker_style'], color: string): CSSProperties {
+  switch (style) {
+    case 'grid':
+      return {
+        backgroundImage: `linear-gradient(rgba(255,255,255,0.28) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.28) 1px, transparent 1px), linear-gradient(${color}, ${color})`,
+        backgroundSize: '20px 20px, 20px 20px, auto',
+      }
+    case 'dots':
+      return {
+        backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.5) 0 2px, transparent 2.5px), linear-gradient(${color}, ${color})`,
+        backgroundSize: '18px 18px, auto',
+      }
+    case 'stripe':
+      return {
+        backgroundImage: `repeating-linear-gradient(135deg, rgba(255,255,255,0.32) 0 8px, transparent 8px 18px), linear-gradient(${color}, ${color})`,
+      }
+    case 'torn':
+      return {
+        backgroundImage: `linear-gradient(90deg, rgba(255,255,255,0.24), transparent 24%, rgba(0,0,0,0.06) 70%, rgba(255,255,255,0.16)), linear-gradient(${color}, ${color})`,
+      }
+    default:
+      return {
+        backgroundImage: `linear-gradient(90deg, rgba(255,255,255,0.2), transparent 34%, rgba(0,0,0,0.05) 74%, rgba(255,255,255,0.12)), linear-gradient(${color}, ${color})`,
+      }
+  }
+}
+
 function getStickerBackground(color: string | null): string {
   const paletteIndex = STICKER_PALETTE.indexOf(color || '#fff1f5')
   return paletteIndex >= 0 ? `var(--journal-sticker-${paletteIndex + 1})` : color || 'var(--journal-sticker-1)'
 }
 
 const STICKER_PALETTE = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed']
+const TAPE_LAYOUT_CONSTRAINTS = { minWidth: 90, minHeight: 18 }
+const STICKER_LAYOUT_CONSTRAINTS = { minWidth: 42, minHeight: 42 }
+
+function getLayoutConstraints(item: JournalItemWithNote, materialKind?: string) {
+  if (item.item_type === 'tape' || materialKind === 'tape') return TAPE_LAYOUT_CONSTRAINTS
+  if (materialKind === 'sticker') return STICKER_LAYOUT_CONSTRAINTS
+  return undefined
+}
+
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function asNumber(value: unknown): number {
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(number) ? Math.min(100, Math.max(0, number)) : 0
+}
+
+function getMaterialGlassStyle(strength: number, color: string): CSSProperties | undefined {
+  if (strength <= 0) return undefined
+  const alpha = Math.min(0.42, strength / 240)
+  return {
+    backgroundColor: `color-mix(in srgb, ${color} ${Math.max(34, 100 - strength)}%, rgba(255,255,255,${alpha}))`,
+    backdropFilter: `blur(${Math.round(strength / 14)}px) saturate(${100 + Math.round(strength * 0.45)}%)`,
+  }
+}
+
+function isTapeStyleId(value: string): value is JournalItemWithNote['sticker_style'] {
+  return value === 'washi' || value === 'grid' || value === 'dots' || value === 'stripe' || value === 'torn'
+}
