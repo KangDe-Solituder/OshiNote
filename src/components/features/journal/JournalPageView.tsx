@@ -12,6 +12,7 @@ import { fetchJournalBooks, fetchJournalItems } from '../../../features/journal/
 import { JournalCanvas } from './JournalCanvas'
 import { getPageBackground } from './journalCanvasStyle'
 import { JournalStickerPopover } from './JournalStickerPopover'
+import type { JournalPopoverAnchor } from './JournalCanvas'
 import { usePageTransition, usePanelTransition, usePopoverTransition } from '../themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
 import { fetchStampForTarget } from '../../../features/stamps/stampService'
@@ -35,6 +36,8 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   const panelTransition = usePanelTransition()
   const popoverTransition = usePopoverTransition()
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [popoverItemId, setPopoverItemId] = useState<string | null>(null)
+  const [popoverAnchor, setPopoverAnchor] = useState<JournalPopoverAnchor | null>(null)
   const [viewingPageId, setViewingPageId] = useState<string | null>(standalonePostcard?.id || null)
   const [previewItemsByPageId, setPreviewItemsByPageId] = useState<Record<string, JournalItemWithNote[]>>({})
   const [stampsByPageId, setStampsByPageId] = useState<Record<string, Stamp | null>>({})
@@ -84,6 +87,8 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   useEffect(() => {
     setViewingPageId(standalonePostcard?.id || null)
     setSelectedItemId(null)
+    setPopoverItemId(null)
+    setPopoverAnchor(null)
     setShowPageSidebar(false)
   }, [bookId, standalonePostcard?.id])
 
@@ -173,6 +178,8 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   async function handleRemove(itemId: string) {
     await removeItem(itemId)
     if (selectedItemId === itemId) setSelectedItemId(null)
+    if (popoverItemId === itemId) setPopoverItemId(null)
+    if (popoverItemId === itemId) setPopoverAnchor(null)
   }
 
   async function handleDeletePage() {
@@ -215,6 +222,8 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   function handleBack() {
     if (bookId && showPageCanvas && !standalonePostcard) {
       setSelectedItemId(null)
+      setPopoverItemId(null)
+      setPopoverAnchor(null)
       setShowPageEditor(false)
       setShowPageActions(false)
       setViewingPageId(null)
@@ -251,7 +260,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                 {t('journalPage.pageSetup')}
               </Button>
               {activePage && (
-              <Button variant="primary" size="sm" onClick={() => navigate(`/journal/pages/${activePage.id}/edit`)}>
+              <Button variant="primary" size="sm" onClick={() => navigate(`/journal/pages/${activePage.id}/edit?compose=1`)}>
                 <LayoutGrid size={15} />
                 {t('journalCreate.editPage')}
               </Button>
@@ -385,7 +394,18 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                   zoom={zoom}
                   stamp={activePage ? stampsByPageId[activePage.id] : null}
                   onZoomChange={setZoom}
-                  onSelectItem={(item) => setSelectedItemId(item?.id || null)}
+                  onSelectItem={(item) => {
+                    setSelectedItemId(item?.id || null)
+                    if (!item) {
+                      setPopoverItemId(null)
+                      setPopoverAnchor(null)
+                    }
+                  }}
+                  onOpenItemPopover={(item, anchor) => {
+                    setSelectedItemId(item.id)
+                    setPopoverItemId(item.id)
+                    setPopoverAnchor(anchor)
+                  }}
                   onCommitLayout={handleCommitLayout}
                 />
               </motion.div>
@@ -404,18 +424,22 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
             )}
           </AnimatePresence>
           <AnimatePresence>
-            {selectedItem && (
+            {selectedItem && popoverItemId === selectedItem.id && (
               <JournalStickerPopover
                 key={selectedItem.id}
                 oshiId={oshiId}
                 selectedItem={selectedItem}
+                anchor={popoverAnchor}
                 items={items}
                 onUpdateLayout={handleInspectorLayout}
                 onUpdateStyle={updateItemStyle}
                 onRemove={handleRemove}
                 onToggleFavorite={handleToggleFavorite}
                 onUpdateNote={handleUpdateNote}
-                onClose={() => setSelectedItemId(null)}
+                onClose={() => {
+                  setPopoverItemId(null)
+                  setPopoverAnchor(null)
+                }}
               />
             )}
           </AnimatePresence>

@@ -8,6 +8,11 @@ import { StampOverlay } from '../stamps/StampOverlay'
 import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
 import type { Stamp, StampInput } from '../../../types'
 
+export interface JournalPopoverAnchor {
+  clientX: number
+  clientY: number
+}
+
 interface JournalCanvasProps {
   page: JournalPage | null
   items: JournalItemWithNote[]
@@ -20,6 +25,7 @@ interface JournalCanvasProps {
   stampSoundEnabled?: boolean
   onZoomChange: (zoom: number) => void
   onSelectItem: (item: JournalItemWithNote | null) => void
+  onOpenItemPopover?: (item: JournalItemWithNote, anchor: JournalPopoverAnchor) => void
   onCommitLayout: (itemId: string, layout: JournalLayoutInput) => void
   onStampPlace?: (stamp: StampInput) => void
   onStampPlacementComplete?: () => void
@@ -38,6 +44,7 @@ export function JournalCanvas({
   stampSoundEnabled = false,
   onZoomChange,
   onSelectItem,
+  onOpenItemPopover,
   onCommitLayout,
   onStampPlace,
   onStampPlacementComplete,
@@ -104,6 +111,7 @@ export function JournalCanvas({
               zoom={zoom}
               orientation={orientation}
               onSelect={onSelectItem}
+              onOpenPopover={onOpenItemPopover}
               onCommitLayout={onCommitLayout}
             />
           ))}

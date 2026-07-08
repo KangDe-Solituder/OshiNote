@@ -6,6 +6,7 @@ import { clampLayout, type JournalLayoutInput } from '../../../features/journal/
 import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
 import { useI18n } from '../../../i18n/useI18n'
 import { getJournalMaterialDefinition, parseMaterialStyle } from '../../../features/journal/journalMaterials'
+import type { JournalPopoverAnchor } from './JournalCanvas'
 
 interface JournalStickerProps {
   item: JournalItemWithNote
@@ -13,6 +14,7 @@ interface JournalStickerProps {
   zoom: number
   orientation?: JournalPageOrientation
   onSelect: (item: JournalItemWithNote) => void
+  onOpenPopover?: (item: JournalItemWithNote, anchor: JournalPopoverAnchor) => void
   onCommitLayout: (itemId: string, layout: JournalLayoutInput) => void
 }
 
@@ -24,7 +26,32 @@ interface DragState {
   moved: boolean
 }
 
-export function JournalSticker({ item, selected, zoom, orientation = 'portrait', onSelect, onCommitLayout }: JournalStickerProps) {
+type NoteCardStyle = {
+  titleVisible: boolean
+  titleText: string
+  bodyText: string
+  fontFamily: string
+  fontSize: number
+  fontWeight: number
+  lineHeight: number
+  textColor: string
+  backgroundColor: string
+  padding: number
+  radius: number
+  showTags: boolean
+}
+
+type ImageItemStyle = {
+  fit: 'contain' | 'cover'
+  frame: 'none' | 'simple' | 'paper' | 'polaroid'
+  borderWidth: number
+  borderColor: string
+  radius: number
+  shadow: number
+  backgroundColor: string
+}
+
+export function JournalSticker({ item, selected, zoom, orientation = 'portrait', onSelect, onOpenPopover, onCommitLayout }: JournalStickerProps) {
   const { t } = useI18n()
   const dragRef = useRef<DragState | null>(null)
   const [imageSrc, setImageSrc] = useState('')
@@ -32,6 +59,8 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
   const isMaterial = item.item_type === 'material'
   const material = isMaterial ? getJournalMaterialDefinition(item.material_id) : null
   const materialKind = material?.kind
+  const noteCard = item.item_type === 'note' ? getNoteCardStyle(item, t('common.untitled'), t('common.noContent')) : null
+  const imageStyle = item.item_type === 'illustration' ? getImageItemStyle(item) : null
 
   useEffect(() => {
     if (item.item_type !== 'illustration') return
@@ -116,7 +145,13 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
   return (
     <button
       type="button"
+      data-journal-item-id={item.id}
       onClick={() => onSelect(item)}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        onSelect(item)
+        onOpenPopover?.(item, { clientX: event.clientX, clientY: event.clientY })
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -132,7 +167,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
         selected
           ? isTape ? 'ring-2 ring-accent/80' : 'ring-2 ring-accent shadow-xl'
           : isTape || isMaterial ? 'hover:brightness-105' : 'hover:shadow-lg',
-        item.item_type === 'illustration' && 'bg-bg-card',
+        item.item_type === 'illustration' && !imageStyle && 'bg-bg-card',
         !isTape && item.sticker_style === 'memo' && 'bg-[linear-gradient(#0000_23px,rgba(120,130,180,0.18)_24px)] bg-[length:100%_24px]',
         !isTape && item.sticker_style === 'ticket' && 'border-dashed',
       )}
@@ -143,7 +178,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
         height: item.height,
         zIndex: item.z_index,
         transform: `rotate(${item.rotation}deg)`,
-        backgroundColor: isTape || isMaterial ? 'transparent' : item.item_type === 'illustration' ? 'var(--color-bg-card)' : getStickerBackground(item.color),
+        backgroundColor: isTape || isMaterial || imageStyle ? 'transparent' : item.item_type === 'illustration' ? 'var(--color-bg-card)' : getStickerBackground(item.color),
         borderColor: selected ? 'var(--color-accent)' : 'rgba(120, 100, 120, 0.22)',
       }}
     >
@@ -151,7 +186,25 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
         <TapeBody item={item} />
       ) : isMaterial ? (
         <MaterialBody item={item} />
-      ) : item.item_type === 'illustration' ? (
+      ) : item.item_type === 'illustration' ? imageStyle ? (
+        <div className="h-full w-full overflow-hidden" style={getImageFrameStyle(imageStyle)}>
+          <div
+            className="h-full w-full overflow-hidden"
+            style={{
+              padding: `${getImagePadding(imageStyle)}px ${getImagePadding(imageStyle)}px ${getImageBottomPadding(imageStyle)}px`,
+              borderRadius: imageStyle.radius,
+            }}
+          >
+            {imageSrc ? (
+              <img src={imageSrc} alt={item.illustration?.title || ''} className="h-full w-full" style={{ objectFit: imageStyle.fit }} draggable={false} />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-text-muted">
+                <ImageIcon size={28} />
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
         <div className="flex h-full flex-col">
           <div className="min-h-0 flex-1 bg-bg-tertiary">
             {imageSrc ? (
@@ -175,6 +228,34 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
               {item.illustration?.artist ? t('common.byArtist', { artist: item.illustration.artist }) : t('common.unknownArtist')}
             </p>
           </div>
+        </div>
+      ) : noteCard ? (
+        <div
+          className="flex h-full w-full flex-col overflow-hidden border border-black/10 shadow-sm"
+          style={{
+            backgroundColor: noteCard.backgroundColor,
+            color: noteCard.textColor,
+            padding: noteCard.padding,
+            borderRadius: noteCard.radius,
+            fontFamily: getFontFamily(noteCard.fontFamily),
+            fontSize: noteCard.fontSize,
+            fontWeight: noteCard.fontWeight,
+            lineHeight: noteCard.lineHeight,
+          }}
+        >
+          {noteCard.titleVisible && (
+            <h4 className="mb-2 shrink-0 whitespace-pre-wrap break-words text-[1.08em] font-semibold leading-snug">
+              {noteCard.titleText}
+            </h4>
+          )}
+          <p className="min-h-0 flex-1 whitespace-pre-wrap break-words">
+            {noteCard.bodyText}
+          </p>
+          {noteCard.showTags && item.note && item.note.tags.length > 0 && (
+            <div className="mt-2 flex shrink-0 flex-wrap gap-1 overflow-hidden text-[0.78em]">
+              {item.note.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-full bg-white/55 px-2 py-0.5 text-text-muted">{tag}</span>)}
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex h-full flex-col p-4">
@@ -339,6 +420,72 @@ function getStickerBackground(color: string | null): string {
   return paletteIndex >= 0 ? `var(--journal-sticker-${paletteIndex + 1})` : color || 'var(--journal-sticker-1)'
 }
 
+function getNoteCardStyle(item: JournalItemWithNote, untitled: string, empty: string): NoteCardStyle | null {
+  const payload = parseMaterialStyle(item.style_payload)
+  if (!isRecord(payload.noteCard)) return null
+  const raw = payload.noteCard
+  return {
+    titleVisible: raw.titleVisible !== false,
+    titleText: asString(raw.titleText) || item.note?.title || untitled,
+    bodyText: (asString(raw.bodyText) || item.note?.plain_text || empty).slice(0, 200),
+    fontFamily: asString(raw.fontFamily) || 'system',
+    fontSize: asNumberWithDefault(raw.fontSize, 14),
+    fontWeight: asNumberWithDefault(raw.fontWeight, 500),
+    lineHeight: asNumberWithDefault(raw.lineHeight, 1.45),
+    textColor: asString(raw.textColor) || '#1f2f4d',
+    backgroundColor: asString(raw.backgroundColor) || '#fff7d6',
+    padding: asNumberWithDefault(raw.padding, 16),
+    radius: asNumberWithDefault(raw.radius, 16),
+    showTags: raw.showTags !== false,
+  }
+}
+
+function getImageItemStyle(item: JournalItemWithNote): ImageItemStyle | null {
+  const payload = parseMaterialStyle(item.style_payload)
+  if (!isRecord(payload.imageStyle)) return null
+  const raw = payload.imageStyle
+  const fit = raw.fit === 'cover' ? 'cover' : 'contain'
+  const frame = raw.frame === 'simple' || raw.frame === 'paper' || raw.frame === 'polaroid' ? raw.frame : 'none'
+  return {
+    fit,
+    frame,
+    borderWidth: asNumberWithDefault(raw.borderWidth, frame === 'none' ? 0 : 2),
+    borderColor: asString(raw.borderColor) || '#ffffff',
+    radius: asNumberWithDefault(raw.radius, 12),
+    shadow: asNumberWithDefault(raw.shadow, frame === 'none' ? 0 : 16),
+    backgroundColor: asString(raw.backgroundColor) || (frame === 'none' ? 'transparent' : '#ffffff'),
+  }
+}
+
+function getImageFrameStyle(style: ImageItemStyle): CSSProperties {
+  return {
+    borderRadius: style.radius,
+    border: style.borderWidth > 0 ? `${style.borderWidth}px solid ${style.borderColor}` : '0 solid transparent',
+    backgroundColor: style.backgroundColor,
+    boxShadow: style.shadow > 0 ? `0 ${Math.round(style.shadow / 2)}px ${style.shadow}px rgba(31,47,77,0.22)` : 'none',
+  }
+}
+
+function getImagePadding(style: ImageItemStyle) {
+  return style.frame === 'paper' ? 8 : style.frame === 'polaroid' ? 10 : 0
+}
+
+function getImageBottomPadding(style: ImageItemStyle) {
+  return style.frame === 'polaroid' ? 30 : getImagePadding(style)
+}
+
+function getFontFamily(value: string) {
+  if (value === 'serif') return 'Georgia, "Times New Roman", serif'
+  if (value === 'sans') return 'Arial, "Helvetica Neue", sans-serif'
+  if (value === 'mono') return '"SFMono-Regular", Consolas, "Liberation Mono", monospace'
+  if (value === 'casual') return '"Comic Sans MS", "Segoe Print", cursive'
+  return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
 const STICKER_PALETTE = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed']
 const TAPE_LAYOUT_CONSTRAINTS = { minWidth: 90, minHeight: 18 }
 const STICKER_LAYOUT_CONSTRAINTS = { minWidth: 42, minHeight: 42 }
@@ -356,6 +503,11 @@ function asString(value: unknown): string {
 function asNumber(value: unknown): number {
   const number = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(number) ? Math.min(100, Math.max(0, number)) : 0
+}
+
+function asNumberWithDefault(value: unknown, fallback: number): number {
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(number) ? number : fallback
 }
 
 function getMaterialGlassStyle(strength: number, color: string): CSSProperties | undefined {

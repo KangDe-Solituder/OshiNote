@@ -307,6 +307,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       }
     }
     if (payload.kind === 'illustration') {
+      const imageSize = getDefaultIllustrationItemSize(illustrationsById.get(payload.id))
       return {
         itemType: 'illustration',
         sourceId: payload.id,
@@ -321,8 +322,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
             backgroundColor: 'transparent',
           },
         }),
-        width: 300,
-        height: 230,
+        width: imageSize.width,
+        height: imageSize.height,
         rotation: 2,
       }
     }
@@ -1373,6 +1374,20 @@ function readStoredDrawerDock(): DrawerDock {
 
 function createDraftId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function getDefaultIllustrationItemSize(illustration: Illustration | undefined) {
+  const rawWidth = illustration?.width || 0
+  const rawHeight = illustration?.height || 0
+  if (rawWidth > 0 && rawHeight > 0) {
+    const maxSide = 320
+    const scale = Math.min(maxSide / rawWidth, maxSide / rawHeight, 1)
+    return {
+      width: Math.max(120, Math.round(rawWidth * scale)),
+      height: Math.max(120, Math.round(rawHeight * scale)),
+    }
+  }
+  return { width: 260, height: 320 }
 }
 
 function stampToInput(stamp: Stamp | StampInput): StampInput {

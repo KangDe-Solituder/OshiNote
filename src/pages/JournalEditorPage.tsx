@@ -2,67 +2,47 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
   LayoutGrid,
   Loader2,
-  Palette,
   RotateCcw,
-  Save,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 import { useJournalStore } from '../stores/journalStore'
 import { useNoteStore } from '../stores/noteStore'
-import type { JournalDraftItem, JournalItemWithNote, JournalPage, Oshi, Stamp, StampInput } from '../types'
+import type { JournalDraftItem, JournalItemWithNote, JournalPage, Stamp, StampInput } from '../types'
 import { autoArrangeNotes, clampLayout, type JournalLayoutInput } from '../features/journal/journalLayout'
 import {
   createJournalItemForIllustration,
   createJournalItemForMaterial,
   createJournalItemForNote,
-  createStandalonePostcard,
   fetchJournalPageById,
   removeJournalItem,
   updateJournalItemStyle,
   updateJournalPage,
 } from '../features/journal/journalService'
-import { fetchAllOshis } from '../features/oshis/oshiService'
 import { JournalCanvas } from '../components/features/journal/JournalCanvas'
+import type { JournalPopoverAnchor } from '../components/features/journal/JournalCanvas'
 import { JournalCreationFlow } from '../components/features/journal/JournalCreationFlow'
-import { JournalInspector } from '../components/features/journal/JournalInspector'
-import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
-import { SelectMenu } from '../components/ui/SelectMenu'
+import { JournalStickerPopover } from '../components/features/journal/JournalStickerPopover'
 import { useI18n } from '../i18n/useI18n'
-import { StampControl } from '../components/features/stamps/StampControl'
 import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
 import { useStampSettingsStore } from '../stores/stampSettingsStore'
-import { JOURNAL_BACKGROUND_PRESETS } from '../features/journal/journalBackgrounds'
-
-interface PageDraft {
-  title: string
-  description: string
-  date_label: string
-  background: string
-}
 
 export function JournalEditorPage() {
   const { t } = useI18n()
   const { oshiId = '', pageId = '' } = useParams<{ oshiId: string; pageId: string }>()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const motionSeconds = useUiMotionSeconds()
   const isDraftPage = !pageId
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [popoverItemId, setPopoverItemId] = useState<string | null>(null)
+  const [popoverAnchor, setPopoverAnchor] = useState<JournalPopoverAnchor | null>(null)
   const [zoom, setZoom] = useState(1)
-  const [detailsOpen, setDetailsOpen] = useState(false)
   const [compositionOpen, setCompositionOpen] = useState(false)
   const [compositionInitialStep, setCompositionInitialStep] = useState<'setup' | 'draft'>('draft')
-  const [pageDraft, setPageDraft] = useState<PageDraft>(createDefaultPageDraft())
   const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
   const [stampPlacementDraft, setStampPlacementDraft] = useState<StampInput | null>(null)
-  const [oshis, setOshis] = useState<Oshi[]>([])
-  const [selectedOshiId, setSelectedOshiId] = useState(oshiId)
-  const [savingPage, setSavingPage] = useState(false)
   const {
     pages,
     activePageId,
@@ -71,7 +51,6 @@ export function JournalEditorPage() {
     error,
     openPageForEditing,
     closeBook,
-    updatePage,
     updateItemLayout,
     updateItemStyle,
     removeItem,
@@ -81,15 +60,6 @@ export function JournalEditorPage() {
   const toggleFavorite = useNoteStore((state) => state.toggleFavorite)
   const updateNote = useNoteStore((state) => state.updateNote)
   const backTo = '/journal'
-
-  useEffect(() => {
-    fetchAllOshis()
-      .then((rows) => {
-        setOshis(rows)
-        if (!selectedOshiId && rows[0]) setSelectedOshiId(rows[0].id)
-      })
-      .catch(() => setOshis([]))
-  }, [selectedOshiId])
 
   useEffect(() => {
     let cancelled = false
@@ -108,24 +78,14 @@ export function JournalEditorPage() {
     }
     closeBook()
     setSelectedItemId(null)
-    setPageDraft(createDefaultPageDraft())
+    setPopoverItemId(null)
+    setPopoverAnchor(null)
     setStampDraft(null)
     setStampPlacementDraft(null)
     return () => {
       cancelled = true
     }
   }, [closeBook, openPageForEditing, oshiId, pageId])
-
-  useEffect(() => {
-    if (pageId) {
-      return
-    }
-    setSelectedOshiId(oshiId)
-  }, [oshiId, pageId])
-
-  useEffect(() => {
-    if (!detailsOpen) setStampPlacementDraft(null)
-  }, [detailsOpen])
 
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) || null,
@@ -140,22 +100,19 @@ export function JournalEditorPage() {
 
   useEffect(() => {
     if (!activePage) return
-    setSelectedOshiId(activePage.oshi_id)
-    setPageDraft({
-      title: activePage.title || '',
-      description: activePage.description || '',
-      date_label: activePage.date_label || '',
-      background: activePage.background || 'paper',
-    })
+    setStampPlacementDraft(null)
   }, [activePage])
 
   useEffect(() => {
-    if (!activePage || searchParams.get('setup') !== '1') return
-    setDetailsOpen(false)
+    if (!activePage) return
+    if (searchParams.get('view') === '1' || compositionOpen) return
+    const requestedStep = searchParams.get('setup') === '1' ? 'setup' : 'draft'
     setSelectedItemId(null)
-    setCompositionInitialStep('setup')
+    setPopoverItemId(null)
+    setPopoverAnchor(null)
+    setCompositionInitialStep(requestedStep)
     setCompositionOpen(true)
-  }, [activePage, searchParams])
+  }, [activePage, compositionOpen, searchParams])
 
   useEffect(() => {
     let alive = true
@@ -213,11 +170,11 @@ export function JournalEditorPage() {
   async function handleOpenCompositionEditor(initialStep: 'setup' | 'draft' = 'draft') {
     const preparedPage = await ensurePageForAdding()
     if (!preparedPage) {
-      setDetailsOpen(true)
       return
     }
-    setDetailsOpen(false)
     setSelectedItemId(null)
+    setPopoverItemId(null)
+    setPopoverAnchor(null)
     setCompositionInitialStep(initialStep)
     setCompositionOpen(true)
   }
@@ -270,9 +227,7 @@ export function JournalEditorPage() {
     setStampDraft(await persistStampForTarget('journal_page', activePage.id, draft.stamp))
     await openPageForEditing(activePage.id, activePage.oshi_id)
     setCompositionOpen(false)
-    if (searchParams.get('setup') === '1') {
-      navigate(`/journal/pages/${activePage.id}/edit`, { replace: true })
-    }
+    navigate(`/journal/pages/${activePage.id}/edit?view=1`, { replace: true })
   }
 
   async function handleToggleFavorite(noteId: string) {
@@ -288,73 +243,21 @@ export function JournalEditorPage() {
   async function handleRemove(itemId: string) {
     await removeItem(itemId)
     if (selectedItemId === itemId) setSelectedItemId(null)
-  }
-
-  async function handleSavePage() {
-    const title = pageDraft.title.trim() || t('journalEditor.defaultPageTitle')
-    const input = {
-      title,
-      description: pageDraft.description.trim(),
-      date_label: pageDraft.date_label.trim(),
-      background: pageDraft.background,
-    }
-
-    setSavingPage(true)
-    try {
-      if (!activePage) {
-        if (!selectedOshiId) return
-        const page = await createStandalonePostcard(selectedOshiId, title)
-        await updateJournalPage(page.id, input)
-        setStampDraft(await persistStampForTarget('journal_page', page.id, stampDraft))
-        navigate(`/journal/pages/${page.id}/edit`, { replace: true })
-        return
-      }
-      await updatePage(activePage.id, {
-        title: input.title || t('journalEditor.defaultPageTitle'),
-        description: input.description,
-        date_label: input.date_label,
-        background: input.background,
-      })
-      setStampDraft(await persistStampForTarget('journal_page', activePage.id, stampDraft))
-    } finally {
-      setSavingPage(false)
-    }
+    if (popoverItemId === itemId) setPopoverItemId(null)
+    if (popoverItemId === itemId) setPopoverAnchor(null)
   }
 
   async function handleClearPage() {
     setSelectedItemId(null)
-    if (isDraftPage) {
-      setPageDraft(createDefaultPageDraft())
-      return
-    }
     if (canvasItems.length === 0) return
     if (!confirm(t('journalEditor.clearConfirm'))) return
     await Promise.all(canvasItems.map((item) => removeItem(item.id)))
   }
 
   async function ensurePageForAdding(): Promise<{ pageId: string; oshiId: string } | null> {
-    const targetOshiId = activePage?.oshi_id || selectedOshiId || oshiId
-    if (!targetOshiId) return null
-    if (activePage) return { pageId: activePage.id, oshiId: targetOshiId }
-
-    const title = pageDraft.title.trim() || t('journalEditor.defaultPageTitle')
-    const input = {
-      title,
-      description: pageDraft.description.trim(),
-      date_label: pageDraft.date_label.trim(),
-      background: pageDraft.background,
-    }
-
-    setSavingPage(true)
-    try {
-      const page = await createStandalonePostcard(targetOshiId, title)
-      await updateJournalPage(page.id, input)
-      await openPageForEditing(page.id, targetOshiId)
-      navigate(`/journal/pages/${page.id}/edit`, { replace: true })
-      return { pageId: page.id, oshiId: targetOshiId }
-    } finally {
-      setSavingPage(false)
-    }
+    const targetOshiId = activePage?.oshi_id || oshiId
+    if (!activePage || !targetOshiId) return null
+    return { pageId: activePage.id, oshiId: targetOshiId }
   }
 
   if (isDraftPage) {
@@ -370,9 +273,7 @@ export function JournalEditorPage() {
         onSaveDraft={handleSaveCompositionDraft}
         onCancelEdit={() => {
           setCompositionOpen(false)
-          if (searchParams.get('setup') === '1') {
-            navigate(`/journal/pages/${activePage.id}/edit`, { replace: true })
-          }
+          navigate(`/journal/pages/${activePage.id}/edit?view=1`, { replace: true })
         }}
       />
     )
@@ -413,15 +314,6 @@ export function JournalEditorPage() {
           <LayoutGrid size={15} />
           {t('journalCreate.editPage')}
         </Button>
-
-        <button
-          type="button"
-          onClick={() => setDetailsOpen((open) => !open)}
-          className="rounded-xl p-2.5 text-text-muted transition-colors hover:bg-bg-secondary hover:text-accent"
-          title={detailsOpen ? t('journalEditor.hideDetails') : t('journalEditor.showDetails')}
-        >
-          {detailsOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-        </button>
       </header>
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -439,7 +331,15 @@ export function JournalEditorPage() {
             onZoomChange={setZoom}
             onSelectItem={(item) => {
               setSelectedItemId(item?.id || null)
-              if (item) setDetailsOpen(true)
+              if (!item) {
+                setPopoverItemId(null)
+                setPopoverAnchor(null)
+              }
+            }}
+            onOpenItemPopover={(item, anchor) => {
+              setSelectedItemId(item.id)
+              setPopoverItemId(item.id)
+              setPopoverAnchor(anchor)
             }}
             onCommitLayout={handleCommitLayout}
             onStampPlace={handleStampPlace}
@@ -447,62 +347,23 @@ export function JournalEditorPage() {
             onStampPlacementCancel={() => setStampPlacementDraft(null)}
           />
         </main>
-
-        <aside
-          className="relative min-h-0 shrink-0 border-l border-border-color bg-bg-secondary/20 transition-[width] ease-out"
-          style={{
-            width: detailsOpen ? 380 : 0,
-            transitionDuration: `${motionSeconds}s`,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setDetailsOpen((open) => !open)}
-            className="absolute left-0 top-7 z-[80] flex h-11 w-8 -translate-x-full items-center justify-center rounded-l-2xl border border-r-0 border-border-color bg-bg-primary text-text-muted shadow-sm transition-colors hover:text-accent"
-            title={detailsOpen ? t('journalEditor.hideDetails') : t('journalEditor.showDetails')}
-            aria-label={detailsOpen ? t('journalEditor.hideDetails') : t('journalEditor.showDetails')}
-          >
-            {detailsOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
-
-          <div className="h-full w-[380px] overflow-y-auto p-5">
-            <div className="space-y-4">
-              <PageSetupPanel
-                draft={pageDraft}
-                oshis={oshis}
-                selectedOshiId={selectedOshiId}
-                onOshiChange={setSelectedOshiId}
-                onChange={setPageDraft}
-                onSave={handleSavePage}
-                disabled={savingPage || (!activePage && !selectedOshiId)}
-                saving={savingPage}
-                oshiLocked={!isDraftPage}
-                stampDraft={stampDraft}
-                onStampClear={() => {
-                  setStampDraft(null)
-                  setStampPlacementDraft(null)
-                }}
-                stampPlacing={Boolean(stampPlacementDraft)}
-                onStartStampPlacement={setStampPlacementDraft}
-                onCancelStampPlacement={() => setStampPlacementDraft(null)}
-              />
-              <section className="overflow-hidden rounded-2xl border border-border-color bg-bg-primary/75 shadow-sm shadow-black/5">
-                <JournalInspector
-                  oshiId={oshiId}
-                  selectedItem={selectedItem}
-                  items={canvasItems}
-                  orientation={activePage?.orientation || 'portrait'}
-                  onUpdateLayout={handleInspectorLayout}
-                  onUpdateStyle={updateItemStyle}
-                  onRemove={handleRemove}
-                  onToggleFavorite={handleToggleFavorite}
-                  onUpdateNote={handleUpdateNote}
-                />
-              </section>
-            </div>
-          </div>
-        </aside>
-
+        {selectedItem && popoverItemId === selectedItem.id && (
+          <JournalStickerPopover
+            oshiId={oshiId}
+            selectedItem={selectedItem}
+            anchor={popoverAnchor}
+            items={canvasItems}
+            onUpdateLayout={handleInspectorLayout}
+            onUpdateStyle={updateItemStyle}
+            onRemove={handleRemove}
+            onToggleFavorite={handleToggleFavorite}
+            onUpdateNote={handleUpdateNote}
+            onClose={() => {
+              setPopoverItemId(null)
+              setPopoverAnchor(null)
+            }}
+          />
+        )}
       </div>
     </div>
   )
@@ -559,6 +420,10 @@ function itemToDraftItem(item: JournalItemWithNote): JournalDraftItem[] {
   }
   if (item.item_type === 'illustration') {
     if (!item.illustration_id) return []
+    const hasImageStyle = item.style_payload && item.style_payload !== '{}' && item.style_payload.includes('imageStyle')
+    const imageSize = hasImageStyle
+      ? { width: item.width, height: item.height }
+      : getDefaultIllustrationDraftSize(item.illustration, item.width, item.height)
     return [{
       ...base,
       itemType: 'illustration',
@@ -574,6 +439,8 @@ function itemToDraftItem(item: JournalItemWithNote): JournalDraftItem[] {
           backgroundColor: 'transparent',
         },
       }),
+      width: imageSize.width,
+      height: imageSize.height,
     }]
   }
   return [{
@@ -604,129 +471,14 @@ function draftItemToLayout(item: JournalDraftItem) {
   }
 }
 
-function PageSetupPanel({
-  draft,
-  oshis,
-  selectedOshiId,
-  onOshiChange,
-  onChange,
-  onSave,
-  disabled,
-  saving,
-  oshiLocked,
-  stampDraft,
-  onStampClear,
-  stampPlacing,
-  onStartStampPlacement,
-  onCancelStampPlacement,
-}: {
-  draft: PageDraft
-  oshis: Oshi[]
-  selectedOshiId: string
-  onOshiChange: (oshiId: string) => void
-  onChange: (draft: PageDraft) => void
-  onSave: () => void
-  disabled: boolean
-  saving: boolean
-  oshiLocked: boolean
-  stampDraft: Stamp | StampInput | null
-  onStampClear: () => void
-  stampPlacing: boolean
-  onStartStampPlacement: (stamp: StampInput) => void
-  onCancelStampPlacement: () => void
-}) {
-  const { t } = useI18n()
-  return (
-    <section className="rounded-2xl border border-border-color bg-bg-primary/75 p-4 shadow-sm shadow-black/5">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-text-muted">{t('journalEditor.setup.kicker')}</p>
-          <h2 className="text-sm font-semibold text-text-primary">{t('journalEditor.setup.title')}</h2>
-        </div>
-        <Button size="sm" onClick={onSave} disabled={disabled}>
-          <Save size={15} />
-          {saving ? t('journalEditor.setup.saving') : t('journalEditor.setup.save')}
-        </Button>
-      </div>
-
-      <div className="space-y-3">
-        <label className="grid gap-1.5 text-xs font-medium text-text-muted">
-          {t('journalEditor.setup.oshi')}
-          <SelectMenu
-            value={selectedOshiId}
-            onChange={onOshiChange}
-            disabled={oshiLocked}
-            options={oshis.map((oshi) => ({ value: oshi.id, label: oshi.name }))}
-            placeholder={t('journalEditor.setup.chooseOshi')}
-            ariaLabel={t('journalEditor.setup.chooseOshi')}
-            className="w-full"
-            buttonClassName="w-full rounded-xl text-text-primary"
-            menuClassName="w-full"
-          />
-        </label>
-        <label className="grid gap-1.5 text-xs font-medium text-text-muted">
-          {t('journalEditor.setup.pageTitle')}
-          <input
-            value={draft.title}
-            onChange={(event) => onChange({ ...draft, title: event.target.value })}
-            className={fieldClassName}
-            placeholder={t('journalEditor.setup.pageTitlePlaceholder')}
-          />
-        </label>
-        <label className="grid gap-1.5 text-xs font-medium text-text-muted">
-          {t('journalEditor.setup.dateLabel')}
-          <input
-            value={draft.date_label}
-            onChange={(event) => onChange({ ...draft, date_label: event.target.value })}
-            className={fieldClassName}
-            placeholder={t('journalEditor.setup.dateLabelPlaceholder')}
-          />
-        </label>
-        <label className="grid gap-1.5 text-xs font-medium text-text-muted">
-          {t('journalEditor.setup.description')}
-          <textarea
-            value={draft.description}
-            onChange={(event) => onChange({ ...draft, description: event.target.value })}
-            className={`${fieldClassName} min-h-24 resize-none`}
-            placeholder={t('journalEditor.setup.descriptionPlaceholder')}
-          />
-        </label>
-        <section>
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-text-muted">
-            <Palette size={14} />
-            {t('journalEditor.setup.background')}
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {JOURNAL_BACKGROUND_PRESETS.map((background) => (
-              <button
-                key={background.id}
-                type="button"
-                onClick={() => onChange({ ...draft, background: background.id })}
-                className={`rounded-xl border px-2 py-2 text-xs transition-colors ${
-                  draft.background === background.id
-                    ? 'border-accent bg-accent-soft text-accent'
-                    : 'border-border-color bg-bg-secondary text-text-secondary hover:border-border-hover'
-                }`}
-              >
-                {t(background.labelKey)}
-              </button>
-            ))}
-          </div>
-        </section>
-        <StampControl
-          value={stampDraft}
-          onClear={onStampClear}
-          onStartPlacement={onStartStampPlacement}
-          onCancelPlacement={onCancelStampPlacement}
-          placing={stampPlacing}
-        />
-      </div>
-    </section>
-  )
-}
-
-const fieldClassName = 'min-w-0 rounded-xl border border-border-color bg-bg-secondary px-3 py-2 text-sm text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-50'
-
-function createDefaultPageDraft(): PageDraft {
-  return { title: '', description: '', date_label: '', background: 'paper' }
+function getDefaultIllustrationDraftSize(illustration: JournalItemWithNote['illustration'], fallbackWidth: number, fallbackHeight: number) {
+  const rawWidth = illustration?.width || 0
+  const rawHeight = illustration?.height || 0
+  if (rawWidth <= 0 || rawHeight <= 0) return { width: fallbackWidth, height: fallbackHeight }
+  const maxSide = Math.max(fallbackWidth, fallbackHeight, 320)
+  const scale = Math.min(maxSide / rawWidth, maxSide / rawHeight, 1)
+  return {
+    width: Math.max(120, Math.round(rawWidth * scale)),
+    height: Math.max(120, Math.round(rawHeight * scale)),
+  }
 }
