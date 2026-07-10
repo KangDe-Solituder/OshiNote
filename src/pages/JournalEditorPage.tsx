@@ -13,6 +13,11 @@ import { useNoteStore } from '../stores/noteStore'
 import type { JournalDraftItem, JournalItemWithNote, JournalPage, Stamp, StampInput } from '../types'
 import { autoArrangeNotes, clampLayout, type JournalLayoutInput } from '../features/journal/journalLayout'
 import {
+  createCompositionDraft,
+  createDraftSavePlan,
+  draftItemToJournalLayout,
+} from '../features/journal/journalDraftAdapters'
+import {
   createJournalItemForIllustration,
   createJournalItemForMaterial,
   createJournalItemForNote,
@@ -198,21 +203,21 @@ export function JournalEditorPage() {
       orientation: draft.orientation,
     })
 
-    const draftOriginIds = new Set(draft.items.map((item) => item.originItemId).filter(Boolean))
-    const supportedExistingItems = canvasItems.filter((item) => isCompositionItem(item))
-    await Promise.all(supportedExistingItems
-      .filter((item) => !draftOriginIds.has(item.id))
-      .map((item) => removeJournalItem(item.id)))
+    const savePlan = createDraftSavePlan(draft.items, canvasItems)
+    await Promise.all(savePlan.existingItemsToRemove.map((item) => removeJournalItem(item.id)))
 
-    for (const item of draft.items) {
-      const layout = draftItemToLayout(item)
+    for (const item of savePlan.itemsToUpdate) {
+      const layout = draftItemToJournalLayout(item)
       if (item.originItemId) {
         await updateItemLayout(item.originItemId, layout)
         if (item.stylePayload !== undefined) {
           await updateItemStyle(item.originItemId, { style_payload: item.stylePayload })
         }
-        continue
       }
+    }
+
+    for (const item of savePlan.itemsToCreate) {
+      const layout = draftItemToJournalLayout(item)
       if (item.itemType === 'note' && item.sourceId) {
         const created = await createJournalItemForNote(activePage.id, item.sourceId, layout)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
@@ -367,118 +372,4 @@ export function JournalEditorPage() {
       </div>
     </div>
   )
-}
-
-function createCompositionDraft(page: JournalPage, items: JournalItemWithNote[], stamp: Stamp | StampInput | null) {
-  return {
-    oshiId: page.oshi_id,
-    title: page.title || '',
-    dateLabel: page.date_label || '',
-    description: page.description || '',
-    background: page.background || 'paper',
-    orientation: page.orientation || 'portrait',
-    items: items.flatMap(itemToDraftItem),
-    stamp,
-  }
-}
-
-function itemToDraftItem(item: JournalItemWithNote): JournalDraftItem[] {
-  if (!isCompositionItem(item)) return []
-  const base = {
-    draftId: `existing-${item.id}`,
-    originItemId: item.id,
-    x: item.x,
-    y: item.y,
-    width: item.width,
-    height: item.height,
-    rotation: item.rotation,
-    zIndex: item.z_index,
-  }
-  if (item.item_type === 'note') {
-    if (!item.note_id) return []
-    return [{
-      ...base,
-      itemType: 'note',
-      sourceId: item.note_id,
-      stylePayload: item.style_payload && item.style_payload !== '{}' ? item.style_payload : JSON.stringify({
-        noteCard: {
-          titleVisible: true,
-          titleText: item.note?.title || '',
-          bodyText: (item.note?.plain_text || '').slice(0, 200),
-          fontFamily: 'system',
-          fontSize: 14,
-          fontWeight: 500,
-          lineHeight: 1.45,
-          textColor: '#1f2f4d',
-          backgroundColor: item.color || '#fff7d6',
-          padding: 16,
-          radius: 16,
-          showTags: true,
-        },
-      }),
-    }]
-  }
-  if (item.item_type === 'illustration') {
-    if (!item.illustration_id) return []
-    const hasImageStyle = item.style_payload && item.style_payload !== '{}' && item.style_payload.includes('imageStyle')
-    const imageSize = hasImageStyle
-      ? { width: item.width, height: item.height }
-      : getDefaultIllustrationDraftSize(item.illustration, item.width, item.height)
-    return [{
-      ...base,
-      itemType: 'illustration',
-      sourceId: item.illustration_id,
-      stylePayload: item.style_payload && item.style_payload !== '{}' ? item.style_payload : JSON.stringify({
-        imageStyle: {
-          fit: 'contain',
-          frame: 'none',
-          borderWidth: 0,
-          borderColor: '#ffffff',
-          radius: 12,
-          shadow: 0,
-          backgroundColor: 'transparent',
-        },
-      }),
-      width: imageSize.width,
-      height: imageSize.height,
-    }]
-  }
-  return [{
-    ...base,
-    itemType: 'material',
-    materialId: item.material_id || 'washi-lilac',
-    materialSnapshot: item.material_snapshot,
-    stylePayload: item.style_payload && item.style_payload !== '{}' ? item.style_payload : JSON.stringify({
-      color: item.color || undefined,
-      variant: item.sticker_style,
-      glassStrength: 0,
-    }),
-  }]
-}
-
-function isCompositionItem(item: JournalItemWithNote) {
-  return item.item_type === 'note' || item.item_type === 'illustration' || item.item_type === 'material' || item.item_type === 'tape'
-}
-
-function draftItemToLayout(item: JournalDraftItem) {
-  return {
-    x: item.x,
-    y: item.y,
-    width: item.width,
-    height: item.height,
-    rotation: item.rotation,
-    z_index: item.zIndex,
-  }
-}
-
-function getDefaultIllustrationDraftSize(illustration: JournalItemWithNote['illustration'], fallbackWidth: number, fallbackHeight: number) {
-  const rawWidth = illustration?.width || 0
-  const rawHeight = illustration?.height || 0
-  if (rawWidth <= 0 || rawHeight <= 0) return { width: fallbackWidth, height: fallbackHeight }
-  const maxSide = Math.max(fallbackWidth, fallbackHeight, 320)
-  const scale = Math.min(maxSide / rawWidth, maxSide / rawHeight, 1)
-  return {
-    width: Math.max(120, Math.round(rawWidth * scale)),
-    height: Math.max(120, Math.round(rawHeight * scale)),
-  }
 }

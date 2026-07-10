@@ -4,12 +4,28 @@ import clsx from 'clsx'
 import type { Illustration, JournalDraftItem, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { clampLayout, getJournalPageSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { getPageBackground } from './journalCanvasStyle'
-import { getJournalMaterialDefinition, parseMaterialStyle } from '../../../features/journal/journalMaterials'
+import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
 import { Button } from '../../ui/Button'
 import { StampOverlay } from '../stamps/StampOverlay'
 import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
 import { useI18n } from '../../../i18n/useI18n'
 import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
+import {
+  getDraftImageItemStyle,
+  getDraftNoteCardStyle,
+  getFontFamily,
+  getImageFrameStyle,
+  getImagePadding,
+  getImageBottomPadding,
+  getMaterialGlassStyle,
+  getMaterialStylePayload,
+  parseStylePayload,
+  patchStylePayload,
+  type ImageItemStyle,
+  type NoteCardStyle,
+} from '../../../features/journal/journalItemStyles'
+import { getDraftItemConstraints } from '../../../features/journal/journalItemSizing'
+import { asNumber, asString } from '../../../utils/safeJson'
 
 interface JournalDraftCanvasProps {
   background: string
@@ -51,31 +67,6 @@ interface FrameDragState {
   moved: boolean
   startAngle?: number
   center?: { x: number; y: number }
-}
-
-type NoteCardStyle = {
-  titleVisible: boolean
-  titleText: string
-  bodyText: string
-  fontFamily: string
-  fontSize: number
-  fontWeight: number
-  lineHeight: number
-  textColor: string
-  backgroundColor: string
-  padding: number
-  radius: number
-  showTags: boolean
-}
-
-type ImageItemStyle = {
-  fit: 'contain' | 'cover'
-  frame: 'none' | 'simple' | 'paper' | 'polaroid'
-  borderWidth: number
-  borderColor: string
-  radius: number
-  shadow: number
-  backgroundColor: string
 }
 
 const RESIZE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
@@ -307,7 +298,7 @@ function CanvasItemFrame({
 }) {
   const dragRef = useRef<FrameDragState | null>(null)
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
-  const constraints = getDraftConstraints(item, material?.kind)
+  const constraints = getDraftItemConstraints(item)
 
   function startDrag(event: PointerEvent<HTMLDivElement>, mode: FrameDragMode, handle?: ResizeHandle) {
     if (event.button !== 0) return
@@ -411,10 +402,7 @@ function CanvasItemFrame({
 
 function DraftItemBody({ item, note, illustration }: { item: JournalDraftItem; note?: Note; illustration?: Illustration }) {
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
-  const stylePayload = {
-    ...(material?.defaultStyle || {}),
-    ...parseMaterialStyle(item.stylePayload),
-  }
+  const stylePayload = getMaterialStylePayload(item.stylePayload, material?.id)
   if (item.itemType === 'note') return <DraftNoteBody item={item} note={note} />
   if (item.itemType === 'illustration') return <DraftIllustrationBody item={item} illustration={illustration} />
   if (material) return <DraftMaterialBody materialId={material.id} stylePayload={stylePayload} />
@@ -423,7 +411,7 @@ function DraftItemBody({ item, note, illustration }: { item: JournalDraftItem; n
 
 function DraftNoteBody({ item, note }: { item: JournalDraftItem; note?: Note }) {
   const { t } = useI18n()
-  const noteCard = getNoteCardStyle(item, note, t('common.untitled'), t('common.noContent'))
+  const noteCard = getDraftNoteCardStyle(item, note, t('common.untitled'), t('common.noContent'))
   const tags = noteCard.showTags ? (note?.tags || []).slice(0, 3) : []
   return (
     <div
@@ -458,7 +446,7 @@ function DraftNoteBody({ item, note }: { item: JournalDraftItem; note?: Note }) 
 
 function DraftIllustrationBody({ item, illustration }: { item: JournalDraftItem; illustration?: Illustration }) {
   const [imageSrc, setImageSrc] = useState('')
-  const imageStyle = getImageItemStyle(item)
+  const imageStyle = getDraftImageItemStyle(item)
 
   useEffect(() => {
     let alive = true
@@ -483,8 +471,8 @@ function DraftIllustrationBody({ item, illustration }: { item: JournalDraftItem;
   }, [illustration])
 
   const frameStyle = getImageFrameStyle(imageStyle)
-  const imagePadding = imageStyle.frame === 'paper' ? 8 : imageStyle.frame === 'polaroid' ? 10 : 0
-  const bottomPadding = imageStyle.frame === 'polaroid' ? 30 : imagePadding
+  const imagePadding = getImagePadding(imageStyle)
+  const bottomPadding = getImageBottomPadding(imageStyle)
 
   return (
     <div className="h-full w-full overflow-hidden" style={frameStyle}>
@@ -518,7 +506,7 @@ function DraftMaterialBody({ materialId, stylePayload }: { materialId: string; s
   if (!material) return null
   const color = asString(stylePayload.color) || '#d9c4ff'
   const glassStrength = asNumber(stylePayload.glassStrength, 0)
-  const glassStyle = getGlassStyle(glassStrength, color)
+  const glassStyle = getMaterialGlassStyle(glassStrength, color)
 
   if (material.kind === 'tape') {
     return <TapeShape color={color} styleId={asString(stylePayload.tapeStyle) || 'washi'} extraStyle={glassStyle} />
@@ -599,7 +587,7 @@ function JournalItemDetailPanel({
 
 function NoteDetailControls({ item, note, onUpdateItem }: { item: JournalDraftItem; note?: Note; onUpdateItem: JournalDraftCanvasProps['onUpdateItem'] }) {
   const { t } = useI18n()
-  const noteCard = getNoteCardStyle(item, note, t('common.untitled'), t('common.noContent'))
+  const noteCard = getDraftNoteCardStyle(item, note, t('common.untitled'), t('common.noContent'))
   function update(change: Partial<NoteCardStyle>) {
     updateStylePayload(item, { noteCard: { ...noteCard, ...change } }, onUpdateItem)
   }
@@ -623,7 +611,7 @@ function NoteDetailControls({ item, note, onUpdateItem }: { item: JournalDraftIt
 
 function ImageDetailControls({ item, orientation, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalDraftCanvasProps['onUpdateItem'] }) {
   const { t } = useI18n()
-  const style = getImageItemStyle(item)
+  const style = getDraftImageItemStyle(item)
   function update(change: Partial<ImageItemStyle>) {
     updateStylePayload(item, { imageStyle: { ...style, ...change } }, onUpdateItem)
   }
@@ -644,7 +632,7 @@ function ImageDetailControls({ item, orientation, onUpdateItem }: { item: Journa
 function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalDraftCanvasProps['onUpdateItem'] }) {
   const { t } = useI18n()
   const material = getJournalMaterialDefinition(item.materialId)
-  const style = { ...(material?.defaultStyle || {}), ...parseMaterialStyle(item.stylePayload) }
+  const style = getMaterialStylePayload(item.stylePayload, item.materialId)
   const isTape = material?.kind === 'tape'
   const isSticker = material?.kind === 'sticker'
   function update(change: Record<string, unknown>) {
@@ -675,7 +663,7 @@ function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: Jou
 function LayoutNumberControls({ item, orientation, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalDraftCanvasProps['onUpdateItem'] }) {
   const { t } = useI18n()
   function update(change: Partial<JournalLayoutInput>) {
-    onUpdateItem(item.draftId, clampLayout({ ...getItemLayout(item), ...change }, getDraftConstraints(item, getJournalMaterialDefinition(item.materialId)?.kind), orientation))
+    onUpdateItem(item.draftId, clampLayout({ ...getItemLayout(item), ...change }, getDraftItemConstraints(item), orientation))
   }
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -859,7 +847,7 @@ function resizeSelected(item: JournalDraftItem, widthDelta: number, heightDelta:
     width: item.width + widthDelta,
     height: item.height + heightDelta,
     rotation: item.rotation,
-  }, getDraftConstraints(item, getJournalMaterialDefinition(item.materialId)?.kind), orientation)
+  }, getDraftItemConstraints(item), orientation)
   onUpdateItem(item.draftId, layout)
 }
 
@@ -870,29 +858,24 @@ function rotateSelected(item: JournalDraftItem, delta: number, orientation: Jour
     width: item.width,
     height: item.height,
     rotation: item.rotation + delta,
-  }, getDraftConstraints(item, getJournalMaterialDefinition(item.materialId)?.kind), orientation)
+  }, getDraftItemConstraints(item), orientation)
   onUpdateItem(item.draftId, layout)
 }
 
 function updateStylePayload(item: JournalDraftItem, change: Record<string, unknown>, onUpdateItem: JournalDraftCanvasProps['onUpdateItem']) {
-  const payload = {
-    ...parseMaterialStyle(item.stylePayload),
-    ...change,
-  }
   onUpdateItem(item.draftId, {
     x: item.x,
     y: item.y,
     width: item.width,
     height: item.height,
     rotation: item.rotation,
-    stylePayload: JSON.stringify(payload),
+    stylePayload: patchStylePayload(item.stylePayload, change),
   })
 }
 
 function getMaterialGlassStrength(item: JournalDraftItem): number {
-  const payload = parseMaterialStyle(item.stylePayload)
-  const value = typeof payload.glassStrength === 'number' ? payload.glassStrength : Number(payload.glassStrength)
-  return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0
+  const payload = parseStylePayload(item.stylePayload)
+  return Math.min(100, Math.max(0, asNumber(payload.glassStrength, 0)))
 }
 
 function updateMaterialGlassStrength(item: JournalDraftItem, glassStrength: number, onUpdateItem: JournalDraftCanvasProps['onUpdateItem']) {
@@ -909,71 +892,11 @@ function getItemLayout(item: JournalDraftItem): JournalLayoutInput {
   }
 }
 
-function getDraftConstraints(item: JournalDraftItem, materialKind?: string) {
-  if (materialKind === 'tape') return { minWidth: 90, minHeight: 18 }
-  if (materialKind === 'sticker') return { minWidth: 30, minHeight: 30 }
-  if (item.itemType === 'illustration') return { minWidth: 80, minHeight: 80 }
-  if (item.itemType === 'note') return { minWidth: 120, minHeight: 90 }
-  return undefined
-}
-
-function getNoteCardStyle(item: JournalDraftItem, note: Note | undefined, untitled: string, empty: string): NoteCardStyle {
-  const payload = parseMaterialStyle(item.stylePayload)
-  const raw = isRecord(payload.noteCard) ? payload.noteCard : {}
-  return {
-    titleVisible: raw.titleVisible !== false,
-    titleText: asString(raw.titleText) || note?.title || untitled,
-    bodyText: (asString(raw.bodyText) || note?.plain_text || empty).slice(0, 200),
-    fontFamily: asString(raw.fontFamily) || 'system',
-    fontSize: asNumber(raw.fontSize, 14),
-    fontWeight: asNumber(raw.fontWeight, 500),
-    lineHeight: asNumber(raw.lineHeight, 1.45),
-    textColor: asString(raw.textColor) || '#1f2f4d',
-    backgroundColor: asString(raw.backgroundColor) || '#fff7d6',
-    padding: asNumber(raw.padding, 16),
-    radius: asNumber(raw.radius, 16),
-    showTags: raw.showTags !== false,
-  }
-}
-
-function getImageItemStyle(item: JournalDraftItem): ImageItemStyle {
-  const payload = parseMaterialStyle(item.stylePayload)
-  const raw = isRecord(payload.imageStyle) ? payload.imageStyle : {}
-  const fit = raw.fit === 'cover' ? 'cover' : 'contain'
-  const frame = raw.frame === 'simple' || raw.frame === 'paper' || raw.frame === 'polaroid' ? raw.frame : 'none'
-  return {
-    fit,
-    frame,
-    borderWidth: asNumber(raw.borderWidth, frame === 'none' ? 0 : 2),
-    borderColor: asString(raw.borderColor) || '#ffffff',
-    radius: asNumber(raw.radius, 12),
-    shadow: asNumber(raw.shadow, frame === 'none' ? 0 : 16),
-    backgroundColor: asString(raw.backgroundColor) || (frame === 'none' ? 'transparent' : '#ffffff'),
-  }
-}
-
-function getImageFrameStyle(style: ImageItemStyle): CSSProperties {
-  return {
-    borderRadius: style.radius,
-    border: style.borderWidth > 0 ? `${style.borderWidth}px solid ${style.borderColor}` : '0 solid transparent',
-    backgroundColor: style.backgroundColor,
-    boxShadow: style.shadow > 0 ? `0 ${Math.round(style.shadow / 2)}px ${style.shadow}px rgba(31,47,77,0.22)` : 'none',
-  }
-}
-
 function getDetailTitle(item: JournalDraftItem, note: Note | undefined, illustration: Illustration | undefined, t: ReturnType<typeof useI18n>['t']) {
   if (item.itemType === 'note') return note?.title || t('journalEditor.addNote')
   if (item.itemType === 'illustration') return illustration?.title || illustration?.original_filename || t('journalEditor.addIllustration')
   const material = getJournalMaterialDefinition(item.materialId)
   return material ? t(material.nameKey) : t('journalEditor.addMaterials')
-}
-
-function getFontFamily(value: string) {
-  if (value === 'serif') return 'Georgia, "Times New Roman", serif'
-  if (value === 'sans') return 'Arial, "Helvetica Neue", sans-serif'
-  if (value === 'mono') return '"SFMono-Regular", Consolas, "Liberation Mono", monospace'
-  if (value === 'casual') return '"Comic Sans MS", "Segoe Print", cursive'
-  return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 }
 
 function getTapePattern(style: string, color: string): CSSProperties {
@@ -997,28 +920,6 @@ function getTapePattern(style: string, color: string): CSSProperties {
   return {
     backgroundImage: `linear-gradient(90deg, rgba(255,255,255,0.2), transparent 34%, rgba(0,0,0,0.05) 74%, rgba(255,255,255,0.12)), linear-gradient(${color}, ${color})`,
   }
-}
-
-function getGlassStyle(strength: number, color: string): CSSProperties | undefined {
-  if (strength <= 0) return undefined
-  const alpha = Math.min(0.42, strength / 240)
-  return {
-    backgroundColor: `color-mix(in srgb, ${color} ${Math.max(34, 100 - strength)}%, rgba(255,255,255,${alpha}))`,
-    backdropFilter: `blur(${Math.round(strength / 14)}px) saturate(${100 + Math.round(strength * 0.45)}%)`,
-  }
-}
-
-function asString(value: unknown): string {
-  return typeof value === 'string' ? value : ''
-}
-
-function asNumber(value: unknown, fallback: number): number {
-  const number = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(number) ? number : fallback
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function isTapeStyleId(value: string) {

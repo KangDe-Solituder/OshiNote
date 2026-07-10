@@ -5,8 +5,20 @@ import type { JournalItemWithNote, JournalPageOrientation } from '../../../types
 import { clampLayout, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
 import { useI18n } from '../../../i18n/useI18n'
-import { getJournalMaterialDefinition, parseMaterialStyle } from '../../../features/journal/journalMaterials'
+import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
 import type { JournalPopoverAnchor } from './JournalCanvas'
+import {
+  getFontFamily,
+  getImageBottomPadding,
+  getImageFrameStyle,
+  getImagePadding,
+  getJournalImageItemStyle,
+  getJournalNoteCardStyle,
+  getMaterialGlassStyle,
+  getMaterialStylePayload,
+} from '../../../features/journal/journalItemStyles'
+import { getJournalItemConstraints } from '../../../features/journal/journalItemSizing'
+import { asNumber, asString } from '../../../utils/safeJson'
 
 interface JournalStickerProps {
   item: JournalItemWithNote
@@ -26,41 +38,14 @@ interface DragState {
   moved: boolean
 }
 
-type NoteCardStyle = {
-  titleVisible: boolean
-  titleText: string
-  bodyText: string
-  fontFamily: string
-  fontSize: number
-  fontWeight: number
-  lineHeight: number
-  textColor: string
-  backgroundColor: string
-  padding: number
-  radius: number
-  showTags: boolean
-}
-
-type ImageItemStyle = {
-  fit: 'contain' | 'cover'
-  frame: 'none' | 'simple' | 'paper' | 'polaroid'
-  borderWidth: number
-  borderColor: string
-  radius: number
-  shadow: number
-  backgroundColor: string
-}
-
 export function JournalSticker({ item, selected, zoom, orientation = 'portrait', onSelect, onOpenPopover, onCommitLayout }: JournalStickerProps) {
   const { t } = useI18n()
   const dragRef = useRef<DragState | null>(null)
   const [imageSrc, setImageSrc] = useState('')
   const isTape = item.item_type === 'tape'
   const isMaterial = item.item_type === 'material'
-  const material = isMaterial ? getJournalMaterialDefinition(item.material_id) : null
-  const materialKind = material?.kind
-  const noteCard = item.item_type === 'note' ? getNoteCardStyle(item, t('common.untitled'), t('common.noContent')) : null
-  const imageStyle = item.item_type === 'illustration' ? getImageItemStyle(item) : null
+  const noteCard = item.item_type === 'note' ? getJournalNoteCardStyle(item, t('common.untitled'), t('common.noContent')) : null
+  const imageStyle = item.item_type === 'illustration' ? getJournalImageItemStyle(item) : null
 
   useEffect(() => {
     if (item.item_type !== 'illustration') return
@@ -122,7 +107,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
       ...drag.startLayout,
       x: drag.startLayout.x + dx,
       y: drag.startLayout.y + dy,
-    }, getLayoutConstraints(item, materialKind), orientation)
+    }, getJournalItemConstraints(item), orientation)
     e.currentTarget.style.left = `${layout.x}px`
     e.currentTarget.style.top = `${layout.y}px`
   }
@@ -138,7 +123,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
       ...drag.startLayout,
       x: drag.startLayout.x + (e.clientX - drag.startClientX) / zoom,
       y: drag.startLayout.y + (e.clientY - drag.startClientY) / zoom,
-    }, getLayoutConstraints(item, materialKind), orientation)
+    }, getJournalItemConstraints(item), orientation)
     onCommitLayout(item.id, layout)
   }
 
@@ -298,12 +283,9 @@ function TapeBody({ item }: { item: JournalItemWithNote }) {
 
 function MaterialBody({ item }: { item: JournalItemWithNote }) {
   const material = getJournalMaterialDefinition(item.material_id)
-  const style = {
-    ...(material?.defaultStyle || {}),
-    ...parseMaterialStyle(item.style_payload),
-  }
+  const style = getMaterialStylePayload(item.style_payload, item.material_id)
   const color = asString(style.color) || item.color || '#d9c4ff'
-  const glassStrength = asNumber(style.glassStrength)
+  const glassStrength = Math.min(100, Math.max(0, asNumber(style.glassStrength, 0)))
   const glassStyle = getMaterialGlassStyle(glassStrength, color)
 
   if (material?.kind === 'tape') {
@@ -420,104 +402,7 @@ function getStickerBackground(color: string | null): string {
   return paletteIndex >= 0 ? `var(--journal-sticker-${paletteIndex + 1})` : color || 'var(--journal-sticker-1)'
 }
 
-function getNoteCardStyle(item: JournalItemWithNote, untitled: string, empty: string): NoteCardStyle | null {
-  const payload = parseMaterialStyle(item.style_payload)
-  if (!isRecord(payload.noteCard)) return null
-  const raw = payload.noteCard
-  return {
-    titleVisible: raw.titleVisible !== false,
-    titleText: asString(raw.titleText) || item.note?.title || untitled,
-    bodyText: (asString(raw.bodyText) || item.note?.plain_text || empty).slice(0, 200),
-    fontFamily: asString(raw.fontFamily) || 'system',
-    fontSize: asNumberWithDefault(raw.fontSize, 14),
-    fontWeight: asNumberWithDefault(raw.fontWeight, 500),
-    lineHeight: asNumberWithDefault(raw.lineHeight, 1.45),
-    textColor: asString(raw.textColor) || '#1f2f4d',
-    backgroundColor: asString(raw.backgroundColor) || '#fff7d6',
-    padding: asNumberWithDefault(raw.padding, 16),
-    radius: asNumberWithDefault(raw.radius, 16),
-    showTags: raw.showTags !== false,
-  }
-}
-
-function getImageItemStyle(item: JournalItemWithNote): ImageItemStyle | null {
-  const payload = parseMaterialStyle(item.style_payload)
-  if (!isRecord(payload.imageStyle)) return null
-  const raw = payload.imageStyle
-  const fit = raw.fit === 'cover' ? 'cover' : 'contain'
-  const frame = raw.frame === 'simple' || raw.frame === 'paper' || raw.frame === 'polaroid' ? raw.frame : 'none'
-  return {
-    fit,
-    frame,
-    borderWidth: asNumberWithDefault(raw.borderWidth, frame === 'none' ? 0 : 2),
-    borderColor: asString(raw.borderColor) || '#ffffff',
-    radius: asNumberWithDefault(raw.radius, 12),
-    shadow: asNumberWithDefault(raw.shadow, frame === 'none' ? 0 : 16),
-    backgroundColor: asString(raw.backgroundColor) || (frame === 'none' ? 'transparent' : '#ffffff'),
-  }
-}
-
-function getImageFrameStyle(style: ImageItemStyle): CSSProperties {
-  return {
-    borderRadius: style.radius,
-    border: style.borderWidth > 0 ? `${style.borderWidth}px solid ${style.borderColor}` : '0 solid transparent',
-    backgroundColor: style.backgroundColor,
-    boxShadow: style.shadow > 0 ? `0 ${Math.round(style.shadow / 2)}px ${style.shadow}px rgba(31,47,77,0.22)` : 'none',
-  }
-}
-
-function getImagePadding(style: ImageItemStyle) {
-  return style.frame === 'paper' ? 8 : style.frame === 'polaroid' ? 10 : 0
-}
-
-function getImageBottomPadding(style: ImageItemStyle) {
-  return style.frame === 'polaroid' ? 30 : getImagePadding(style)
-}
-
-function getFontFamily(value: string) {
-  if (value === 'serif') return 'Georgia, "Times New Roman", serif'
-  if (value === 'sans') return 'Arial, "Helvetica Neue", sans-serif'
-  if (value === 'mono') return '"SFMono-Regular", Consolas, "Liberation Mono", monospace'
-  if (value === 'casual') return '"Comic Sans MS", "Segoe Print", cursive'
-  return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
-}
-
 const STICKER_PALETTE = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed']
-const TAPE_LAYOUT_CONSTRAINTS = { minWidth: 90, minHeight: 18 }
-const STICKER_LAYOUT_CONSTRAINTS = { minWidth: 42, minHeight: 42 }
-
-function getLayoutConstraints(item: JournalItemWithNote, materialKind?: string) {
-  if (item.item_type === 'tape' || materialKind === 'tape') return TAPE_LAYOUT_CONSTRAINTS
-  if (materialKind === 'sticker') return STICKER_LAYOUT_CONSTRAINTS
-  return undefined
-}
-
-function asString(value: unknown): string {
-  return typeof value === 'string' ? value : ''
-}
-
-function asNumber(value: unknown): number {
-  const number = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(number) ? Math.min(100, Math.max(0, number)) : 0
-}
-
-function asNumberWithDefault(value: unknown, fallback: number): number {
-  const number = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(number) ? number : fallback
-}
-
-function getMaterialGlassStyle(strength: number, color: string): CSSProperties | undefined {
-  if (strength <= 0) return undefined
-  const alpha = Math.min(0.42, strength / 240)
-  return {
-    backgroundColor: `color-mix(in srgb, ${color} ${Math.max(34, 100 - strength)}%, rgba(255,255,255,${alpha}))`,
-    backdropFilter: `blur(${Math.round(strength / 14)}px) saturate(${100 + Math.round(strength * 0.45)}%)`,
-  }
-}
 
 function isTapeStyleId(value: string): value is JournalItemWithNote['sticker_style'] {
   return value === 'washi' || value === 'grid' || value === 'dots' || value === 'stripe' || value === 'torn'

@@ -23,6 +23,8 @@ import type {
 import { createInitialLayout } from './journalLayout'
 import { deleteStampForTarget, persistStampForTarget } from '../stamps/stampService'
 import { getJournalMaterialDefinition, getMaterialSnapshot } from './journalMaterials'
+import { draftItemToLayout } from './journalItemSizing'
+import { safeJsonParse, isStringArray, isRecord } from '../../utils/safeJson'
 
 interface JoinedJournalItemRow extends JournalItemRow {
   note_oshi_id: string | null
@@ -703,7 +705,7 @@ function deserializeItem(row: JournalItemRow): JournalItem {
 function deserializeNote(row: NoteRow): Note {
   return {
     ...row,
-    tags: JSON.parse(row.tags || '[]'),
+    tags: safeJsonParse(row.tags, [], isStringArray),
     favorite: row.favorite === 1,
   }
 }
@@ -719,12 +721,7 @@ function deserializeIllustration(row: IllustrationRow): Illustration {
 }
 
 function parseJsonStringArray(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value || '[]')
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
-  } catch {
-    return []
-  }
+  return safeJsonParse(value, [], isStringArray)
 }
 
 function deserializeBook(row: JournalBook): JournalBook {
@@ -754,24 +751,9 @@ function normalizeJournalItemStyle(itemType: JournalItemType, value: string): Jo
   return isStickerStyle(value) ? value : 'sticky'
 }
 
-function draftItemToLayout(item: JournalDraftItem): JournalLayoutUpdate {
-  return {
-    x: item.x,
-    y: item.y,
-    width: item.width,
-    height: item.height,
-    rotation: item.rotation,
-    z_index: item.zIndex,
-  }
-}
-
 function getStylePayloadColor(stylePayload: string): string | null {
-  try {
-    const parsed = JSON.parse(stylePayload)
-    return parsed && typeof parsed.color === 'string' ? parsed.color : null
-  } catch {
-    return null
-  }
+  const parsed = safeJsonParse<Record<string, unknown>>(stylePayload, {}, isRecord)
+  return typeof parsed.color === 'string' ? parsed.color : null
 }
 
 function createDraftNoteLayout(index: number, zIndex: number): JournalLayoutUpdate {

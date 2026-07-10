@@ -26,7 +26,7 @@ It is not meant to be a generic note app or a social posting tool. Its core is a
 
 OshiNote is in an early but usable desktop stage.
 
-The main app shell, local SQLite storage, oshi spaces, note editor, illustration library, journal module, resource skeleton, stamp workflow, themes, and trilingual UI are already in place. The next stage is shifting from basic management toward a richer handmade journal experience.
+The main app shell, local SQLite storage, oshi spaces, note editor, illustration library, journal module, resource skeleton, stamp workflow, themes, and trilingual UI are already in place. Journal has moved from a simple canvas prototype to a composition-oriented flow with page setup, resource drawers, canvas placement, and a more detailed edit mode. The next stage is stabilizing this foundation, splitting large components, and then expanding templates and built-in materials.
 
 ## Implemented
 
@@ -75,9 +75,12 @@ The main app shell, local SQLite storage, oshi spaces, note editor, illustration
 
 - Top-level Journal module.
 - Books and loose pages.
-- Journal editor canvas for arranging notes and images.
-- Page setup drawer for title, date, description, background, oshi, and collection settings.
-- Basic save and reload flow for journal pages.
+- Page creation flow with setup, notes, images, materials, stamp, and review steps.
+- Canvas-based composition editor for arranging notes, images, built-in materials, and stamps.
+- View mode for careful page review plus a dedicated detailed edit mode.
+- Page setup supports title, date label, description, background preset, oshi, book collection, and orientation.
+- Built-in material prototype for tape, stickers, paper notes, and labels.
+- Shared style payload helpers keep note cards, image frames, and materials consistent after save/reopen.
 - Legacy oshi-journal paths redirect to the top-level journal module.
 
 ### Resources And Templates
@@ -104,15 +107,12 @@ The main app shell, local SQLite storage, oshi spaces, note editor, illustration
 
 ## Not Implemented Yet
 
-- Handmade journal elements:
-  - tape
-  - paper notes / memo blocks
-  - stickers
-  - reusable visual materials
+- Full user-facing material library management.
+- User-uploaded stickers and reusable custom materials.
+- Advanced material packs and template packs.
 - Postcard templates and postcard gacha.
 - LLM-assisted tag pool understanding and quote extraction.
 - User-imported PNG stamps.
-- Full material library management.
 - Advanced journal templates with fixed slots.
 - Full export / backup / restore workflow.
 - Search normalization for Japanese readings, aliases, and kana/kanji expansion.
@@ -120,17 +120,18 @@ The main app shell, local SQLite storage, oshi spaces, note editor, illustration
 
 ## Next Direction
 
-### 1. Journal Handmade Elements
+### 1. Journal Stability And Component Boundaries
 
-The next product direction is to make Journal feel more like a real handmade page.
+The Journal feature is now expressive enough that the next engineering step should be stabilization before more surface area is added.
 
 Recommended order:
 
-1. Tape v1
-2. Paper Note / Memo v1
-3. Sticker / Material v1
+1. Split `JournalCreationFlow` into setup, rail, edge drawer, resource drawers, and review components.
+2. Split `JournalDraftCanvas` into item frame, renderers, detail panel, and interaction hooks.
+3. Share visual renderers between view mode and detailed edit mode.
+4. Add focused tests for pure layout, style payload, draft conversion, and popover positioning.
 
-Tape should be first because it is simple, visually effective, and a good test for free placement, rotation, scaling, and persistence.
+This keeps the handmade direction flexible without letting the editor become fragile.
 
 ### 2. Template Foundation For Postcards
 
@@ -209,6 +210,7 @@ Quality checks:
 
 ```bash
 pnpm lint
+pnpm test
 pnpm build
 ```
 
@@ -239,11 +241,14 @@ OshiNote/
 |-- src/
 |   |-- components/        # UI, layout, editor, journal, stamp components
 |   |-- features/          # Feature services and domain logic
+|   |-- hooks/             # Shared React hooks
 |   |-- i18n/              # English / Chinese / Japanese translations
 |   |-- pages/             # Route pages
 |   |-- services/          # Media, export, update, AI services
 |   |-- stores/            # Zustand stores
+|   |-- utils/             # Shared safe parsing/storage helpers
 |   `-- styles/            # Themes and global styles
+|-- docs/                  # Architecture and stabilization notes
 |-- public/                # Static assets and optional font placeholders
 |-- src-tauri/             # Rust / Tauri app
 |-- local-dev-plan/        # Local planning notes, not meant for release docs

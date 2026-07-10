@@ -1,5 +1,6 @@
 import type { JournalMaterialKind } from '../../types'
 import type { TranslationKey } from '../../i18n/translations'
+import { isRecord, safeJsonParse } from '../../utils/safeJson'
 
 export interface JournalMaterialDefinition {
   id: string
@@ -57,12 +58,7 @@ export function getMaterialSnapshot(material: JournalMaterialDefinition): string
 }
 
 export function parseMaterialStyle(value: string | null | undefined): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(value || '{}')
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
-  } catch {
-    return {}
-  }
+  return safeJsonParse<Record<string, unknown>>(value, {}, isRecord)
 }
 
 function material(

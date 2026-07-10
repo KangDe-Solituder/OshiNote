@@ -5,6 +5,7 @@ import { useLayoutEffect, useState, type ComponentProps } from 'react'
 import { motion } from 'framer-motion'
 import { usePopoverTransition } from '../themes/uiMotion'
 import type { JournalPopoverAnchor } from './JournalCanvas'
+import { getAnchoredPopoverPosition, getElementAnchoredPopoverPosition } from '../../../features/journal/journalPopoverPosition'
 
 interface JournalStickerPopoverProps extends Omit<ComponentProps<typeof JournalInspector>, 'variant'> {
   selectedItem: JournalItemWithNote
@@ -23,7 +24,10 @@ export function JournalStickerPopover(props: JournalStickerPopoverProps) {
   useLayoutEffect(() => {
     function updatePosition() {
       if (anchor) {
-        setPosition(getAnchoredPosition(anchor))
+        setPosition({
+          ...getAnchoredPopoverPosition(anchor, getPopoverPositionOptions()),
+          mode: 'fixed',
+        })
         return
       }
       const target = findJournalItemElement(selectedItem.id)
@@ -36,19 +40,15 @@ export function JournalStickerPopover(props: JournalStickerPopoverProps) {
         return
       }
       const rect = target.getBoundingClientRect()
-      const width = POPOVER_WIDTH
-      const height = POPOVER_HEIGHT
-      const gap = POPOVER_GAP
-      const rightLeft = rect.right + gap
-      const leftLeft = rect.left - width - gap
-      const left = rightLeft + width <= window.innerWidth - 16
-        ? rightLeft
-        : leftLeft >= 16
-          ? leftLeft
-          : Math.max(16, Math.min(rect.left, window.innerWidth - width - 16))
-      const preferredTop = rect.top + rect.height / 2 - height / 2
-      const top = Math.max(16, Math.min(preferredTop, window.innerHeight - height - 16))
-      setPosition({ left, top, mode: 'fixed' })
+      setPosition({
+        ...getElementAnchoredPopoverPosition({
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        }, getPopoverPositionOptions()),
+        mode: 'fixed',
+      })
     }
 
     updatePosition()
@@ -80,26 +80,17 @@ export function JournalStickerPopover(props: JournalStickerPopoverProps) {
 
 const POPOVER_WIDTH = 360
 const POPOVER_HEIGHT = 560
-const POPOVER_GAP = 12
 const VIEWPORT_PADDING = 16
 
-function getAnchoredPosition(anchor: JournalPopoverAnchor) {
-  const rightSpace = window.innerWidth - anchor.clientX
-  const leftSpace = anchor.clientX
-  const preferRight = rightSpace >= leftSpace
-  const rightLeft = anchor.clientX + POPOVER_GAP
-  const leftLeft = anchor.clientX - POPOVER_WIDTH - POPOVER_GAP
-  const left = preferRight
-    ? Math.min(rightLeft, window.innerWidth - POPOVER_WIDTH - VIEWPORT_PADDING)
-    : Math.max(leftLeft, VIEWPORT_PADDING)
-  const top = Math.max(
-    VIEWPORT_PADDING,
-    Math.min(anchor.clientY - 24, window.innerHeight - POPOVER_HEIGHT - VIEWPORT_PADDING),
-  )
+function getPopoverPositionOptions() {
   return {
-    left: Math.max(VIEWPORT_PADDING, Math.min(left, window.innerWidth - POPOVER_WIDTH - VIEWPORT_PADDING)),
-    top,
-    mode: 'fixed' as const,
+    popoverWidth: POPOVER_WIDTH,
+    popoverHeight: POPOVER_HEIGHT,
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    },
+    padding: VIEWPORT_PADDING,
   }
 }
 

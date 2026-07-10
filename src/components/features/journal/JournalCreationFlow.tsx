@@ -18,11 +18,14 @@ import { createJournalPageFromDraft } from '../../../features/journal/journalSer
 import { getJournalPageSize } from '../../../features/journal/journalLayout'
 import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
 import { JOURNAL_MATERIAL_KINDS, JOURNAL_MATERIALS, getJournalMaterialDefinition, getMaterialSnapshot } from '../../../features/journal/journalMaterials'
+import { createImageStylePayload, createNoteCardStylePayload } from '../../../features/journal/journalItemStyles'
+import { getDefaultIllustrationItemSize } from '../../../features/journal/journalItemSizing'
 import type { JournalMaterialKind } from '../../../types'
 import { JournalMaterialTile } from './JournalMaterialTile'
 import { JournalDraftCanvas, type DragPayload } from './JournalDraftCanvas'
 import { getPageBackground } from './journalCanvasStyle'
 import { StampControl } from '../stamps/StampControl'
+import { readLocalStorage, writeLocalStorage } from '../../../utils/safeLocalStorage'
 
 type StepId = 'setup' | 'notes' | 'images' | 'materials' | 'stamp' | 'review'
 type NoteFilter = 'all' | 'favorite' | 'tagged' | 'untagged'
@@ -168,7 +171,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     setDraftBackSaved(false)
   }, [items, stampDraft])
   useEffect(() => {
-    localStorage.setItem(DRAWER_DOCK_STORAGE_KEY, drawerDock)
+    writeLocalStorage(DRAWER_DOCK_STORAGE_KEY, drawerDock)
   }, [drawerDock])
   useEffect(() => {
     function syncViewport() {
@@ -285,21 +288,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       return {
         itemType: 'note',
         sourceId: payload.id,
-        stylePayload: JSON.stringify({
-          noteCard: {
-            titleVisible: true,
-            titleText: note?.title || '',
-            bodyText: (note?.plain_text || '').slice(0, 200),
-            fontFamily: 'system',
-            fontSize: 14,
-            fontWeight: 500,
-            lineHeight: 1.45,
-            textColor: '#1f2f4d',
-            backgroundColor: '#fff7d6',
-            padding: 16,
-            radius: 16,
-            showTags: true,
-          },
+        stylePayload: createNoteCardStylePayload(note, {
+          backgroundColor: '#fff7d6',
         }),
         width: 260,
         height: 178,
@@ -311,17 +301,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       return {
         itemType: 'illustration',
         sourceId: payload.id,
-        stylePayload: JSON.stringify({
-          imageStyle: {
-            fit: 'contain',
-            frame: 'none',
-            borderWidth: 0,
-            borderColor: '#ffffff',
-            radius: 12,
-            shadow: 0,
-            backgroundColor: 'transparent',
-          },
-        }),
+        stylePayload: createImageStylePayload(),
         width: imageSize.width,
         height: imageSize.height,
         rotation: 2,
@@ -1367,27 +1347,12 @@ function getDockFromPoint(clientX: number, clientY: number): DrawerDock | null {
 }
 
 function readStoredDrawerDock(): DrawerDock {
-  if (typeof localStorage === 'undefined') return 'left'
-  const value = localStorage.getItem(DRAWER_DOCK_STORAGE_KEY)
+  const value = readLocalStorage(DRAWER_DOCK_STORAGE_KEY)
   return value === 'right' || value === 'top' || value === 'bottom' || value === 'left' ? value : 'left'
 }
 
 function createDraftId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
-function getDefaultIllustrationItemSize(illustration: Illustration | undefined) {
-  const rawWidth = illustration?.width || 0
-  const rawHeight = illustration?.height || 0
-  if (rawWidth > 0 && rawHeight > 0) {
-    const maxSide = 320
-    const scale = Math.min(maxSide / rawWidth, maxSide / rawHeight, 1)
-    return {
-      width: Math.max(120, Math.round(rawWidth * scale)),
-      height: Math.max(120, Math.round(rawHeight * scale)),
-    }
-  }
-  return { width: 260, height: 320 }
 }
 
 function stampToInput(stamp: Stamp | StampInput): StampInput {
