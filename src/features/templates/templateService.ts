@@ -1,5 +1,6 @@
 import { generateId, getDb } from '../../database'
 import type { ResourceTemplate, ResourceTemplateRow, ResourceTemplateType, TemplateSnapshot } from '../../types'
+import { JOURNAL_PAGE_TEMPLATES, toResourceTemplate } from '../journal/journalPageTemplates'
 
 const VALID_TEMPLATE_TYPES: ResourceTemplateType[] = ['note', 'journal_page', 'stamp', 'material']
 
@@ -8,10 +9,7 @@ export const BUILTIN_TEMPLATES: ResourceTemplate[] = [
     style: 'memory-note',
     fields: ['title', 'date', 'mood', 'body'],
   }),
-  createBuiltinTemplate('builtin-journal-page-live', 'journal_page', 'templates.builtin.journalLive.name', 'templates.builtin.journalLive.description', {
-    background: 'grid',
-    slots: ['date', 'title', 'illustration', 'reflection'],
-  }),
+  ...JOURNAL_PAGE_TEMPLATES.map(toResourceTemplate),
   createBuiltinTemplate('builtin-stamp-recorded', 'stamp', 'templates.builtin.stampRecorded.name', 'templates.builtin.stampRecorded.description', {
     template_id: 'recorded',
     position: 'bottom-right',
@@ -23,20 +21,23 @@ export const BUILTIN_TEMPLATES: ResourceTemplate[] = [
 ]
 
 export async function fetchResourceTemplates(type?: ResourceTemplateType): Promise<ResourceTemplate[]> {
-  const db = await getDb()
-  const bindings: unknown[] = []
-  const where = ['deleted = 0', 'hidden = 0']
-  if (type) {
-    where.push('type = ?')
-    bindings.push(type)
-  }
-  const rows = await db.select<ResourceTemplateRow[]>(
-    `SELECT * FROM templates WHERE ${where.join(' AND ')} ORDER BY created_at DESC`,
-    bindings
-  )
-  const userTemplates = rows.map(deserializeTemplate)
   const builtins = type ? BUILTIN_TEMPLATES.filter((template) => template.type === type) : BUILTIN_TEMPLATES
-  return [...builtins, ...userTemplates]
+  try {
+    const db = await getDb()
+    const bindings: unknown[] = []
+    const where = ['deleted = 0', 'hidden = 0']
+    if (type) {
+      where.push('type = ?')
+      bindings.push(type)
+    }
+    const rows = await db.select<ResourceTemplateRow[]>(
+      `SELECT * FROM templates WHERE ${where.join(' AND ')} ORDER BY created_at DESC`,
+      bindings
+    )
+    return [...builtins, ...rows.map(deserializeTemplate)]
+  } catch {
+    return builtins
+  }
 }
 
 export async function createResourceTemplate(input: {

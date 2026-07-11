@@ -1,24 +1,18 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import clsx from 'clsx'
-import { Camera, Calendar, Flower2, Heart, ImageIcon, Music2, Sparkles, Star } from 'lucide-react'
+import { Calendar, Heart, ImageIcon } from 'lucide-react'
 import type { JournalItemWithNote, JournalPageOrientation } from '../../../types'
 import { clampLayout, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
 import { useI18n } from '../../../i18n/useI18n'
-import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
 import type { JournalPopoverAnchor } from './JournalCanvas'
 import {
-  getFontFamily,
-  getImageBottomPadding,
-  getImageFrameStyle,
-  getImagePadding,
   getJournalImageItemStyle,
   getJournalNoteCardStyle,
-  getMaterialGlassStyle,
-  getMaterialStylePayload,
 } from '../../../features/journal/journalItemStyles'
 import { getJournalItemConstraints } from '../../../features/journal/journalItemSizing'
-import { asNumber, asString } from '../../../utils/safeJson'
+import { journalItemToDraftItem } from '../../../features/journal/journalDraftAdapters'
+import { JournalDraftItemRenderer } from './JournalDraftItemRenderer'
 
 interface JournalStickerProps {
   item: JournalItemWithNote
@@ -46,9 +40,10 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
   const isMaterial = item.item_type === 'material'
   const noteCard = item.item_type === 'note' ? getJournalNoteCardStyle(item, t('common.untitled'), t('common.noContent')) : null
   const imageStyle = item.item_type === 'illustration' ? getJournalImageItemStyle(item) : null
+  const sharedDraftItem = isMaterial || noteCard || imageStyle ? journalItemToDraftItem(item)[0] : null
 
   useEffect(() => {
-    if (item.item_type !== 'illustration') return
+    if (item.item_type !== 'illustration' || imageStyle) return
     let alive = true
     let currentUrl = ''
     const originalPath = item.illustration?.original_path || null
@@ -75,7 +70,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
       alive = false
       releaseMediaUrl(currentUrl)
     }
-  }, [item.illustration?.original_path, item.illustration?.thumbnail_path, item.item_type])
+  }, [imageStyle, item.illustration?.original_path, item.illustration?.thumbnail_path, item.item_type])
 
   function handlePointerDown(e: PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0) return
@@ -169,27 +164,9 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
     >
       {isTape ? (
         <TapeBody item={item} />
-      ) : isMaterial ? (
-        <MaterialBody item={item} />
-      ) : item.item_type === 'illustration' ? imageStyle ? (
-        <div className="h-full w-full overflow-hidden" style={getImageFrameStyle(imageStyle)}>
-          <div
-            className="h-full w-full overflow-hidden"
-            style={{
-              padding: `${getImagePadding(imageStyle)}px ${getImagePadding(imageStyle)}px ${getImageBottomPadding(imageStyle)}px`,
-              borderRadius: imageStyle.radius,
-            }}
-          >
-            {imageSrc ? (
-              <img src={imageSrc} alt={item.illustration?.title || ''} className="h-full w-full" style={{ objectFit: imageStyle.fit }} draggable={false} />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-text-muted">
-                <ImageIcon size={28} />
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
+      ) : sharedDraftItem ? (
+        <JournalDraftItemRenderer item={sharedDraftItem} note={item.note || undefined} illustration={item.illustration || undefined} />
+      ) : item.item_type === 'illustration' ? (
         <div className="flex h-full flex-col">
           <div className="min-h-0 flex-1 bg-bg-tertiary">
             {imageSrc ? (
@@ -213,34 +190,6 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
               {item.illustration?.artist ? t('common.byArtist', { artist: item.illustration.artist }) : t('common.unknownArtist')}
             </p>
           </div>
-        </div>
-      ) : noteCard ? (
-        <div
-          className="flex h-full w-full flex-col overflow-hidden border border-black/10 shadow-sm"
-          style={{
-            backgroundColor: noteCard.backgroundColor,
-            color: noteCard.textColor,
-            padding: noteCard.padding,
-            borderRadius: noteCard.radius,
-            fontFamily: getFontFamily(noteCard.fontFamily),
-            fontSize: noteCard.fontSize,
-            fontWeight: noteCard.fontWeight,
-            lineHeight: noteCard.lineHeight,
-          }}
-        >
-          {noteCard.titleVisible && (
-            <h4 className="mb-2 shrink-0 whitespace-pre-wrap break-words text-[1.08em] font-semibold leading-snug">
-              {noteCard.titleText}
-            </h4>
-          )}
-          <p className="min-h-0 flex-1 whitespace-pre-wrap break-words">
-            {noteCard.bodyText}
-          </p>
-          {noteCard.showTags && item.note && item.note.tags.length > 0 && (
-            <div className="mt-2 flex shrink-0 flex-wrap gap-1 overflow-hidden text-[0.78em]">
-              {item.note.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-full bg-white/55 px-2 py-0.5 text-text-muted">{tag}</span>)}
-            </div>
-          )}
         </div>
       ) : (
         <div className="flex h-full flex-col p-4">
@@ -279,69 +228,6 @@ function TapeBody({ item }: { item: JournalItemWithNote }) {
   const color = item.color || '#d9c4ff'
   const style = item.sticker_style
   return <TapeShape color={color} styleId={style} />
-}
-
-function MaterialBody({ item }: { item: JournalItemWithNote }) {
-  const material = getJournalMaterialDefinition(item.material_id)
-  const style = getMaterialStylePayload(item.style_payload, item.material_id)
-  const color = asString(style.color) || item.color || '#d9c4ff'
-  const glassStrength = Math.min(100, Math.max(0, asNumber(style.glassStrength, 0)))
-  const glassStyle = getMaterialGlassStyle(glassStrength, color)
-
-  if (material?.kind === 'tape') {
-    return <TapeShape color={color} styleId={asString(style.tapeStyle) || 'washi'} extraStyle={glassStyle} />
-  }
-
-  if (material?.kind === 'paper') {
-    return (
-      <span
-        className="pointer-events-none relative block h-full w-full overflow-hidden rounded-lg border border-white/55 shadow-sm"
-        style={{ backgroundColor: color, ...glassStyle }}
-      >
-        <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.35),transparent_48%,rgba(0,0,0,0.05))]" />
-        {style.line === true && (
-          <span className="absolute inset-x-3 top-7 bottom-3 bg-[linear-gradient(transparent_21px,rgba(100,110,140,0.18)_22px)] bg-[length:100%_22px]" />
-        )}
-      </span>
-    )
-  }
-
-  if (material?.kind === 'label') {
-    return (
-      <span
-        className={clsx(
-          'pointer-events-none relative flex h-full w-full items-center justify-center overflow-hidden border border-black/10 px-3 shadow-sm',
-          style.shape === 'ticket' ? 'rounded-md border-dashed' : 'rounded-full'
-        )}
-        style={{ backgroundColor: color, ...glassStyle }}
-      >
-        <span className="h-2 w-2 rounded-full bg-white/70 shadow-inner" />
-        <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.26),transparent_50%,rgba(0,0,0,0.05))]" />
-      </span>
-    )
-  }
-
-  return (
-    <span
-        className={clsx(
-          'pointer-events-none flex h-full w-full items-center justify-center rounded-full',
-          glassStrength > 0 ? 'border border-white/60 shadow-sm' : 'border border-transparent bg-transparent shadow-none'
-        )}
-        style={{ color, ...glassStyle }}
-    >
-      <MaterialIcon icon={asString(style.icon)} />
-    </span>
-  )
-}
-
-function MaterialIcon({ icon }: { icon: string }) {
-  const size = 42
-  if (icon === 'heart') return <Heart size={size} fill="currentColor" />
-  if (icon === 'star') return <Star size={size} fill="currentColor" />
-  if (icon === 'flower') return <Flower2 size={size} />
-  if (icon === 'music') return <Music2 size={size} />
-  if (icon === 'camera') return <Camera size={size} />
-  return <Sparkles size={size} />
 }
 
 function TapeShape({ color, styleId, extraStyle }: { color: string; styleId: string; extraStyle?: CSSProperties }) {

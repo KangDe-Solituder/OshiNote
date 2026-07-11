@@ -314,6 +314,9 @@ export type JournalDraftItemType = 'note' | 'illustration' | 'material'
 export interface JournalDraftItem {
   draftId: string
   originItemId?: string
+  templateSlotId?: string
+  templateSourceId?: string
+  templateGenerated?: boolean
   itemType: JournalDraftItemType
   sourceId?: string
   materialId?: string
