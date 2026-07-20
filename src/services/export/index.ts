@@ -4,13 +4,14 @@ import { fetchAllOshis } from '../../features/oshis/oshiService'
 import { fetchArchivesByOshi } from '../../features/oshis/archiveService'
 import { getDb } from '../../database'
 import type { Note, NoteRow, Oshi, Archive } from '../../types'
+import { isStringArray, safeJsonParse } from '../../utils/safeJson'
 
 export type ExportFormat = 'json' | 'markdown' | 'txt'
 
 function deserializeNote(row: NoteRow): Note {
   return {
     ...row,
-    tags: JSON.parse(row.tags || '[]'),
+    tags: safeJsonParse(row.tags, [], isStringArray),
     favorite: row.favorite === 1,
   }
 }

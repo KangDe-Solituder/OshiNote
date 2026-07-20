@@ -12,6 +12,13 @@ export async function getDb(): Promise<Database> {
   return dbPromise
 }
 
+export async function closeDb(): Promise<void> {
+  const current = db
+  db = null
+  dbPromise = null
+  if (current) await current.close()
+}
+
 async function initializeDb(): Promise<Database> {
   const database = await Database.load('sqlite:oshinote.db')
   try {

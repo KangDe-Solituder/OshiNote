@@ -34,7 +34,7 @@ The main app shell, local SQLite storage, oshi spaces, note editor, illustration
 
 - Tauri desktop shell with a custom top window bar.
 - Resizable sidebar for My Oshis.
-- Bottom sidebar entries for Home, Export, and Settings.
+- Bottom sidebar entries for Home, Data, and Settings.
 - Top-level navigation for Journal and Resources.
 - Multiple themes, glass effect, font size controls, and motion speed controls.
 
@@ -105,6 +105,16 @@ The main app shell, local SQLite storage, oshi spaces, note editor, illustration
 - Optional stamp fonts can be downloaded from Settings into the app data directory.
 - PNG stamp import is planned but not implemented yet.
 
+### Backup And Sync
+
+- Existing readable exports remain available as JSON, Markdown, and TXT.
+- Portable OshiNote ZIP backups support two modes:
+  - data only: database content without local media files;
+  - complete data: database content plus local illustrations, thumbnails, and stamp fonts.
+- Backups can be imported through the Data page; the app restarts after replacing the local database.
+- Optional WebDAV snapshot sync can test a server, upload the latest complete backup, or download and restore it.
+- WebDAV sync is snapshot-based in the first version. It does not merge records bidirectionally.
+
 ## Not Implemented Yet
 
 - Full user-facing material library management.
@@ -114,7 +124,7 @@ The main app shell, local SQLite storage, oshi spaces, note editor, illustration
 - LLM-assisted tag pool understanding and quote extraction.
 - User-imported PNG stamps.
 - Advanced journal templates with fixed slots.
-- Full export / backup / restore workflow.
+- Automatic scheduled backup and conflict-aware WebDAV merging.
 - Search normalization for Japanese readings, aliases, and kana/kanji expansion.
 - Route-level code splitting and deeper performance audits.
 

@@ -7,6 +7,7 @@ import { Modal } from '../components/ui/Modal'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 import { fetchJournalBooks, fetchStandalonePostcards } from '../features/journal/journalService'
+import { getJournalBackgroundPreset } from '../features/journal/journalBackgrounds'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import { useJournalStore } from '../stores/journalStore'
 import type { JournalBook, JournalCoverDecoration, JournalCoverStyle, JournalPage, Oshi } from '../types'
@@ -588,9 +589,11 @@ function ShelfListRow({ item, onOpen }: { item: JournalShelfItem; onOpen: () => 
 
 function LoosePageCover({ page }: { page: JournalPage }) {
   return (
-    <div className="relative aspect-[0.68] w-full overflow-hidden rounded-[14px] border border-border-color bg-[var(--journal-canvas-bg)] shadow-[0_14px_28px_rgba(66,90,130,0.16)]">
+    <div
+      className="relative aspect-[0.68] w-full overflow-hidden rounded-[14px] border border-border-color shadow-[0_14px_28px_rgba(66,90,130,0.16)]"
+      style={getJournalBackgroundPreset(page.background).canvasBackground}
+    >
       <div className="absolute inset-3 rounded-[10px] border border-border-color/80" />
-      <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(var(--journal-canvas-dot)_1px,transparent_1px)] [background-size:15px_15px]" />
       <div className="absolute left-5 top-8 h-12 w-16 rotate-[-3deg] rounded-xl bg-[var(--journal-sticker-2)] shadow-sm" />
       <div className="absolute bottom-20 right-5 h-11 w-20 rotate-[2deg] rounded-xl bg-[var(--journal-sticker-4)] shadow-sm" />
       <FileImage size={28} className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 text-accent" />
