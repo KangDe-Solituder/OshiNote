@@ -1,6 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
-import { relaunch } from '@tauri-apps/plugin-process'
 import { closeDb } from '../../database'
 
 export type BackupMode = 'data' | 'complete'
@@ -45,6 +44,6 @@ export async function importBackup(): Promise<BackupSummary | null> {
 
   await closeDb()
   await invoke<BackupSummary>('restore_backup', { archive_path: path })
-  await relaunch()
+  window.location.reload()
   return null
 }

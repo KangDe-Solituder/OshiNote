@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Check, FileImage, ImageIcon, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '../../ui/Button'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../../layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../../layout/pageShell'
 import { useJournalStore } from '../../../stores/journalStore'
 import { useNoteStore } from '../../../stores/noteStore'
 import type { JournalBook, JournalItemWithNote, JournalPage, Stamp } from '../../../types'
@@ -235,7 +235,8 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 border-b border-border-color bg-bg-primary/95">
-        <div className={`${PAGE_HEADER_CLASS} h-20 gap-3 border-b-0`}>
+        <div className={`${PAGE_HEADER_CLASS} h-20 border-b-0`}>
+          <div className={`${PAGE_WIDE_FRAME_CLASS} flex min-w-0 items-center gap-3`}>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <button type="button" onClick={handleBack} className="rounded-lg p-2 text-text-muted hover:bg-bg-tertiary hover:text-text-primary" title={bookId && showPageCanvas && !standalonePostcard ? t('journalPage.backToPages') : t('journalPage.backToJournal')}>
               <ArrowLeft size={20} />
@@ -321,6 +322,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
               </Button>
             </>
           )}
+          </div>
         </div>
         <AnimatePresence initial={false}>
           {showPageEditor && (
@@ -503,7 +505,7 @@ function PageGallery({
 }) {
   return (
     <motion.div {...transition} className={`${PAGE_CONTENT_CLASS} h-full min-w-0 flex-1 bg-bg-primary`}>
-      <div className="mx-auto max-w-6xl">
+      <div className={PAGE_WIDE_FRAME_CLASS}>
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-bold text-text-primary">{t('journalPage.pages')}</h3>
@@ -517,7 +519,7 @@ function PageGallery({
         {loading && pages.length === 0 ? (
           <Loader2 size={24} className="mx-auto mt-20 animate-spin text-accent" />
         ) : (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,320px))] justify-start gap-5">
             {pages.map((page) => (
               <PagePreviewCard key={page.id} page={page} items={itemsByPageId[page.id] || []} stamp={stampsByPageId[page.id]} active={false} onSelect={() => onSelect(page.id)} t={t} />
             ))}

@@ -5,7 +5,7 @@ import { BookOpen, Camera, FileImage, Flower, Grid3X3, Heart, List, Loader2, Moo
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { SelectMenu } from '../components/ui/SelectMenu'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { fetchJournalBooks, fetchStandalonePostcards } from '../features/journal/journalService'
 import { getJournalBackgroundPreset } from '../features/journal/journalBackgrounds'
 import { fetchAllOshis } from '../features/oshis/oshiService'
@@ -230,8 +230,9 @@ export function JournalHomePage() {
       </header>
 
       <main className={`${PAGE_CONTENT_CLASS} min-h-0`}>
+        <div className={PAGE_WIDE_FRAME_CLASS}>
         <div className="mb-8 flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[240px] flex-1 sm:max-w-md">
+          <div className="relative min-w-[240px] flex-1 sm:max-w-xl lg:max-w-2xl">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               value={query}
@@ -265,7 +266,7 @@ export function JournalHomePage() {
               <motion.div
                 key="grid"
                 {...pageTransition}
-                className="grid grid-cols-2 gap-x-7 gap-y-10 md:grid-cols-3 xl:grid-cols-4"
+                className="grid grid-cols-2 justify-start gap-x-7 gap-y-10 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
               >
                 {filteredItems.map((item, index) => (
                   <ShelfGridCard
@@ -284,7 +285,7 @@ export function JournalHomePage() {
                 <button
                   type="button"
                   onClick={openNewChoice}
-                  className="flex h-[262px] max-w-[180px] flex-col items-center justify-center rounded-2xl bg-bg-secondary/20 text-accent transition-colors hover:bg-bg-secondary/40"
+                  className="flex aspect-[0.68] w-full max-w-[220px] flex-col items-center justify-center rounded-2xl bg-bg-secondary/20 text-accent transition-colors hover:bg-bg-secondary/40"
                 >
                   <Plus size={30} />
                   <span className="mt-4 text-sm font-semibold">{t('journalHome.new')}</span>
@@ -304,6 +305,7 @@ export function JournalHomePage() {
             )}
           </AnimatePresence>
         )}
+        </div>
       </main>
       <Modal open={newChoiceOpen} onClose={() => setNewChoiceOpen(false)} title={t('journalHome.createChoice.title')}>
         <div className="grid gap-4">
@@ -469,7 +471,7 @@ function ShelfGridCard({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: motionSeconds, delay: Math.min(index * 0.012, 0.06), ease: 'easeOut' }}
-      className="group relative max-w-[180px]"
+      className="group relative w-full max-w-[220px]"
     >
       <motion.button type="button" onClick={onOpen} whileHover={{ y: -2 }} whileTap={{ scale: 0.99 }} className="block w-full text-left">
         {item.kind === 'book' ? <BookCover book={item.book} /> : <LoosePageCover page={item.page} />}

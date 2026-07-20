@@ -1,5 +1,4 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
-import { relaunch } from '@tauri-apps/plugin-process'
 import { closeDb } from '../../database'
 import { isRecord, safeJsonParse, asString } from '../../utils/safeJson'
 import { readLocalStorage, writeLocalStorage } from '../../utils/safeLocalStorage'
@@ -70,8 +69,8 @@ export async function uploadWebDavBackup(config: WebDavConfig): Promise<WebDavSu
 
 export async function downloadAndRestoreWebDavBackup(config: WebDavConfig): Promise<void> {
   requireTauri()
+  await invoke<string>('download_webdav_backup', { config: toCommandConfig(config) })
   await closeDb()
-  const archivePath = await invoke<string>('download_webdav_backup', { config: toCommandConfig(config) })
-  await invoke('restore_backup', { archive_path: archivePath })
-  await relaunch()
+  await invoke('restore_downloaded_webdav_backup')
+  window.location.reload()
 }

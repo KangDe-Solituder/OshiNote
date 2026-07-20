@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import { Edit3, ExternalLink, FileText, Heart, ImageIcon, Link2, Loader2, Plus, Tag } from 'lucide-react'
 import { Button } from '../components/ui/Button'
-import { PAGE_CONTENT_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS } from '../components/layout/pageShell'
 import { OshiForm } from '../features/oshis/OshiForm'
 import { fetchOshiById, getOshiNoteCount, updateOshi } from '../features/oshis/oshiService'
 import { fetchRecentNotesByOshi, getTagsByOshi } from '../features/notes/noteService'
@@ -84,7 +84,7 @@ export function OshiOverviewPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-bg-primary">
-      <main className={`${PAGE_CONTENT_CLASS} mx-auto max-w-6xl`}>
+      <main className={`${PAGE_CONTENT_CLASS} ${PAGE_DASHBOARD_FRAME_CLASS}`}>
         <section className="mb-5 rounded-2xl border border-border-color bg-bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-start gap-4">
             <div
@@ -132,7 +132,7 @@ export function OshiOverviewPage() {
           <StatCard icon={Tag} label={t('nav.tags')} value={stats.tags} to={`/oshis/${oshiId}/tags`} />
         </section>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(380px,0.8fr)] 2xl:grid-cols-[minmax(0,1.45fr)_minmax(440px,0.75fr)]">
           <section className="rounded-2xl border border-border-color bg-bg-card p-5">
             <SectionHeader title={t('oshiOverview.recentNotes')} to={`/oshis/${oshiId}/notes`} />
             {notes.length === 0 ? (

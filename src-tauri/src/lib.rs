@@ -1,6 +1,6 @@
 use reqwest::{Client, Method, Url};
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Component, Path, PathBuf};
@@ -13,6 +13,7 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 const BACKUP_FORMAT: &str = "oshinote-backup";
 const BACKUP_VERSION: u32 = 1;
 const WEBDAV_BACKUP_NAME: &str = "oshinote-latest-full.oshi.zip";
+const RESTORE_LOG_FILE: &str = "restore.log";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct BackupManifest {
@@ -119,13 +120,60 @@ fn create_backup(
 
 #[tauri::command]
 fn restore_backup(app: tauri::AppHandle, archive_path: String) -> Result<BackupSummary, String> {
-    let archive_path = PathBuf::from(archive_path);
+    restore_backup_with_log(&app, &PathBuf::from(archive_path))
+}
+
+#[tauri::command]
+fn restore_downloaded_webdav_backup(app: tauri::AppHandle) -> Result<BackupSummary, String> {
     let app_data_dir = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
+    let archive_path = app_data_dir
+        .join("backups")
+        .join("webdav-download.oshi.zip");
+    restore_backup_with_log(&app, &archive_path)
+}
+
+fn restore_backup_with_log(
+    app: &tauri::AppHandle,
+    archive_path: &Path,
+) -> Result<BackupSummary, String> {
+    let log_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
+    append_restore_log(
+        &log_dir,
+        &format!(
+            "restore requested archive={} exists={}",
+            archive_path.display(),
+            archive_path.is_file()
+        ),
+    );
+    let result = restore_backup_archive(app, archive_path);
+    if result.is_ok() {
+        append_restore_log(&log_dir, "restore completed");
+    } else if let Err(error) = &result {
+        append_restore_log(&log_dir, &format!("restore failed: {error}"));
+    }
+    result
+}
+
+fn restore_backup_archive(
+    app: &tauri::AppHandle,
+    archive_path: &Path,
+) -> Result<BackupSummary, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    let app_config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
     let archive_file =
-        File::open(&archive_path).map_err(|error| format!("Could not open backup: {error}"))?;
+        File::open(archive_path).map_err(|error| format!("Could not open backup: {error}"))?;
     let mut archive = ZipArchive::new(archive_file)
         .map_err(|error| format!("Invalid backup archive: {error}"))?;
     let manifest = read_manifest(&mut archive)?;
@@ -150,24 +198,34 @@ fn restore_backup(app: tauri::AppHandle, archive_path: String) -> Result<BackupS
             }
         }
 
-        let database_path = app_data_dir.join("oshinote.db");
-        fs::create_dir_all(&app_data_dir).map_err(|error| error.to_string())?;
-        if database_path.exists() {
-            fs::copy(
-                &database_path,
-                app_data_dir.join("oshinote.db.before-restore"),
-            )
-            .map_err(|error| format!("Could not create pre-restore backup: {error}"))?;
-        }
+        let database_path = app_config_dir.join("oshinote.db");
+        let previous_database_path = app_config_dir.join("oshinote.db.before-restore");
+        let replacement_path = app_config_dir.join("oshinote.db.restore-new");
+        fs::create_dir_all(&app_config_dir).map_err(|error| error.to_string())?;
+        fs::copy(staging.join("oshinote.db"), &replacement_path)
+            .map_err(|error| format!("Could not prepare restored database: {error}"))?;
         for suffix in ["-wal", "-shm"] {
-            let sidecar = app_data_dir.join(format!("oshinote.db{suffix}"));
+            let sidecar = app_config_dir.join(format!("oshinote.db{suffix}"));
             if sidecar.exists() {
                 fs::remove_file(sidecar)
                     .map_err(|error| format!("Could not clear SQLite sidecar: {error}"))?;
             }
         }
-        fs::copy(staging.join("oshinote.db"), &database_path)
-            .map_err(|error| format!("Could not restore database: {error}"))?;
+        if database_path.exists() {
+            if previous_database_path.exists() {
+                fs::remove_file(&previous_database_path)
+                    .map_err(|error| format!("Could not clear previous restore backup: {error}"))?;
+            }
+            fs::rename(&database_path, &previous_database_path).map_err(|error| {
+                format!("Could not release current database for restore: {error}")
+            })?;
+        }
+        if let Err(error) = fs::rename(&replacement_path, &database_path) {
+            if previous_database_path.exists() && !database_path.exists() {
+                let _ = fs::rename(&previous_database_path, &database_path);
+            }
+            return Err(format!("Could not activate restored database: {error}"));
+        }
 
         if manifest.mode == "complete" {
             for path in &manifest.included_paths {
@@ -282,7 +340,11 @@ fn create_backup_archive(
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    let database_path = app_data_dir.join("oshinote.db");
+    let app_config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
+    let database_path = app_config_dir.join("oshinote.db");
     if !database_path.exists() {
         return Err("The OshiNote database does not exist yet.".to_string());
     }
@@ -465,6 +527,18 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn append_restore_log(app_data_dir: &Path, message: &str) {
+    let log_path = app_data_dir.join(RESTORE_LOG_FILE);
+    if let Ok(mut log) = OpenOptions::new().create(true).append(true).open(log_path) {
+        let _ = writeln!(
+            log,
+            "{} pid={} {message}",
+            format_timestamp(),
+            std::process::id()
+        );
+    }
 }
 
 fn webdav_client(config: &WebDavConfig) -> Result<Client, String> {
@@ -679,6 +753,7 @@ pub fn run() {
             open_external_url,
             create_backup,
             restore_backup,
+            restore_downloaded_webdav_backup,
             test_webdav_connection,
             upload_webdav_backup,
             download_webdav_backup

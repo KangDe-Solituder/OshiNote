@@ -45,11 +45,6 @@
       "windows": {
         "installMode": "passive"
       }
-    },
-    "sql": {
-      "preload": [
-        "sqlite:oshinote.db"
-      ]
     }
   }
 }
