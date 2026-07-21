@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import { BaseDirectory, exists, mkdir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs'
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -78,8 +78,8 @@ export async function removeIllustrationFiles(paths: Array<string | null | undef
 
 export async function resolveMediaUrl(relativePath: string | null | undefined): Promise<string> {
   if (!relativePath) return ''
-  if (!isTauri()) return ''
-  const bytes = await readFile(relativePath, { baseDir: BaseDirectory.AppData })
+  if (!hasTauriRuntime()) return ''
+  const bytes = await readIllustrationBytes(relativePath)
   return URL.createObjectURL(new Blob([bytes], { type: getImageMimeType(relativePath) }))
 }
 
@@ -101,6 +101,25 @@ export async function resolveMediaUrlWithFallback(
 
 export function releaseMediaUrl(url: string): void {
   if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+}
+
+async function readIllustrationBytes(relativePath: string): Promise<Uint8Array<ArrayBuffer>> {
+  try {
+    const bytes = await readFile(relativePath, { baseDir: BaseDirectory.AppData })
+    return new Uint8Array(bytes)
+  } catch (pluginError) {
+    try {
+      const bytes = await invoke<number[]>('read_illustration_media_file', { relativePath })
+      return new Uint8Array(bytes)
+    } catch (nativeError) {
+      throw new Error(`Could not read illustration media. Plugin: ${String(pluginError)}; native: ${String(nativeError)}`, { cause: nativeError })
+    }
+  }
+}
+
+function hasTauriRuntime(): boolean {
+  if (isTauri()) return true
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
 
 async function ensureMediaDir(path: string): Promise<void> {

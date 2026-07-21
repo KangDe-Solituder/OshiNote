@@ -13,6 +13,7 @@ import { JournalItemDetailPanel } from './JournalItemDetailPanel'
 import { getItemLayout } from './journalDraftCanvasGeometry'
 import { StampOverlay } from '../stamps/StampOverlay'
 import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
+import { useJournalWheelZoom } from './journalCanvasZoom'
 
 interface JournalDraftCanvasProps {
   background: string
@@ -66,6 +67,7 @@ export function JournalDraftCanvas({
 }: JournalDraftCanvasProps) {
   const { t } = useI18n()
   const pageSize = getJournalPageSize(orientation)
+  const viewportRef = useJournalWheelZoom(zoom, onZoomChange)
   const pageRef = useRef<HTMLDivElement>(null)
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
   const selectedItem = items.find((item) => item.draftId === selectedItemId) || null
@@ -99,7 +101,7 @@ export function JournalDraftCanvas({
   }
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto bg-[var(--journal-canvas-bg)] p-6">
+    <div ref={viewportRef} className="relative flex h-full min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto bg-[var(--journal-canvas-bg)] p-6">
       <div className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
         <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
         <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>

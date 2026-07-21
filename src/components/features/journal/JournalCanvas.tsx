@@ -7,6 +7,7 @@ import { getPageBackground } from './journalCanvasStyle'
 import { StampOverlay } from '../stamps/StampOverlay'
 import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
 import type { Stamp, StampInput } from '../../../types'
+import { useJournalWheelZoom } from './journalCanvasZoom'
 
 export interface JournalPopoverAnchor {
   clientX: number
@@ -53,9 +54,10 @@ export function JournalCanvas({
   const { t } = useI18n()
   const orientation = page?.orientation || 'portrait'
   const canvasSize = getJournalCanvasSize(items, orientation)
+  const viewportRef = useJournalWheelZoom(zoom, onZoomChange)
 
   return (
-    <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-auto bg-[var(--journal-canvas-bg)]">
+    <div ref={viewportRef} className="relative h-full min-h-0 min-w-0 flex-1 overflow-auto bg-[var(--journal-canvas-bg)]">
       <div
         className="sticky top-4 z-[60] flex h-10 w-max items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur"
         style={{ left: `max(16px, calc(100% - 178px - ${zoomControlsRightOffset}px))` }}

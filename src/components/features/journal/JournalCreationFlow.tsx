@@ -11,7 +11,7 @@ import { useI18n } from '../../../i18n/useI18n'
 import type { Illustration, JournalDraftItem, JournalPageOrientation, Note, Oshi, Stamp, StampInput } from '../../../types'
 import { fetchAllOshis } from '../../../features/oshis/oshiService'
 import { fetchNotesByOshi } from '../../../features/notes/noteService'
-import { fetchIllustrations } from '../../../features/illustrations/illustrationService'
+import { fetchIllustrationById, fetchIllustrations } from '../../../features/illustrations/illustrationService'
 import { createJournalPageFromDraft } from '../../../features/journal/journalService'
 import { getJournalPageSize } from '../../../features/journal/journalLayout'
 import { getJournalMaterialDefinition, getMaterialSnapshot } from '../../../features/journal/journalMaterials'
@@ -76,6 +76,11 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const queryOshiId = editMode ? '' : searchParams.get('oshiId') || ''
   const queryTemplate = editMode ? null : getJournalPageTemplateDefinition(searchParams.get('templateId'))
   const drawerHoverCloseTimerRef = useRef<number | null>(null)
+  const initialIllustrationIdsRef = useRef(
+    Array.from(new Set((initialDraft?.items || [])
+      .filter((item) => item.itemType === 'illustration' && item.sourceId)
+      .map((item) => item.sourceId!)))
+  )
   const [stepIndex, setStepIndex] = useState(editMode && initialStep !== 'setup' ? 1 : 0)
   const step = STEPS[stepIndex]
   const [oshis, setOshis] = useState<Oshi[]>([])
@@ -143,11 +148,16 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     Promise.all([
       fetchNotesByOshi(selectedOshiId, { page: 1, pageSize: 200, archiveFilter: 'all' }),
       fetchIllustrations({ oshiId: selectedOshiId, includeArchived: false, sort: 'newest' }),
+      Promise.all(initialIllustrationIdsRef.current.map((id) => fetchIllustrationById(id).catch(() => null))),
     ])
-      .then(([noteResult, illustrationRows]) => {
+      .then(([noteResult, illustrationRows, referencedIllustrations]) => {
         if (!alive) return
+        const mergedIllustrations = new Map(illustrationRows.map((illustration) => [illustration.id, illustration]))
+        for (const illustration of referencedIllustrations) {
+          if (illustration) mergedIllustrations.set(illustration.id, illustration)
+        }
         setNotes(noteResult.notes)
-        setIllustrations(illustrationRows)
+        setIllustrations(Array.from(mergedIllustrations.values()))
         if (editMode) return
         setItems((current) => current.filter((item) => {
           if (item.itemType === 'note') return noteResult.notes.some((note) => note.id === item.sourceId)
@@ -182,6 +192,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
 
   const notesById = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
   const illustrationsById = useMemo(() => new Map(illustrations.map((illustration) => [illustration.id, illustration])), [illustrations])
+  const selectableIllustrations = useMemo(() => illustrations.filter((illustration) => !illustration.archived), [illustrations])
   const placedNoteIds = useMemo(() => new Set(items.filter((item) => item.itemType === 'note').map((item) => item.sourceId || '')), [items])
   const placedIllustrationIds = useMemo(() => new Set(items.filter((item) => item.itemType === 'illustration').map((item) => item.sourceId || '')), [items])
   const canSubmit = Boolean(selectedOshiId) && !creating
@@ -434,7 +445,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               <AnimatePresence mode="wait">
                 <motion.div key={step.id} initial={{ opacity: 0, x: effectiveDrawerDock === 'right' ? 10 : -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: effectiveDrawerDock === 'right' ? -10 : 10 }} transition={{ duration: motionSeconds, ease: 'easeOut' }}>
                   {step.id === 'notes' && <JournalNotesDrawer notes={notes} loading={loadingResources} query={noteQuery} filter={noteFilter} page={notePage} placedIds={placedNoteIds} onQueryChange={setNoteQuery} onFilterChange={setNoteFilter} onPageChange={setNotePage} onPointerPlace={startPointerResourceDrag} />}
-                  {step.id === 'images' && <JournalImagesDrawer illustrations={illustrations} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
+                  {step.id === 'images' && <JournalImagesDrawer illustrations={selectableIllustrations} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'materials' && <JournalMaterialsDrawer kind={materialKind} page={materialPage} onKindChange={setMaterialKind} onPageChange={setMaterialPage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'stamp' && <JournalStampDrawer value={stampDraft} placing={Boolean(stampPlacementDraft)} onClear={() => { setStampDraft(null); setStampPlacementDraft(null) }} onStartPlacement={setStampPlacementDraft} onCancelPlacement={() => setStampPlacementDraft(null)} />}
                   {step.id === 'review' && <JournalReviewDrawer title={title} dateLabel={dateLabel} description={description} background={background} orientation={orientation} templateId={selectedTemplateId} itemCount={items.length} stamp={stampDraft} creating={creating} canCreate={canSubmit} onCreate={handleSubmit} submitLabel={editMode ? t('journalEditor.setup.save') : t('journalCreate.create')} submittingLabel={editMode ? t('journalEditor.setup.saving') : t('journalCreate.creating')} />}

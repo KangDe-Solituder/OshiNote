@@ -14,6 +14,7 @@ const BACKUP_FORMAT: &str = "oshinote-backup";
 const BACKUP_VERSION: u32 = 1;
 const WEBDAV_BACKUP_NAME: &str = "oshinote-latest-full.oshi.zip";
 const RESTORE_LOG_FILE: &str = "restore.log";
+const MAX_ILLUSTRATION_MEDIA_BYTES: u64 = 25 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct BackupManifest {
@@ -70,6 +71,36 @@ fn open_external_url(url: String) -> Result<(), String> {
         } else {
             Err("Could not open the system browser.".to_string())
         }
+    })
+}
+
+#[tauri::command]
+fn read_illustration_media_file(
+    app: tauri::AppHandle,
+    relative_path: String,
+) -> Result<Vec<u8>, String> {
+    let normalized_path = relative_path.replace('\\', "/");
+    if !normalized_path.starts_with("media/illustrations/")
+        || normalized_path.starts_with('/')
+        || normalized_path.contains("../")
+        || normalized_path.contains(':')
+    {
+        return Err("Invalid illustration media path.".to_string());
+    }
+
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    let media_path = app_data_dir.join(Path::new(&normalized_path));
+    let metadata = fs::metadata(&media_path).map_err(|error| {
+        format!("Could not access illustration media file {normalized_path}: {error}")
+    })?;
+    if !metadata.is_file() || metadata.len() > MAX_ILLUSTRATION_MEDIA_BYTES {
+        return Err("Illustration media file is invalid or too large.".to_string());
+    }
+    fs::read(media_path).map_err(|error| {
+        format!("Could not read illustration media file {normalized_path}: {error}")
     })
 }
 
@@ -751,6 +782,7 @@ pub fn run() {
             post_local_ai_chat,
             download_stamp_font,
             open_external_url,
+            read_illustration_media_file,
             create_backup,
             restore_backup,
             restore_downloaded_webdav_backup,
