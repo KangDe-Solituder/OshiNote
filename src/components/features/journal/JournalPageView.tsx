@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Check, FileImage, ImageIcon, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
@@ -18,6 +18,17 @@ import { useI18n } from '../../../i18n/useI18n'
 import { fetchStampForTarget } from '../../../features/stamps/stampService'
 import { StampOverlay } from '../stamps/StampOverlay'
 import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
+import {
+  getFontFamily,
+  getImageBottomPadding,
+  getImageFrameStyle,
+  getImageItemStyleFromPayload,
+  getImagePadding,
+  getJournalImageItemStyle,
+  getJournalNoteCardStyle,
+  getNoteCardStyleFromPayload,
+} from '../../../features/journal/journalItemStyles'
+import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
 
 interface JournalPageViewProps {
   oshiId: string
@@ -614,33 +625,13 @@ function PagePreviewCard({
     >
       <div className="relative overflow-hidden rounded-xl border border-border-color" style={{ aspectRatio: pageAspect, ...getPageBackground(page.background || 'paper') }}>
         {items.map((item) => (
-          <span
+          <PagePreviewItem
             key={item.id}
-            className={`absolute overflow-hidden rounded-md border ${item.item_type === 'tape' ? 'shadow-none' : 'shadow-sm'}`}
-            style={{
-              left: `${(item.x / canvasSize.width) * 100}%`,
-              top: `${(item.y / canvasSize.height) * 100}%`,
-              width: `${(item.width / canvasSize.width) * 100}%`,
-              height: `${(item.height / canvasSize.height) * 100}%`,
-              transform: `rotate(${item.rotation}deg)`,
-              backgroundColor: item.item_type === 'illustration' ? 'var(--color-bg-card)' : item.item_type === 'tape' ? item.color || '#d9c4ff' : getPreviewStickerBackground(item.color),
-              borderColor: 'color-mix(in srgb, var(--color-accent) 24%, transparent)',
-            }}
-          >
-            {item.item_type === 'illustration' ? (
-              <span className="flex h-full w-full items-center justify-center bg-bg-tertiary text-text-muted">
-                <ImageIcon size={compact ? 12 : 16} />
-              </span>
-            ) : item.item_type === 'tape' ? (
-              <span className="block h-full w-full opacity-75 [background-image:linear-gradient(90deg,rgba(255,255,255,0.22),transparent_35%,rgba(0,0,0,0.06)),radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.55)_0_1px,transparent_1.5px)] [background-size:auto,12px_10px]" />
-            ) : (
-              <span className="flex h-full flex-col gap-1 p-1.5">
-                <span className="h-1.5 w-2/3 rounded-full bg-text-primary/35" />
-                <span className="h-1 w-full rounded-full bg-text-secondary/25" />
-                <span className="h-1 w-4/5 rounded-full bg-text-secondary/20" />
-              </span>
-            )}
-          </span>
+            item={item}
+            compact={compact}
+            canvasSize={canvasSize}
+            t={t}
+          />
         ))}
         <StampOverlay stamp={stamp || null} />
         <span className="absolute right-3 top-3 rounded-full bg-bg-card/90 px-2 py-0.5 text-xs font-semibold text-accent">
@@ -650,6 +641,125 @@ function PagePreviewCard({
       <p className="mt-3 truncate text-sm font-semibold text-text-primary">{page.title || t('journalPage.pageNumber', { number: page.page_index + 1 })}</p>
       {!compact && <p className="mt-1 line-clamp-1 text-xs text-text-muted">{page.description || page.date_label || t('common.noDescription')}</p>}
     </button>
+  )
+}
+
+function PagePreviewItem({
+  item,
+  compact,
+  canvasSize,
+  t,
+}: {
+  item: JournalItemWithNote
+  compact: boolean
+  canvasSize: { width: number; height: number }
+  t: Translate
+}) {
+  const [imageSrc, setImageSrc] = useState('')
+  const isIllustration = item.item_type === 'illustration'
+
+  useEffect(() => {
+    if (!isIllustration) {
+      setImageSrc('')
+      return
+    }
+    let alive = true
+    let currentUrl = ''
+    resolveMediaUrlWithFallback(item.illustration?.thumbnail_path, item.illustration?.original_path)
+      .then((url) => {
+        currentUrl = url
+        if (alive) setImageSrc(url)
+        else releaseMediaUrl(url)
+      })
+      .catch(() => {
+        if (alive) setImageSrc('')
+      })
+    return () => {
+      alive = false
+      releaseMediaUrl(currentUrl)
+    }
+  }, [isIllustration, item.illustration?.original_path, item.illustration?.thumbnail_path])
+
+  const positionStyle: CSSProperties = {
+    left: `${(item.x / canvasSize.width) * 100}%`,
+    top: `${(item.y / canvasSize.height) * 100}%`,
+    width: `${(item.width / canvasSize.width) * 100}%`,
+    height: `${(item.height / canvasSize.height) * 100}%`,
+    transform: `rotate(${item.rotation}deg)`,
+  }
+
+  if (item.item_type === 'note') {
+    const noteStyle = getJournalNoteCardStyle(item, t('common.untitled'), t('common.noContent'))
+      || getNoteCardStyleFromPayload(null, item.note, t('common.untitled'), t('common.noContent'))
+    return (
+      <span
+        className="absolute overflow-hidden"
+        style={{
+          ...positionStyle,
+          borderRadius: noteStyle.radius,
+          backgroundColor: noteStyle.backgroundColor,
+          color: noteStyle.textColor,
+          fontFamily: getFontFamily(noteStyle.fontFamily),
+          fontWeight: noteStyle.fontWeight,
+          lineHeight: noteStyle.lineHeight,
+          border: '1px solid color-mix(in srgb, var(--color-accent) 18%, transparent)',
+        }}
+      >
+        <span className="flex h-full w-full flex-col overflow-hidden" style={{ padding: compact ? 4 : 8, fontSize: compact ? 5 : 8 }}>
+          {noteStyle.titleVisible && <span className="shrink-0 truncate font-semibold">{noteStyle.titleText}</span>}
+          <span className="mt-1 min-h-0 overflow-hidden whitespace-pre-wrap break-words opacity-85 line-clamp-4">{noteStyle.bodyText}</span>
+        </span>
+      </span>
+    )
+  }
+
+  if (isIllustration) {
+    const imageStyle = getJournalImageItemStyle(item) || getImageItemStyleFromPayload(null)
+    const imagePadding = getImagePadding(imageStyle)
+    const bottomPadding = getImageBottomPadding(imageStyle)
+    return (
+      <span
+        className="absolute overflow-hidden"
+        style={{
+          ...positionStyle,
+          ...getImageFrameStyle(imageStyle),
+        }}
+      >
+        <span
+          className="block h-full w-full overflow-hidden"
+          style={{ padding: `${imagePadding}px ${imagePadding}px ${bottomPadding}px`, borderRadius: imageStyle.radius }}
+        >
+          {imageSrc ? (
+            <img src={imageSrc} alt={item.illustration?.title || ''} className="block h-full w-full" style={{ objectFit: imageStyle.fit, borderRadius: imageStyle.radius }} draggable={false} />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center bg-bg-tertiary text-text-muted">
+              <ImageIcon size={compact ? 12 : 16} />
+            </span>
+          )}
+        </span>
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className={`absolute overflow-hidden rounded-md ${item.item_type === 'tape' ? 'shadow-none' : 'border shadow-sm'}`}
+      style={{
+        ...positionStyle,
+        backgroundColor: item.item_type === 'tape' ? item.color || '#d9c4ff' : getPreviewStickerBackground(item.color),
+        borderColor: 'color-mix(in srgb, var(--color-accent) 24%, transparent)',
+      }}
+    >
+      {item.item_type === 'tape' ? (
+        <span className="block h-full w-full opacity-75 [background-image:linear-gradient(90deg,rgba(255,255,255,0.22),transparent_35%,rgba(0,0,0,0.06)),radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.55)_0_1px,transparent_1.5px)] [background-size:auto,12px_10px]" />
+      ) : (
+        <span className="flex h-full flex-col gap-1 p-1.5">
+          <span className="h-1.5 w-2/3 rounded-full bg-text-primary/35" />
+          <span className="h-1 w-full rounded-full bg-text-secondary/25" />
+          <span className="h-1 w-4/5 rounded-full bg-text-secondary/20" />
+        </span>
+      )}
+    </span>
   )
 }
 

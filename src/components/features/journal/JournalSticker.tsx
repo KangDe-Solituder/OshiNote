@@ -1,15 +1,8 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { useRef, type CSSProperties, type PointerEvent } from 'react'
 import clsx from 'clsx'
-import { Calendar, Heart, ImageIcon } from 'lucide-react'
 import type { JournalItemWithNote, JournalPageOrientation } from '../../../types'
 import { clampLayout, type JournalLayoutInput } from '../../../features/journal/journalLayout'
-import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
-import { useI18n } from '../../../i18n/useI18n'
 import type { JournalPopoverAnchor } from './JournalCanvas'
-import {
-  getJournalImageItemStyle,
-  getJournalNoteCardStyle,
-} from '../../../features/journal/journalItemStyles'
 import { getJournalItemConstraints } from '../../../features/journal/journalItemSizing'
 import { journalItemToDraftItem } from '../../../features/journal/journalDraftAdapters'
 import { JournalDraftItemRenderer } from './JournalDraftItemRenderer'
@@ -33,44 +26,10 @@ interface DragState {
 }
 
 export function JournalSticker({ item, selected, zoom, orientation = 'portrait', onSelect, onOpenPopover, onCommitLayout }: JournalStickerProps) {
-  const { t } = useI18n()
   const dragRef = useRef<DragState | null>(null)
-  const [imageSrc, setImageSrc] = useState('')
   const isTape = item.item_type === 'tape'
   const isMaterial = item.item_type === 'material'
-  const noteCard = item.item_type === 'note' ? getJournalNoteCardStyle(item, t('common.untitled'), t('common.noContent')) : null
-  const imageStyle = item.item_type === 'illustration' ? getJournalImageItemStyle(item) : null
-  const sharedDraftItem = isMaterial || noteCard || imageStyle ? journalItemToDraftItem(item)[0] : null
-
-  useEffect(() => {
-    if (item.item_type !== 'illustration' || imageStyle) return
-    let alive = true
-    let currentUrl = ''
-    const originalPath = item.illustration?.original_path || null
-    const primaryPath = item.illustration?.thumbnail_path || originalPath
-    resolveMediaUrl(primaryPath)
-      .then((url) => {
-        currentUrl = url
-        if (alive) setImageSrc(url)
-        else releaseMediaUrl(url)
-      })
-      .catch(() => {
-        if (!alive || !item.illustration?.thumbnail_path || !originalPath) return
-        resolveMediaUrl(originalPath)
-          .then((url) => {
-            currentUrl = url
-            if (alive) setImageSrc(url)
-            else releaseMediaUrl(url)
-          })
-          .catch(() => {
-            if (alive) setImageSrc('')
-          })
-      })
-    return () => {
-      alive = false
-      releaseMediaUrl(currentUrl)
-    }
-  }, [imageStyle, item.illustration?.original_path, item.illustration?.thumbnail_path, item.item_type])
+  const sharedDraftItem = journalItemToDraftItem(item)[0] || null
 
   function handlePointerDown(e: PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0) return
@@ -143,11 +102,12 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
           ? 'overflow-visible rounded-md border-0 shadow-none transition-[filter]'
           : isMaterial
             ? 'overflow-visible rounded-lg border-0 shadow-sm transition-[filter,box-shadow]'
-          : 'overflow-hidden rounded-lg border shadow-md transition-shadow',
+          : sharedDraftItem
+            ? 'overflow-visible rounded-lg border-0 shadow-none transition-[filter,box-shadow]'
+            : 'overflow-hidden rounded-lg border shadow-md transition-shadow',
         selected
           ? isTape ? 'ring-2 ring-accent/80' : 'ring-2 ring-accent shadow-xl'
           : isTape || isMaterial ? 'hover:brightness-105' : 'hover:shadow-lg',
-        item.item_type === 'illustration' && !imageStyle && 'bg-bg-card',
         !isTape && item.sticker_style === 'memo' && 'bg-[linear-gradient(#0000_23px,rgba(120,130,180,0.18)_24px)] bg-[length:100%_24px]',
         !isTape && item.sticker_style === 'ticket' && 'border-dashed',
       )}
@@ -158,7 +118,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
         height: item.height,
         zIndex: item.z_index,
         transform: `rotate(${item.rotation}deg)`,
-        backgroundColor: isTape || isMaterial || imageStyle ? 'transparent' : item.item_type === 'illustration' ? 'var(--color-bg-card)' : getStickerBackground(item.color),
+        backgroundColor: sharedDraftItem ? 'transparent' : item.item_type === 'illustration' ? 'var(--color-bg-card)' : getStickerBackground(item.color),
         borderColor: selected ? 'var(--color-accent)' : 'rgba(120, 100, 120, 0.22)',
       }}
     >
@@ -166,60 +126,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
         <TapeBody item={item} />
       ) : sharedDraftItem ? (
         <JournalDraftItemRenderer item={sharedDraftItem} note={item.note || undefined} illustration={item.illustration || undefined} />
-      ) : item.item_type === 'illustration' ? (
-        <div className="flex h-full flex-col">
-          <div className="min-h-0 flex-1 bg-bg-tertiary">
-            {imageSrc ? (
-              <img src={imageSrc} alt={item.illustration?.title || ''} className="h-full w-full object-cover" draggable={false} />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-text-muted">
-                <ImageIcon size={28} />
-              </div>
-            )}
-          </div>
-          <div className="shrink-0 p-3">
-            <div className="flex items-start gap-2">
-              <h4 className="min-w-0 flex-1 text-sm font-semibold text-text-primary line-clamp-1">
-                {item.illustration?.title || t('common.untitled')}
-              </h4>
-              {item.illustration?.favorite && (
-                <Heart size={15} className="shrink-0 text-pink-500" fill="currentColor" />
-              )}
-            </div>
-            <p className="mt-1 line-clamp-1 text-[11px] text-text-muted">
-              {item.illustration?.artist ? t('common.byArtist', { artist: item.illustration.artist }) : t('common.unknownArtist')}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex h-full flex-col p-4">
-          <div className="mb-2 flex items-start gap-2">
-            <h4 className="min-w-0 flex-1 text-sm font-semibold text-text-primary line-clamp-2">
-              {item.note?.title || t('common.untitled')}
-            </h4>
-            {item.note?.favorite && (
-              <Heart size={15} className="shrink-0 text-pink-500" fill="currentColor" />
-            )}
-          </div>
-
-          <p className="flex-1 text-xs leading-relaxed text-text-secondary line-clamp-4">
-            {item.note?.plain_text || t('common.noContent')}
-          </p>
-
-          <div className="mt-3 flex items-center gap-1.5 overflow-hidden">
-            {item.note?.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="shrink-0 rounded-full bg-white/55 px-2 py-0.5 text-[11px] text-text-muted">
-                {tag}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-2 flex items-center gap-1 text-[11px] text-text-muted">
-            <Calendar size={12} />
-            {item.note?.created_at ? new Date(item.note.created_at).toLocaleDateString() : ''}
-          </div>
-        </div>
-      )}
+      ) : null}
     </button>
   )
 }
