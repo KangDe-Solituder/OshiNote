@@ -1,3 +1,5 @@
+mod data_sync;
+
 use reqwest::{Client, Method, Url};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
@@ -11,7 +13,7 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const BACKUP_FORMAT: &str = "oshinote-backup";
-const BACKUP_VERSION: u32 = 1;
+const BACKUP_VERSION: u32 = 2;
 const WEBDAV_BACKUP_NAME: &str = "oshinote-latest-full.oshi.zip";
 const RESTORE_LOG_FILE: &str = "restore.log";
 const MAX_ILLUSTRATION_MEDIA_BYTES: u64 = 25 * 1024 * 1024;
@@ -24,6 +26,19 @@ struct BackupManifest {
     created_at: String,
     database: String,
     included_paths: Vec<String>,
+    #[serde(default)]
+    repository_id: Option<String>,
+    #[serde(default)]
+    head_commit: Option<String>,
+    #[serde(default)]
+    schema_version: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BackupSyncMetadata {
+    repository_id: Option<String>,
+    head_commit: Option<String>,
+    schema_version: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -144,9 +159,10 @@ fn create_backup(
     app: tauri::AppHandle,
     destination: String,
     include_media: bool,
+    sync_metadata: Option<BackupSyncMetadata>,
 ) -> Result<BackupSummary, String> {
     let path = PathBuf::from(destination);
-    create_backup_archive(&app, &path, include_media)
+    create_backup_archive(&app, &path, include_media, sync_metadata.as_ref())
 }
 
 #[tauri::command]
@@ -220,6 +236,7 @@ fn restore_backup_archive(
         if manifest.mode == "complete" {
             for path in &manifest.included_paths {
                 if path == "media" || path == "fonts" {
+                    fs::create_dir_all(staging.join(path)).map_err(|error| error.to_string())?;
                     extract_backup_tree(
                         &mut archive,
                         &format!("appdata/{path}/"),
@@ -259,11 +276,15 @@ fn restore_backup_archive(
         }
 
         if manifest.mode == "complete" {
-            for path in &manifest.included_paths {
-                if path != "media" && path != "fonts" {
-                    continue;
-                }
-                copy_tree(&staging.join(path), &app_data_dir.join(path))?;
+            if let Err(error) =
+                activate_restored_trees(&staging, &app_data_dir, &manifest.included_paths)
+            {
+                rollback_restored_database(
+                    &database_path,
+                    &previous_database_path,
+                    &app_config_dir,
+                );
+                return Err(error);
             }
         }
         Ok::<(), String>(())
@@ -301,6 +322,7 @@ async fn test_webdav_connection(config: WebDavConfig) -> Result<(), String> {
 async fn upload_webdav_backup(
     app: tauri::AppHandle,
     config: WebDavConfig,
+    sync_metadata: Option<BackupSyncMetadata>,
 ) -> Result<WebDavSummary, String> {
     let client = webdav_client(&config)?;
     ensure_webdav_directories(&client, &config).await?;
@@ -311,11 +333,13 @@ async fn upload_webdav_backup(
     let backup_dir = app_data_dir.join("backups");
     fs::create_dir_all(&backup_dir).map_err(|error| error.to_string())?;
     let local_backup = backup_dir.join(WEBDAV_BACKUP_NAME);
-    create_backup_archive(&app, &local_backup, true)?;
+    create_backup_archive(&app, &local_backup, true, sync_metadata.as_ref())?;
     let bytes = fs::read(&local_backup).map_err(|error| error.to_string())?;
     let size = bytes.len() as u64;
+    let temporary_name = format!("{WEBDAV_BACKUP_NAME}.uploading");
+    let temporary_url = webdav_file_url(&config, &temporary_name)?;
     let response = client
-        .put(webdav_file_url(&config, WEBDAV_BACKUP_NAME)?)
+        .put(temporary_url.clone())
         .basic_auth(&config.username, Some(&config.password))
         .header("Content-Type", "application/zip")
         .body(bytes)
@@ -324,6 +348,34 @@ async fn upload_webdav_backup(
         .map_err(|error| format_webdav_error(error.to_string()))?;
     if !response.status().is_success() {
         return Err(format!("WebDAV upload failed: {}", response.status()));
+    }
+    let destination_url = webdav_file_url(&config, WEBDAV_BACKUP_NAME)?;
+    let moved = client
+        .request(Method::from_bytes(b"MOVE").unwrap(), temporary_url.clone())
+        .basic_auth(&config.username, Some(&config.password))
+        .header("Destination", destination_url.as_str())
+        .header("Overwrite", "T")
+        .send()
+        .await
+        .map_err(|error| format_webdav_error(error.to_string()))?;
+    if !moved.status().is_success() {
+        let fallback_bytes = fs::read(&local_backup).map_err(|error| error.to_string())?;
+        let fallback = client
+            .put(destination_url)
+            .basic_auth(&config.username, Some(&config.password))
+            .header("Content-Type", "application/zip")
+            .body(fallback_bytes)
+            .send()
+            .await
+            .map_err(|error| format_webdav_error(error.to_string()))?;
+        if !fallback.status().is_success() {
+            return Err(format!("WebDAV upload failed: {}", fallback.status()));
+        }
+        let _ = client
+            .delete(temporary_url)
+            .basic_auth(&config.username, Some(&config.password))
+            .send()
+            .await;
     }
     Ok(WebDavSummary {
         remote_path: config.remote_path,
@@ -366,6 +418,7 @@ fn create_backup_archive(
     app: &tauri::AppHandle,
     destination: &Path,
     include_media: bool,
+    sync_metadata: Option<&BackupSyncMetadata>,
 ) -> Result<BackupSummary, String> {
     let app_data_dir = app
         .path()
@@ -396,6 +449,9 @@ fn create_backup_archive(
         created_at: format_timestamp(),
         database: "database/oshinote.db".to_string(),
         included_paths: included_paths.clone(),
+        repository_id: sync_metadata.and_then(|metadata| metadata.repository_id.clone()),
+        head_commit: sync_metadata.and_then(|metadata| metadata.head_commit.clone()),
+        schema_version: sync_metadata.and_then(|metadata| metadata.schema_version),
     };
 
     let file =
@@ -479,7 +535,9 @@ fn read_manifest(archive: &mut ZipArchive<File>) -> Result<BackupManifest, Strin
         .map_err(|error| error.to_string())?;
     let manifest: BackupManifest =
         serde_json::from_str(&json).map_err(|error| format!("Invalid backup manifest: {error}"))?;
-    if manifest.format != BACKUP_FORMAT || manifest.version != BACKUP_VERSION {
+    if manifest.format != BACKUP_FORMAT
+        || !(manifest.version == 1 || manifest.version == BACKUP_VERSION)
+    {
         return Err("Unsupported OshiNote backup format.".to_string());
     }
     if manifest.mode != "data" && manifest.mode != "complete" {
@@ -542,22 +600,66 @@ fn safe_relative_path(value: &str) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
-fn copy_tree(source: &Path, destination: &Path) -> Result<(), String> {
-    if !source.exists() {
-        return Ok(());
+fn activate_restored_trees(
+    staging: &Path,
+    app_data_dir: &Path,
+    included_paths: &[String],
+) -> Result<(), String> {
+    let activation_id = timestamp_id();
+    let mut activated: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for name in included_paths {
+        if name != "media" && name != "fonts" {
+            continue;
+        }
+        let source = staging.join(name);
+        fs::create_dir_all(&source).map_err(|error| error.to_string())?;
+        let destination = app_data_dir.join(name);
+        let previous = app_data_dir.join(format!(".{name}.before-restore-{activation_id}"));
+        if previous.exists() {
+            fs::remove_dir_all(&previous).map_err(|error| error.to_string())?;
+        }
+        if destination.exists() {
+            fs::rename(&destination, &previous).map_err(|error| {
+                format!("Could not preserve previous {name} directory: {error}")
+            })?;
+        }
+        if let Err(error) = fs::rename(&source, &destination) {
+            if previous.exists() && !destination.exists() {
+                let _ = fs::rename(&previous, &destination);
+            }
+            for (active_destination, active_previous) in activated.iter().rev() {
+                if active_destination.exists() {
+                    let _ = fs::remove_dir_all(active_destination);
+                }
+                if active_previous.exists() {
+                    let _ = fs::rename(active_previous, active_destination);
+                }
+            }
+            return Err(format!(
+                "Could not activate restored {name} directory: {error}"
+            ));
+        }
+        activated.push((destination, previous));
     }
-    fs::create_dir_all(destination).map_err(|error| error.to_string())?;
-    for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
-        let entry = entry.map_err(|error| error.to_string())?;
-        let source_path = entry.path();
-        let destination_path = destination.join(entry.file_name());
-        if source_path.is_dir() {
-            copy_tree(&source_path, &destination_path)?;
-        } else {
-            fs::copy(source_path, destination_path).map_err(|error| error.to_string())?;
+    for (_, previous) in activated {
+        if previous.exists() {
+            let _ = fs::remove_dir_all(previous);
         }
     }
     Ok(())
+}
+
+fn rollback_restored_database(database_path: &Path, previous_path: &Path, config_dir: &Path) {
+    let failed_path = config_dir.join("oshinote.db.failed-restore");
+    if failed_path.exists() {
+        let _ = fs::remove_file(&failed_path);
+    }
+    if database_path.exists() {
+        let _ = fs::rename(database_path, &failed_path);
+    }
+    if previous_path.exists() && !database_path.exists() {
+        let _ = fs::rename(previous_path, database_path);
+    }
 }
 
 fn append_restore_log(app_data_dir: &Path, message: &str) {
@@ -788,7 +890,15 @@ pub fn run() {
             restore_downloaded_webdav_backup,
             test_webdav_connection,
             upload_webdav_backup,
-            download_webdav_backup
+            download_webdav_backup,
+            data_sync::inspect_webdav_repository,
+            data_sync::read_webdav_text,
+            data_sync::write_webdav_text,
+            data_sync::upload_webdav_app_data_file,
+            data_sync::download_webdav_app_data_file,
+            data_sync::activate_sync_cache_file,
+            data_sync::inspect_sync_cache,
+            data_sync::clear_sync_cache
         ])
         .run(tauri::generate_context!())
         .expect("error while running OshiNote");

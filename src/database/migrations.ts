@@ -203,4 +203,22 @@ export const MIGRATIONS = [
   )`,
 
   `CREATE INDEX IF NOT EXISTS idx_templates_type ON templates(type, hidden, deleted)`,
+
+  `CREATE TABLE IF NOT EXISTS sync_state (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS sync_conflicts (
+    id          TEXT PRIMARY KEY,
+    entity_key  TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    base_value  TEXT,
+    local_value TEXT,
+    remote_value TEXT,
+    resolution  TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS idx_sync_conflicts_resolution ON sync_conflicts(resolution, created_at)`,
 ]
