@@ -15,6 +15,7 @@ import { useSidebarStore } from '../stores/sidebarStore'
 import { useStampSettingsStore } from '../stores/stampSettingsStore'
 import { downloadStampFont, STAMP_FONT_DEFINITIONS, type StampFontDefinition, type StampFontId } from '../features/stamps/stampFonts'
 import { useStampFontStore } from '../stores/stampFontStore'
+import { PAGE_CONTENT_CLASS, PAGE_FORM_FRAME_CLASS } from '../components/layout/pageShell'
 
 const THEMES: { id: ThemeId }[] = [
   { id: 'pink-cozy' },
@@ -123,12 +124,15 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-text-primary mb-8">{t('settings.title')}</h1>
+    <div className={PAGE_CONTENT_CLASS}>
+      <div className={PAGE_FORM_FRAME_CLASS}>
+      <h1 className="mb-8 text-3xl font-bold text-text-primary">{t('settings.title')}</h1>
 
-      <section className="mb-10">
+      <div className="settings-layout-grid">
+
+      <section className="settings-section settings-section-half">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.theme')}</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {THEMES.map((theme) => (
             <button
               key={theme.id}
@@ -150,7 +154,7 @@ export function SettingsPage() {
         </p>
       </section>
 
-      <section className="mb-10">
+      <section className="settings-section settings-section-half">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.appearance')}</h2>
         <div className="space-y-3">
           <button
@@ -196,7 +200,7 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section className="mb-10">
+      <section className="settings-section settings-section-wide">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">{t('settings.stampFonts')}</h2>
@@ -226,7 +230,7 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      <section className="mb-10">
+      <section className="settings-section settings-section-wide">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.background')}</h2>
         <Card className="space-y-4">
           <div className="flex items-center justify-between">
@@ -325,7 +329,7 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      <section className="mb-10">
+      <section className="settings-section settings-section-main">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.general')}</h2>
         <Card className="space-y-4">
           <div className="flex items-center justify-between">
@@ -378,7 +382,7 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      <section className="mb-10">
+      <section className="settings-section settings-section-side">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.sidebar')}</h2>
         <Card className="space-y-4">
           <SettingToggle
@@ -396,7 +400,7 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      <section className="mb-10">
+      <section className="settings-section settings-section-wide">
         <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.updates')}</h2>
         <Card className="space-y-5">
           <div className="flex items-center justify-between gap-4">
@@ -478,6 +482,8 @@ export function SettingsPage() {
       </section>
 
       {/* LLM configuration is intentionally hidden for the first release. */}
+      </div>
+      </div>
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { getOshiArchiveNoteCounts } from '../features/notes/noteService'
 import type { Archive, CardStyle, Oshi, OshiArchiveNoteCounts, OshiNoteArchiveFilter } from '../types'
 import { usePageTransition } from '../components/features/themes/uiMotion'
 import { useI18n } from '../i18n/useI18n'
+import { ADAPTIVE_NOTE_GRID_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 
 const ARCHIVE_FILTER_ALL = 'all'
 const ARCHIVE_FILTER_UNFILED = 'unfiled'
@@ -186,8 +187,9 @@ export function OshiDetailPage() {
     <div className="h-full flex flex-col">
       <div
         ref={toolbarRef}
-        className="relative z-40 border-b border-border-color bg-bg-primary/60 px-6 py-4 lg:px-10"
+        className="relative z-40 border-b border-border-color bg-bg-primary/60 px-[var(--page-gutter)] py-4"
       >
+        <div className={PAGE_WIDE_FRAME_CLASS}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 border-b border-border-color">
           <div className="flex min-w-0 flex-wrap items-end gap-5">
             {archiveTabs.map((tab) => (
@@ -339,6 +341,7 @@ export function OshiDetailPage() {
         </Link>
 
         </div>
+        </div>
       </div>
 
       {/* Content */}
@@ -347,8 +350,9 @@ export function OshiDetailPage() {
           <motion.div
             key={notesLoading ? 'loading' : viewMode}
             {...pageTransition}
-            className="absolute inset-0 overflow-y-auto p-6"
+            className="absolute inset-0 overflow-y-auto px-[var(--page-gutter)] py-6"
           >
+            <div className={`${PAGE_WIDE_FRAME_CLASS} min-h-full`}>
             {notesLoading && (
               <div className="text-center py-12">
                 <Loader2 size={24} className="mx-auto mb-3 text-accent animate-spin" />
@@ -377,7 +381,7 @@ export function OshiDetailPage() {
 
             {!notesLoading && notes.length > 0 && viewMode !== 'graph' && (
               <>
-            <div className={viewMode === 'card' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-1'}>
+            <div className={viewMode === 'card' ? ADAPTIVE_NOTE_GRID_CLASS : 'space-y-1'}>
               {notes.map((note, index) => (
                 <Link
                   key={note.id}
@@ -478,6 +482,7 @@ export function OshiDetailPage() {
             )}
               </>
             )}
+            </div>
           </motion.div>
         </AnimatePresence>
       </div>

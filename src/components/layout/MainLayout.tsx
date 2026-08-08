@@ -17,7 +17,7 @@ export function MainLayout() {
       <TopBar />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <Sidebar />
-        <main className="min-h-0 flex-1 overflow-hidden">
+        <main className="app-main-container min-h-0 flex-1 overflow-hidden">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location.pathname}

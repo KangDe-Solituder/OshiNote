@@ -6,7 +6,7 @@ import { useOshiStore } from '../stores/oshiStore'
 import { OshiCard } from '../features/oshis/OshiCard'
 import { OshiForm } from '../features/oshis/OshiForm'
 import type { Oshi, CreateOshiInput } from '../types'
-import { PAGE_CONTENT_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS } from '../components/layout/pageShell'
 import { useI18n } from '../i18n/useI18n'
 
 export function OshiListPage() {
@@ -39,7 +39,8 @@ export function OshiListPage() {
   }
 
   return (
-    <div className={`${PAGE_CONTENT_CLASS} mx-auto max-w-6xl`}>
+    <div className={PAGE_CONTENT_CLASS}>
+      <div className={PAGE_DASHBOARD_FRAME_CLASS}>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="mb-1 text-2xl font-bold text-text-primary">{t('oshis.title')}</h1>
@@ -83,7 +84,7 @@ export function OshiListPage() {
       )}
 
       {!loading && !error && oshis.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="adaptive-library-grid">
           <AnimatePresence>
             {oshis.map((oshi) => (
               <OshiCard
@@ -115,6 +116,7 @@ export function OshiListPage() {
         onSubmit={editingOshi ? handleUpdate : handleCreate}
         editing={editingOshi}
       />
+      </div>
     </div>
   )
 }

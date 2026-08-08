@@ -25,7 +25,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
-import { PAGE_CONTENT_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import {
   createIllustration,
@@ -144,7 +144,7 @@ export function OshiIllustrationsPage() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
       <main className={`${PAGE_CONTENT_CLASS} min-h-0`}>
-        <div className="mx-auto flex h-full max-w-[1760px] flex-col">
+        <div className={`${PAGE_WIDE_FRAME_CLASS} flex h-full flex-col`}>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-border-color">
             <div className="flex gap-6">
               {TABS.map((item) => (

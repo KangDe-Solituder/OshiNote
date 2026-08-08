@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { AnimatePresence } from 'framer-motion'
 import { Calendar, GalleryVerticalEnd, Heart, ImageIcon, LayoutGrid, List, Loader2, Plus, Search, UserRound } from 'lucide-react'
 import { Button } from '../components/ui/Button'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import {
   deleteIllustration,
@@ -109,7 +109,7 @@ export function IllustrationsPage() {
       </header>
 
       <main className={PAGE_CONTENT_CLASS}>
-        <div className="mx-auto max-w-[1760px]">
+        <div className={PAGE_WIDE_FRAME_CLASS}>
           <div className="mb-5 space-y-3 border-b border-border-color pb-4">
             <div className="flex items-center gap-3">
               <div className="relative flex-1">

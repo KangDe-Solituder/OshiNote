@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, ImageIcon, Layers3, PackageOpen, Shapes, Tag } from 'lucide-react'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { Button } from '../components/ui/Button'
 import { useI18n } from '../i18n/useI18n'
 import { getAllTags, getTotalNoteCount } from '../features/notes/noteService'
@@ -40,6 +40,7 @@ export function ResourcesPage() {
       </header>
 
       <main className={PAGE_CONTENT_CLASS}>
+        <div className={PAGE_WIDE_FRAME_CLASS}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <ResourceCard icon={FileText} title={t('nav.allNotes')} description={t('resources.notes.description')} count={counts.notes} to="/notes" action={t('common.viewAll')} />
           <ResourceCard icon={ImageIcon} title={t('nav.illustrations')} description={t('resources.illustrations.description')} count={counts.illustrations} to="/illustrations" action={t('common.viewAll')} />
@@ -57,6 +58,7 @@ export function ResourcesPage() {
             </div>
           </div>
         </section>
+        </div>
       </main>
     </div>
   )

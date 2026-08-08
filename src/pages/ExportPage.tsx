@@ -47,6 +47,7 @@ import {
   type SyncMode,
 } from '../services/sync/incrementalSync'
 import { useI18n } from '../i18n/useI18n'
+import { PAGE_CONTENT_CLASS, PAGE_FORM_FRAME_CLASS } from '../components/layout/pageShell'
 
 type DataTab = 'sync' | 'backup' | 'export'
 type BackupAction = BackupMode | 'import' | 'webdav-upload' | 'webdav-download' | null
@@ -253,7 +254,8 @@ export function ExportPage() {
   const unresolvedConflicts = conflicts.filter((conflict) => !conflict.resolution).length
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className={PAGE_CONTENT_CLASS}>
+      <div className={PAGE_FORM_FRAME_CLASS}>
       <h1 className="mb-2 text-3xl font-bold text-text-primary">{t('export.title')}</h1>
       <p className="mb-6 text-text-secondary">{t('export.subtitle')}</p>
 
@@ -536,6 +538,7 @@ export function ExportPage() {
           </Card>
         </section>
       )}
+      </div>
     </div>
   )
 }

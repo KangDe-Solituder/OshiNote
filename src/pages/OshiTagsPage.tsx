@@ -5,6 +5,7 @@ import { getTagsByOshi } from '../features/notes/noteService'
 import { fetchOshiById } from '../features/oshis/oshiService'
 import type { Oshi } from '../types'
 import { useI18n } from '../i18n/useI18n'
+import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 
 export function OshiTagsPage() {
   const { t } = useI18n()
@@ -26,8 +27,8 @@ export function OshiTagsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
-      <header className="shrink-0 px-6 pt-6 lg:px-10">
-        <div className="mx-auto flex max-w-5xl items-center gap-4">
+      <header className={PAGE_HEADER_CLASS}>
+        <div className={`${PAGE_DASHBOARD_FRAME_CLASS} flex items-center gap-4`}>
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft/25 text-accent">
             <Tag size={23} />
           </span>
@@ -39,8 +40,8 @@ export function OshiTagsPage() {
           </div>
         </div>
       </header>
-      <main className="flex-1 overflow-y-auto px-6 pb-7 pt-5 lg:px-10">
-        <div className="mx-auto max-w-5xl">
+      <main className={PAGE_CONTENT_CLASS}>
+        <div className={PAGE_DASHBOARD_FRAME_CLASS}>
         {tags.length === 0 ? (
           <div className="py-20 text-center">
             <Tag size={48} className="mx-auto mb-4 text-accent-soft" />

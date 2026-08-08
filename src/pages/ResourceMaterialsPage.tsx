@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ImageIcon, PackageOpen, Ruler, Stamp } from 'lucide-react'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_FORM_FRAME_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
 import { Button } from '../components/ui/Button'
 import { useI18n } from '../i18n/useI18n'
 
@@ -18,6 +18,7 @@ export function ResourceMaterialsPage() {
       </header>
 
       <main className={PAGE_CONTENT_CLASS}>
+        <div className={PAGE_FORM_FRAME_CLASS}>
         <section className="rounded-lg border border-dashed border-border-color bg-bg-secondary/20 px-6 py-12 text-center">
           <PackageOpen size={40} className="mx-auto mb-3 text-accent-soft" />
           <h2 className="text-lg font-semibold text-text-primary">{t('materials.empty.title')}</h2>
@@ -42,6 +43,7 @@ export function ResourceMaterialsPage() {
           <HintCard icon={ImageIcon} title={t('materials.hint.images.title')} body={t('materials.hint.images.body')} />
           <HintCard icon={Ruler} title={t('materials.hint.tapes.title')} body={t('materials.hint.tapes.body')} />
           <HintCard icon={Stamp} title={t('materials.hint.stamps.title')} body={t('materials.hint.stamps.body')} />
+        </div>
         </div>
       </main>
     </div>

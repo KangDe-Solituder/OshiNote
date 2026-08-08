@@ -83,8 +83,9 @@ export function OshiOverviewPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-bg-primary">
-      <main className={`${PAGE_CONTENT_CLASS} ${PAGE_DASHBOARD_FRAME_CLASS}`}>
+    <div className="flex h-full min-h-0 flex-col bg-bg-primary">
+      <main className={PAGE_CONTENT_CLASS}>
+        <div className={PAGE_DASHBOARD_FRAME_CLASS}>
         <section className="mb-5 rounded-2xl border border-border-color bg-bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-start gap-4">
             <div
@@ -109,7 +110,7 @@ export function OshiOverviewPage() {
           </div>
 
           {oshi.activity_links.length > 0 && (
-            <div className="mt-4 grid gap-2 md:grid-cols-3">
+            <div className="overview-links-grid mt-4">
               {oshi.activity_links.slice(0, 6).map((url) => (
                 <button
                   key={url}
@@ -126,13 +127,13 @@ export function OshiOverviewPage() {
           )}
         </section>
 
-        <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <section className="overview-stats-grid mb-5">
           <StatCard icon={FileText} label={t('nav.notes')} value={stats.notes} to={`/oshis/${oshiId}/notes`} />
           <StatCard icon={ImageIcon} label={t('nav.illustrations')} value={stats.illustrations} to={`/oshis/${oshiId}/illustrations`} />
           <StatCard icon={Tag} label={t('nav.tags')} value={stats.tags} to={`/oshis/${oshiId}/tags`} />
         </section>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(380px,0.8fr)] 2xl:grid-cols-[minmax(0,1.45fr)_minmax(440px,0.75fr)]">
+        <div className="overview-content-grid">
           <section className="rounded-2xl border border-border-color bg-bg-card p-5">
             <SectionHeader title={t('oshiOverview.recentNotes')} to={`/oshis/${oshiId}/notes`} />
             {notes.length === 0 ? (
@@ -170,6 +171,7 @@ export function OshiOverviewPage() {
               )}
             </section>
           </div>
+        </div>
         </div>
       </main>
 

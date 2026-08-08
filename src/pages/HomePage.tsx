@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
 import { getTotalOshiCount, getTotalNoteCount, getTotalTagCount } from '../features/notes/noteService'
 import { useI18n } from '../i18n/useI18n'
+import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS } from '../components/layout/pageShell'
 
 export function HomePage() {
   const { t } = useI18n()
@@ -31,13 +32,14 @@ export function HomePage() {
   ]
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className={PAGE_CONTENT_CLASS}>
+      <div className={PAGE_DASHBOARD_FRAME_CLASS}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2">{t('home.title')}</h1>
         <p className="text-text-secondary">{t('home.subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="overview-stats-grid mb-8">
         {statCards.map((stat) => (
           <Link key={stat.label} to={stat.link}>
             <Card className="flex items-center gap-4">
@@ -65,6 +67,7 @@ export function HomePage() {
           <p className="text-text-muted">{t('home.empty.body')}</p>
         </div>
       )}
+      </div>
     </div>
   )
 }

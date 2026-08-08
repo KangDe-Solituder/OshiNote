@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Tag } from 'lucide-react'
 import { getAllTags } from '../features/notes/noteService'
 import { useI18n } from '../i18n/useI18n'
+import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS } from '../components/layout/pageShell'
 
 export function TagsPage() {
   const { t } = useI18n()
@@ -13,7 +14,8 @@ export function TagsPage() {
   }, [])
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className={PAGE_CONTENT_CLASS}>
+      <div className={PAGE_DASHBOARD_FRAME_CLASS}>
       <h1 className="text-3xl font-bold text-text-primary mb-2">{t('tags.title')}</h1>
       <p className="text-text-secondary mb-8">{t('tags.subtitle')}</p>
 
@@ -42,6 +44,7 @@ export function TagsPage() {
           })}
         </div>
       )}
+      </div>
     </div>
   )
 }

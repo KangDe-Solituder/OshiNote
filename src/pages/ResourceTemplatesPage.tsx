@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, FileText, Layers3, PackageOpen, ScrollText, Stamp as StampIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { useI18n } from '../i18n/useI18n'
 import { fetchResourceTemplates } from '../features/templates/templateService'
 import type { ResourceTemplate, ResourceTemplateType } from '../types'
@@ -42,6 +42,7 @@ export function ResourceTemplatesPage() {
       </header>
 
       <main className={PAGE_CONTENT_CLASS}>
+        <div className={PAGE_WIDE_FRAME_CLASS}>
         <div className="mb-5 flex flex-wrap gap-2">
           {(['all', 'note', 'journal_page', 'stamp', 'material'] as const).map((type) => (
             <button
@@ -72,6 +73,7 @@ export function ResourceTemplatesPage() {
             ))}
           </div>
         )}
+        </div>
       </main>
     </div>
   )

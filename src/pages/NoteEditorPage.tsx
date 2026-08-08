@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { TipTapEditor } from '../components/editor/TipTapEditor'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_READING_FRAME_CLASS } from '../components/layout/pageShell'
 import { useEditorStore } from '../stores/editorStore'
 import { useNoteStore } from '../stores/noteStore'
 import { fetchNoteById, fetchNoteImages, getAllTags, replaceNoteImages } from '../features/notes/noteService'
@@ -372,7 +372,7 @@ export function NoteEditorPage() {
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <main className={`min-w-0 ${PAGE_CONTENT_CLASS} transition-[padding] duration-300 ease-out`}>
-          <div className="mx-auto max-w-5xl">
+          <div className={PAGE_READING_FRAME_CLASS}>
             {images.length > 0 && (
               <section className="mb-7 overflow-hidden rounded-2xl border border-border-color bg-bg-secondary/25">
                 <div className="relative aspect-[16/6] min-h-52 overflow-hidden bg-bg-tertiary">

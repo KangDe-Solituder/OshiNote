@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { FileText, Heart, LayoutGrid, List, Loader2, Plus, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS } from '../components/layout/pageShell'
+import { ADAPTIVE_NOTE_GRID_CLASS, PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { fetchAllNotes, getAllTags } from '../features/notes/noteService'
 import { fetchAllArchives } from '../features/oshis/archiveService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
@@ -91,7 +91,7 @@ export function NotesPage() {
       </header>
 
       <main className={PAGE_CONTENT_CLASS}>
-        <div className="mx-auto max-w-6xl">
+        <div className={PAGE_WIDE_FRAME_CLASS}>
 
       <div className="mb-5 space-y-3 border-b border-border-color pb-4">
         <div className="flex items-center gap-3">
@@ -181,7 +181,7 @@ export function NotesPage() {
           <p className="mt-1 text-sm text-text-muted">{t('notes.empty.body')}</p>
         </div>
       ) : viewMode === 'card' ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className={ADAPTIVE_NOTE_GRID_CLASS}>
           {notes.map((note) => <NoteCard key={note.id} note={note} />)}
         </div>
       ) : (

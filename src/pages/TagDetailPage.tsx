@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, StickyNote, Search, ArrowUpDown } from 'lucide-reac
 import { Button } from '../components/ui/Button'
 import { fetchNotesByTag, fetchNotesByTagPaginated } from '../features/notes/noteService'
 import type { Note } from '../types'
+import { PAGE_CONTENT_CLASS, PAGE_READING_FRAME_CLASS } from '../components/layout/pageShell'
 
 const PAGE_SIZE = 20
 
@@ -67,7 +68,8 @@ export function TagDetailPage() {
   }, [notes, localSearch])
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className={PAGE_CONTENT_CLASS}>
+      <div className={PAGE_READING_FRAME_CLASS}>
       <Link
         to="/tags"
         className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary mb-6 transition-colors"
@@ -178,6 +180,7 @@ export function TagDetailPage() {
           )}
         </>
       )}
+      </div>
     </div>
   )
 }
