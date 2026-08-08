@@ -13,13 +13,14 @@ interface MotionTiming {
   viewExit: number
   routeEnter: number
   routeExit: number
+  routeOffset: number
 }
 
 export const MOTION_TIMING: Record<UiMotionDuration, MotionTiming> = {
-  off: { micro: 0, viewEnter: 0, viewExit: 0, routeEnter: 0, routeExit: 0 },
-  fast: { micro: 0.07, viewEnter: 0.12, viewExit: 0.055, routeEnter: 0.14, routeExit: 0.055 },
-  normal: { micro: 0.13, viewEnter: 0.18, viewExit: 0.075, routeEnter: 0.2, routeExit: 0.075 },
-  slow: { micro: 0.2, viewEnter: 0.25, viewExit: 0.1, routeEnter: 0.29, routeExit: 0.105 },
+  off: { micro: 0, viewEnter: 0, viewExit: 0, routeEnter: 0, routeExit: 0, routeOffset: 0 },
+  fast: { micro: 0.07, viewEnter: 0.12, viewExit: 0.055, routeEnter: 0.165, routeExit: 0.075, routeOffset: 10 },
+  normal: { micro: 0.13, viewEnter: 0.18, viewExit: 0.075, routeEnter: 0.24, routeExit: 0.1, routeOffset: 12 },
+  slow: { micro: 0.2, viewEnter: 0.25, viewExit: 0.1, routeEnter: 0.36, routeExit: 0.14, routeOffset: 14 },
 }
 
 export const UI_MOTION_SECONDS: Record<UiMotionDuration, number> = {

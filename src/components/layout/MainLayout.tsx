@@ -22,19 +22,22 @@ export function MainLayout() {
             <motion.div
               key={location.pathname}
               className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-bg-primary"
-              initial={animateRoute ? { opacity: 0, transform: 'translate3d(0, 6px, 0) scale(0.998)' } : false}
+              initial={animateRoute ? { opacity: 0, y: timing.routeOffset } : false}
               animate={{
                 opacity: 1,
-                transform: 'translate3d(0, 0, 0) scale(1)',
+                y: 0,
                 transition: {
                   opacity: { duration: timing.routeEnter, delay: timing.routeExit, ease: MOTION_EASING.enter },
-                  transform: { duration: timing.routeEnter, delay: timing.routeExit, ease: MOTION_EASING.enter },
+                  y: { duration: timing.routeEnter, delay: timing.routeExit, ease: MOTION_EASING.enter },
                 },
               }}
               exit={animateRoute ? {
                 opacity: 0,
-                transform: 'translate3d(0, -3px, 0) scale(0.999)',
-                transition: { duration: timing.routeExit, ease: MOTION_EASING.exit },
+                y: -3,
+                transition: {
+                  opacity: { duration: timing.routeExit, ease: MOTION_EASING.exit },
+                  y: { duration: timing.routeExit, ease: MOTION_EASING.exit },
+                },
               } : undefined}
               style={animateRoute ? { willChange: 'opacity, transform' } : undefined}
             >
