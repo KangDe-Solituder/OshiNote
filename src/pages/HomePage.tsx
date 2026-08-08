@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
 import { Heart, FileText, Tag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
@@ -57,12 +56,9 @@ export function HomePage() {
 
       {stats.notes === 0 && (
         <div className="text-center py-16">
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
+          <div>
             <Heart size={48} className="mx-auto mb-4 text-accent-soft" />
-          </motion.div>
+          </div>
           <h2 className="text-xl font-semibold text-text-primary mb-2">{t('home.empty.title')}</h2>
           <p className="text-text-muted">{t('home.empty.body')}</p>
         </div>

@@ -898,7 +898,8 @@ pub fn run() {
             data_sync::download_webdav_app_data_file,
             data_sync::activate_sync_cache_file,
             data_sync::inspect_sync_cache,
-            data_sync::clear_sync_cache
+            data_sync::clear_sync_cache,
+            data_sync::execute_sync_transaction
         ])
         .run(tauri::generate_context!())
         .expect("error while running OshiNote");

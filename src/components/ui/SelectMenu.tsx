@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
-import { useUiMotionSeconds } from '../features/themes/uiMotion'
+import { MOTION_EASING, useMotionTiming } from '../features/themes/uiMotion'
 import { OVERLAY_Z_INDEX } from './overlay'
 
 export interface SelectMenuOption {
@@ -47,7 +47,7 @@ export function SelectMenu({
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const motionSeconds = useUiMotionSeconds()
+  const timing = useMotionTiming()
   const selected = options.find((option) => option.value === value)
   const menuOrigin = menuAlign === 'right' ? 'origin-top-right' : 'origin-top-left'
 
@@ -128,10 +128,19 @@ export function SelectMenu({
       >
         <motion.div
           ref={menuRef}
-          initial={{ opacity: 0, y: motionSeconds === 0 ? 0 : -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: motionSeconds === 0 ? 0 : -4 }}
-          transition={{ duration: motionSeconds, ease: 'easeOut' }}
+          initial={{ opacity: 0, y: timing.viewEnter === 0 ? 0 : -4, scale: timing.viewEnter === 0 ? 1 : 0.99 }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            transition: { duration: timing.viewEnter, ease: MOTION_EASING.enter },
+          }}
+          exit={{
+            opacity: 0,
+            y: timing.viewExit === 0 ? 0 : -2,
+            scale: timing.viewExit === 0 ? 1 : 0.995,
+            transition: { duration: timing.viewExit, ease: MOTION_EASING.exit },
+          }}
           className={clsx(
             'overflow-hidden rounded-xl border border-border-color bg-bg-primary p-1 shadow-lg transform-gpu will-change-[transform,opacity]',
             menuOrigin,
@@ -200,7 +209,7 @@ export function SelectMenu({
         <ChevronDown
           size={size === 'sm' ? 14 : 16}
           className="shrink-0 transition-transform"
-          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transitionDuration: `${motionSeconds}s` }}
+          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transitionDuration: `${timing.micro}s` }}
         />
       </button>
 

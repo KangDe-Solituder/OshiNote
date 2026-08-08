@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   LayoutGrid,
-  Loader2,
   RotateCcw,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
@@ -302,7 +301,6 @@ export function JournalEditorPage() {
           </h1>
         </div>
 
-        {loading && <Loader2 size={18} className="animate-spin text-accent" />}
         {error && <span className="hidden max-w-64 truncate text-xs text-red-400 sm:inline">{error}</span>}
 
         <Button variant="secondary" size="sm" onClick={handleClearPage} disabled={!isDraftPage && canvasItems.length === 0}>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Heart, Loader2 } from 'lucide-react'
+import { Plus, Heart } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { useOshiStore } from '../stores/oshiStore'
 import { OshiCard } from '../features/oshis/OshiCard'
@@ -8,12 +8,14 @@ import { OshiForm } from '../features/oshis/OshiForm'
 import type { Oshi, CreateOshiInput } from '../types'
 import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS } from '../components/layout/pageShell'
 import { useI18n } from '../i18n/useI18n'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 
 export function OshiListPage() {
   const { t } = useI18n()
   const { oshis, oshiNoteCounts, loading, error, fetchAll, createOshi, updateOshi, deleteOshi } = useOshiStore()
   const [formOpen, setFormOpen] = useState(false)
   const [editingOshi, setEditingOshi] = useState<Oshi | null>(null)
+  const initialLoading = loading && oshis.length === 0
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
@@ -52,12 +54,7 @@ export function OshiListPage() {
         </Button>
       </div>
 
-      {loading && (
-        <div className="text-center py-20">
-          <Loader2 size={32} className="mx-auto mb-4 text-accent animate-spin" />
-          <p className="text-text-muted">{t('common.loading')}</p>
-        </div>
-      )}
+      {initialLoading && <PageLoadingState label={t('common.loading')} layout="cards" />}
 
       {error && (
         <div className="text-center py-12 bg-red-50 rounded-2xl">
@@ -66,14 +63,11 @@ export function OshiListPage() {
         </div>
       )}
 
-      {!loading && !error && oshis.length === 0 && (
+      {!initialLoading && !error && oshis.length === 0 && (
         <div className="text-center py-20">
-          <motion.div
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
+          <div>
             <Heart size={64} className="mx-auto mb-6 text-accent-soft" />
-          </motion.div>
+          </div>
           <h2 className="text-xl font-semibold text-text-primary mb-2">{t('oshis.empty.title')}</h2>
           <p className="text-text-muted mb-6">{t('oshis.empty.body')}</p>
           <Button size="lg" onClick={() => { setEditingOshi(null); setFormOpen(true) }}>
@@ -83,7 +77,7 @@ export function OshiListPage() {
         </div>
       )}
 
-      {!loading && !error && oshis.length > 0 && (
+      {!initialLoading && !error && oshis.length > 0 && (
         <div className="adaptive-library-grid">
           <AnimatePresence>
             {oshis.map((oshi) => (

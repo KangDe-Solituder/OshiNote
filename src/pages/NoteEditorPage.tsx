@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 import { TipTapEditor } from '../components/editor/TipTapEditor'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_READING_FRAME_CLASS } from '../components/layout/pageShell'
 import { useEditorStore } from '../stores/editorStore'
@@ -40,6 +41,7 @@ import { countTextStats, type TextStats } from '../utils/textStats'
 import { useStampSettingsStore } from '../stores/stampSettingsStore'
 
 export function NoteEditorPage() {
+  const { t } = useI18n()
   const { oshiId, noteId } = useParams<{ oshiId: string; noteId: string }>()
   const navigate = useNavigate()
   const isNew = !noteId || noteId === 'new'
@@ -315,11 +317,7 @@ export function NoteEditorPage() {
   }, [oshiId, title, tags, note, isNew, selectedOshiId, archiveId, createdAt, sourceUrl, images])
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-accent" />
-      </div>
-    )
+    return <PageLoadingState label={t('common.loading')} layout="editor" className="h-full bg-bg-primary" />
   }
 
   return (

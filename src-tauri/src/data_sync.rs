@@ -1,14 +1,18 @@
 use reqwest::header::{HeaderMap, HeaderValue, DATE, ETAG, IF_MATCH, IF_NONE_MATCH, LAST_MODIFIED};
 use reqwest::{Client, Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
+use tauri_plugin_sql::{DbInstances, DbPool};
 
 const SYNC_REF_PATH: &str = "sync/v1/refs/main.json";
 const REPOSITORY_PATH: &str = "repository.json";
 const MAX_TEXT_OBJECT_BYTES: usize = 32 * 1024 * 1024;
+const APP_DATABASE_URL: &str = "sqlite:oshinote.db";
+const SYNC_DATABASE_BUSY_TIMEOUT_MS: u64 = 10_000;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WebDavDataConfig {
@@ -53,6 +57,83 @@ pub struct WebDavWriteResult {
 pub struct SyncCacheSummary {
     bytes: u64,
     files: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SyncDatabaseStatement {
+    query: String,
+    values: Vec<JsonValue>,
+}
+
+#[tauri::command]
+pub async fn execute_sync_transaction(
+    db_instances: tauri::State<'_, DbInstances>,
+    statements: Vec<SyncDatabaseStatement>,
+) -> Result<(), String> {
+    if statements.is_empty() {
+        return Ok(());
+    }
+
+    let instances = db_instances.0.read().await;
+    let database = instances
+        .get(APP_DATABASE_URL)
+        .ok_or_else(|| "The OshiNote database is not loaded.".to_string())?;
+    let pool = match database {
+        DbPool::Sqlite(pool) => pool,
+        #[allow(unreachable_patterns)]
+        _ => return Err("The OshiNote database is not SQLite.".to_string()),
+    };
+    let mut connection = pool
+        .acquire()
+        .await
+        .map_err(|error| format!("Could not acquire the sync database connection: {error}"))?;
+
+    sqlx::query(&format!(
+        "PRAGMA busy_timeout = {SYNC_DATABASE_BUSY_TIMEOUT_MS}"
+    ))
+    .execute(&mut *connection)
+    .await
+    .map_err(|error| format!("Could not configure the sync database connection: {error}"))?;
+    sqlx::query("BEGIN IMMEDIATE")
+        .execute(&mut *connection)
+        .await
+        .map_err(format_sync_database_error)?;
+
+    for statement in statements {
+        let mut query = sqlx::query(&statement.query);
+        for value in statement.values {
+            if value.is_null() {
+                query = query.bind(None::<JsonValue>);
+            } else if let Some(value) = value.as_str() {
+                query = query.bind(value.to_owned());
+            } else if let Some(value) = value.as_number() {
+                query = query.bind(value.as_f64().unwrap_or_default());
+            } else {
+                query = query.bind(value);
+            }
+        }
+
+        if let Err(error) = query.execute(&mut *connection).await {
+            let _ = sqlx::query("ROLLBACK").execute(&mut *connection).await;
+            return Err(format_sync_database_error(error));
+        }
+    }
+
+    if let Err(error) = sqlx::query("COMMIT").execute(&mut *connection).await {
+        let _ = sqlx::query("ROLLBACK").execute(&mut *connection).await;
+        return Err(format_sync_database_error(error));
+    }
+
+    Ok(())
+}
+
+fn format_sync_database_error(error: sqlx::Error) -> String {
+    if let sqlx::Error::Database(database_error) = &error {
+        if database_error.code().as_deref() == Some("5") {
+            return "The local database stayed busy for 10 seconds. Close any other OshiNote window and try the sync again.".to_string();
+        }
+    }
+    format!("Could not apply incremental sync changes: {error}")
 }
 
 #[tauri::command]

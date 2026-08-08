@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { AnimatePresence } from 'framer-motion'
-import { Calendar, GalleryVerticalEnd, Heart, ImageIcon, LayoutGrid, List, Loader2, Plus, Search, UserRound } from 'lucide-react'
+import { Calendar, GalleryVerticalEnd, Heart, ImageIcon, LayoutGrid, List, Plus, Search, UserRound } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { fetchAllOshis } from '../features/oshis/oshiService'
@@ -21,6 +21,7 @@ import {
 } from './OshiIllustrationsPage'
 import { useI18n } from '../i18n/useI18n'
 import { SelectMenu } from '../components/ui/SelectMenu'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 
 type IllustrationCategoryFilter = 'all' | IllustrationCategory
 type IllustrationViewMode = 'masonry' | 'grid' | 'list'
@@ -45,6 +46,7 @@ export function IllustrationsPage() {
     () => illustrations.find((illustration) => illustration.id === selectedId) || null,
     [illustrations, selectedId]
   )
+  const initialLoading = loading && illustrations.length === 0
 
   async function load() {
     setLoading(true)
@@ -180,8 +182,8 @@ export function IllustrationsPage() {
             </div>
           </div>
 
-          {loading ? (
-            <div className="py-20 text-center"><Loader2 size={28} className="mx-auto animate-spin text-accent" /></div>
+          {initialLoading ? (
+            <PageLoadingState label={t('common.loading')} layout={viewMode === 'list' ? 'rows' : 'cards'} />
           ) : illustrations.length === 0 ? (
             <div className="py-20 text-center">
               <ImageIcon size={46} className="mx-auto mb-4 text-accent-soft" />

@@ -1,6 +1,6 @@
 import { motion, type HTMLMotionProps } from 'framer-motion'
 import clsx from 'clsx'
-import { useUiMotionSeconds } from '../features/themes/uiMotion'
+import { MOTION_EASING, useUiMotionSeconds } from '../features/themes/uiMotion'
 
 interface CardProps extends HTMLMotionProps<'div'> {
   glass?: boolean
@@ -26,8 +26,8 @@ export function Card({ glass = true, hover = true, padding = 'md', className, ch
         },
         className
       )}
-      whileHover={hover ? { y: -2, scale: 1.01 } : undefined}
-      transition={{ duration: motionSeconds, ease: 'easeOut' }}
+      whileHover={hover && motionSeconds > 0 ? { y: -2 } : undefined}
+      transition={{ duration: motionSeconds, ease: MOTION_EASING.enter }}
       {...props}
     >
       {children}

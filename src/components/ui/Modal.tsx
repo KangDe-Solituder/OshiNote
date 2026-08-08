@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
-import { useUiMotionSeconds } from '../features/themes/uiMotion'
+import { MOTION_EASING, useMotionTiming } from '../features/themes/uiMotion'
 import { OVERLAY_Z_INDEX } from './overlay'
 
 interface ModalProps {
@@ -14,7 +14,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, contentClassName }: ModalProps) {
-  const motionSeconds = useUiMotionSeconds()
+  const timing = useMotionTiming()
 
   useEffect(() => {
     if (open) {
@@ -33,16 +33,25 @@ export function Modal({ open, onClose, title, children, contentClassName }: Moda
           <motion.div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: timing.viewEnter, ease: MOTION_EASING.standard } }}
+            exit={{ opacity: 0, transition: { duration: timing.viewExit, ease: MOTION_EASING.exit } }}
             onClick={onClose}
           />
           <motion.div
             className={`relative mx-4 max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-6 shadow-2xl ${contentClassName || 'max-w-lg'}`}
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ duration: motionSeconds, ease: 'easeOut' }}
+            initial={{ opacity: 0, scale: timing.viewEnter === 0 ? 1 : 0.975, y: timing.viewEnter === 0 ? 0 : 8 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              transition: { duration: timing.viewEnter, ease: MOTION_EASING.enter },
+            }}
+            exit={{
+              opacity: 0,
+              scale: timing.viewExit === 0 ? 1 : 0.99,
+              y: timing.viewExit === 0 ? 0 : 4,
+              transition: { duration: timing.viewExit, ease: MOTION_EASING.exit },
+            }}
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-text-primary">{title}</h2>

@@ -54,6 +54,7 @@ import type {
 } from '../types'
 import { formatDate, formatImageSize, getOshiName } from '../features/illustrations/illustrationFormat'
 import { SelectMenu } from '../components/ui/SelectMenu'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
 import { useI18n } from '../i18n/useI18n'
 import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
@@ -91,6 +92,7 @@ export function OshiIllustrationsPage() {
     () => illustrations.find((illustration) => illustration.id === selectedId) || null,
     [illustrations, selectedId]
   )
+  const initialLoading = loading && illustrations.length === 0
 
   async function load() {
     if (!oshiId) return
@@ -208,10 +210,12 @@ export function OshiIllustrationsPage() {
             </div>
           </div>
 
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center">
-              <Loader2 size={30} className="animate-spin text-accent" />
-            </div>
+          {initialLoading ? (
+            <PageLoadingState
+              label={t('common.loading')}
+              layout={viewMode === 'list' ? 'rows' : 'cards'}
+              className="flex-1"
+            />
           ) : illustrations.length === 0 ? (
             <EmptyState onCreate={() => setShowCreate(true)} />
           ) : viewMode === 'masonry' ? (

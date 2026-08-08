@@ -6,6 +6,7 @@ import clsx from 'clsx'
 import { Button } from '../components/ui/Button'
 import { TagGraphView } from '../components/features/notes/TagGraphView'
 import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 import { useArchiveStore } from '../stores/archiveStore'
 import { useNoteStore } from '../stores/noteStore'
 import { useOshiStore } from '../stores/oshiStore'
@@ -163,11 +164,7 @@ export function OshiDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 size={32} className="animate-spin text-accent" />
-      </div>
-    )
+    return <PageLoadingState label={t('common.loading')} layout="detail" className="h-full bg-bg-primary p-[var(--page-block-gap)]" />
   }
 
   if (!oshi) {
@@ -348,15 +345,13 @@ export function OshiDetailPage() {
       <div className="relative flex-1 min-h-0 overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={notesLoading ? 'loading' : viewMode}
+            key={viewMode}
             {...pageTransition}
             className="absolute inset-0 overflow-y-auto px-[var(--page-gutter)] py-6"
           >
             <div className={`${PAGE_WIDE_FRAME_CLASS} min-h-full`}>
             {notesLoading && (
-              <div className="text-center py-12">
-                <Loader2 size={24} className="mx-auto mb-3 text-accent animate-spin" />
-              </div>
+              <PageLoadingState label={t('common.loading')} layout="rows" delay={100} />
             )}
 
             {!notesLoading && notes.length === 0 && (

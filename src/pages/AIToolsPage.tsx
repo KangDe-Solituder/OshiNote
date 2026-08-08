@@ -5,12 +5,12 @@ import { TranslationPanel } from '../components/features/ai/TranslationPanel'
 import { RefinementPanel } from '../components/features/ai/RefinementPanel'
 import { useAiStore } from '../stores/aiStore'
 import { Card } from '../components/ui/Card'
-import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
+import { usePageTransition } from '../components/features/themes/uiMotion'
 
 type Tab = 'translate' | 'refine'
 
 export function AIToolsPage() {
-  const motionSeconds = useUiMotionSeconds()
+  const pageTransition = usePageTransition()
   const [tab, setTab] = useState<Tab>('translate')
   const config = useAiStore((s) => s.config)
   const needsApiKey = config.provider !== 'local' && !config[config.provider].apiKey
@@ -58,10 +58,7 @@ export function AIToolsPage() {
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={tab}
-              initial={false}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: motionSeconds }}
+              {...pageTransition}
               className="min-h-full"
             >
               {tab === 'translate' ? <TranslationPanel /> : <RefinementPanel />}

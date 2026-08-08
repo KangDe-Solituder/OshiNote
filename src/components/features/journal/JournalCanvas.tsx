@@ -1,4 +1,4 @@
-import { Loader2, Minus, Plus, StickyNote } from 'lucide-react'
+import { Minus, Plus, StickyNote } from 'lucide-react'
 import type { JournalItemWithNote, JournalPage } from '../../../types'
 import { getJournalCanvasSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { JournalSticker } from './JournalSticker'
@@ -92,8 +92,12 @@ export function JournalCanvas({
           </div>
 
           {loading && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg-primary/25 backdrop-blur-sm">
-              <Loader2 size={26} className="animate-spin text-accent" />
+            <div
+              role="status"
+              aria-label={t('common.loading')}
+              className="absolute inset-0 z-50 bg-bg-primary/30 p-5 backdrop-blur-[2px]"
+            >
+              <div className="page-loading-placeholder h-full w-full rounded-2xl border border-border-color/60" />
             </div>
           )}
 

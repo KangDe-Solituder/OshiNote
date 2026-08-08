@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, Heart, LayoutGrid, List, Loader2, Plus, Search } from 'lucide-react'
+import { FileText, Heart, LayoutGrid, List, Plus, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { ADAPTIVE_NOTE_GRID_CLASS, PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
@@ -9,6 +9,7 @@ import { fetchAllOshis } from '../features/oshis/oshiService'
 import type { Archive, NoteLibraryItem, NoteOwnershipFilter, NoteSort, Oshi } from '../types'
 import { useI18n } from '../i18n/useI18n'
 import { SelectMenu } from '../components/ui/SelectMenu'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 
 const PAGE_SIZE = 20
 
@@ -173,7 +174,7 @@ export function NotesPage() {
       </div>
 
       {loading ? (
-        <div className="py-20 text-center"><Loader2 size={28} className="mx-auto animate-spin text-accent" /></div>
+        <PageLoadingState label={t('common.loading')} layout={viewMode === 'list' ? 'rows' : 'cards'} />
       ) : notes.length === 0 ? (
         <div className="py-20 text-center">
           <FileText size={46} className="mx-auto mb-4 text-accent-soft" />

@@ -1,4 +1,5 @@
 import { BaseDirectory, exists, mkdir, readFile, rename, writeFile } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
 import type Database from '@tauri-apps/plugin-sql'
 import { getDb } from '../../database'
 import {
@@ -18,6 +19,11 @@ interface TableDefinition {
   name: string
   primaryKey: string
   columns: readonly string[]
+}
+
+interface SyncDatabaseStatement {
+  query: string
+  values: unknown[]
 }
 
 const TABLES: readonly TableDefinition[] = [
@@ -128,16 +134,11 @@ export async function applySyncOperations(operations: SyncOperation[]): Promise<
     .filter((operation) => operation.operation === 'upsert')
     .sort((left, right) => tableOrder(left.table) - tableOrder(right.table))
 
-  await db.execute('BEGIN IMMEDIATE')
-  try {
-    for (const operation of deletes) await deleteRecord(db, operation)
-    for (const operation of upserts) await upsertRecord(db, operation)
-    await db.execute('COMMIT')
-    await quarantineSupersededMedia(supersededMedia)
-  } catch (error) {
-    await db.execute('ROLLBACK').catch(() => undefined)
-    throw error
-  }
+  const statements: SyncDatabaseStatement[] = deletes.map(buildDeleteStatement)
+  for (const operation of upserts) statements.push(await buildUpsertStatement(operation))
+
+  await invoke('execute_sync_transaction', { statements })
+  await quarantineSupersededMedia(supersededMedia)
 }
 
 async function findSupersededIllustrationMedia(db: Database, operations: SyncOperation[]): Promise<string[]> {
@@ -197,7 +198,7 @@ export function incomingBlobCachePath(hash: string): string {
   return `${INCOMING_CACHE}/${hash}`
 }
 
-async function upsertRecord(db: Database, operation: SyncOperation): Promise<void> {
+async function buildUpsertStatement(operation: SyncOperation): Promise<SyncDatabaseStatement> {
   const table = TABLE_BY_NAME.get(operation.table)
   if (!table || !operation.value) throw new Error(`Unsupported sync table: ${operation.table}`)
   const value = { ...operation.value }
@@ -218,17 +219,20 @@ async function upsertRecord(db: Database, operation: SyncOperation): Promise<voi
     .map((column) => `${column} = excluded.${column}`)
     .join(', ')
   const placeholders = table.columns.map(() => '?').join(', ')
-  await db.execute(
-    `INSERT INTO ${table.name} (${table.columns.join(', ')}) VALUES (${placeholders})
-     ON CONFLICT(${table.primaryKey}) DO UPDATE SET ${updates}`,
-    bindings
-  )
+  return {
+    query: `INSERT INTO ${table.name} (${table.columns.join(', ')}) VALUES (${placeholders})
+      ON CONFLICT(${table.primaryKey}) DO UPDATE SET ${updates}`,
+    values: bindings,
+  }
 }
 
-async function deleteRecord(db: Database, operation: SyncOperation): Promise<void> {
+function buildDeleteStatement(operation: SyncOperation): SyncDatabaseStatement {
   const table = TABLE_BY_NAME.get(operation.table)
   if (!table) throw new Error(`Unsupported sync table: ${operation.table}`)
-  await db.execute(`DELETE FROM ${table.name} WHERE ${table.primaryKey} = ?`, [operation.id])
+  return {
+    query: `DELETE FROM ${table.name} WHERE ${table.primaryKey} = ?`,
+    values: [operation.id],
+  }
 }
 
 function tableOrder(table: string): number {

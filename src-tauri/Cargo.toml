@@ -19,6 +19,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = ["sqlite"] }
 tauri-plugin-process = "2"
 reqwest = { version = "0.13.3", default-features = false, features = ["rustls"] }
 zip = "4.6.1"

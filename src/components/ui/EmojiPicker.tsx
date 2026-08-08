@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Smile, X } from 'lucide-react'
 import { KAOMOJI_CATEGORIES, EMOJI_CATEGORIES } from '../../features/notes/kaomojiPresets'
-import { useUiMotionSeconds } from '../features/themes/uiMotion'
+import { MOTION_EASING, useMotionTiming } from '../features/themes/uiMotion'
 
 interface EmojiPickerProps {
   onSelect: (text: string) => void
@@ -17,7 +17,7 @@ function keepEditorFocus(event: ReactMouseEvent) {
 }
 
 export function EmojiPicker({ onSelect }: EmojiPickerProps) {
-  const motionSeconds = useUiMotionSeconds()
+  const timing = useMotionTiming()
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('emoji')
   const [customItems, setCustomItems] = useState<string[]>(loadCustomKaomoji)
@@ -47,10 +47,19 @@ export function EmojiPicker({ onSelect }: EmojiPickerProps) {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            transition={{ duration: motionSeconds }}
+            initial={{ opacity: 0, y: timing.viewEnter === 0 ? 0 : 6, scale: timing.viewEnter === 0 ? 1 : 0.985 }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { duration: timing.viewEnter, ease: MOTION_EASING.enter },
+            }}
+            exit={{
+              opacity: 0,
+              y: timing.viewExit === 0 ? 0 : 3,
+              scale: timing.viewExit === 0 ? 1 : 0.99,
+              transition: { duration: timing.viewExit, ease: MOTION_EASING.exit },
+            }}
             className="absolute top-full mt-2 left-0 w-80 bg-bg-primary border border-border-color rounded-2xl shadow-2xl z-50 overflow-hidden"
           >
             <div className="flex border-b border-border-color">

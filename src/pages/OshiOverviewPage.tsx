@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
-import { Edit3, ExternalLink, FileText, Heart, ImageIcon, Link2, Loader2, Plus, Tag } from 'lucide-react'
+import { Edit3, ExternalLink, FileText, Heart, ImageIcon, Link2, Plus, Tag } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS } from '../components/layout/pageShell'
 import { OshiForm } from '../features/oshis/OshiForm'
@@ -11,6 +11,7 @@ import { fetchIllustrations, getIllustrationCountByOshi } from '../features/illu
 import { useI18n } from '../i18n/useI18n'
 import { releaseMediaUrl, resolveMediaUrl } from '../services/media/illustrationMedia'
 import type { CreateOshiInput, Illustration, Note, Oshi } from '../types'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 
 export function OshiOverviewPage() {
   const { t } = useI18n()
@@ -67,11 +68,7 @@ export function OshiOverviewPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 size={30} className="animate-spin text-accent" />
-      </div>
-    )
+    return <PageLoadingState label={t('common.loading')} layout="detail" className="h-full bg-bg-primary p-[var(--page-block-gap)]" />
   }
 
   if (!oshi || !oshiId) {

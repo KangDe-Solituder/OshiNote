@@ -1,6 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
 import { motion, type HTMLMotionProps } from 'framer-motion'
 import clsx from 'clsx'
+import { MOTION_EASING, useUiMotionSeconds } from '../features/themes/uiMotion'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -9,7 +10,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', className, children, ...props }, ref) => {
+    const motionSeconds = useUiMotionSeconds()
     const motionProps = props as unknown as HTMLMotionProps<'button'>
+    const interactiveMotion = motionSeconds > 0 && !props.disabled
     const base = clsx(
       'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-50 disabled:pointer-events-none',
       {
@@ -30,8 +33,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <motion.button
         ref={ref}
         className={base}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+        whileHover={interactiveMotion ? { y: -1 } : undefined}
+        whileTap={interactiveMotion ? { y: 0, scale: 0.975 } : undefined}
+        transition={{ duration: motionSeconds, ease: MOTION_EASING.enter }}
         {...motionProps}
       >
         {children}

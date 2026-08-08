@@ -1,14 +1,17 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, StickyNote, Search, ArrowUpDown } from 'lucide-react'
+import { ArrowLeft, StickyNote, Search, ArrowUpDown } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { fetchNotesByTag, fetchNotesByTagPaginated } from '../features/notes/noteService'
 import type { Note } from '../types'
 import { PAGE_CONTENT_CLASS, PAGE_READING_FRAME_CLASS } from '../components/layout/pageShell'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
+import { useI18n } from '../i18n/useI18n'
 
 const PAGE_SIZE = 20
 
 export function TagDetailPage() {
+  const { t } = useI18n()
   const { tagName } = useParams()
   const decodedTagName = tagName ? decodeURIComponent(tagName) : ''
   const [notes, setNotes] = useState<Note[]>([])
@@ -20,6 +23,7 @@ export function TagDetailPage() {
   const [usePaginated, setUsePaginated] = useState(true)
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const initialLoading = loading && notes.length === 0
 
   useEffect(() => {
     if (!decodedTagName) return
@@ -107,10 +111,8 @@ export function TagDetailPage() {
       </div>
 
       {/* Content */}
-      {loading ? (
-        <div className="text-center py-12">
-          <Loader2 size={24} className="mx-auto text-accent animate-spin" />
-        </div>
+      {initialLoading ? (
+        <PageLoadingState label={t('common.loading')} layout="rows" />
       ) : filteredNotes.length === 0 ? (
         <div className="text-center py-20">
           <StickyNote size={48} className="mx-auto mb-4 text-accent-soft" />

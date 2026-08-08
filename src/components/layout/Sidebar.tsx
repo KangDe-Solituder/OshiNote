@@ -150,6 +150,7 @@ function OshiNavGroup({
   onToggle: () => void
 }) {
   const { t } = useI18n()
+  const motionSeconds = useUiMotionSeconds()
   const overviewActive = pathname === `/oshis/${oshi.id}`
   const toggleTitle = expanded ? t('nav.collapseSection', { title: oshi.name }) : t('nav.expandSection', { title: oshi.name })
 
@@ -191,7 +192,7 @@ function OshiNavGroup({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.14, ease: 'easeOut' }}
+            transition={{ duration: motionSeconds, ease: 'easeOut' }}
             className={clsx('mt-1 overflow-hidden', compact ? '' : 'pl-3')}
           >
             <div className="grid gap-1">

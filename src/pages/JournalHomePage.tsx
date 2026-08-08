@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BookOpen, Camera, FileImage, Flower, Grid3X3, Heart, List, Loader2, Moon, MoreHorizontal, Pencil, Plus, Search, Ticket, Trash2 } from 'lucide-react'
+import { BookOpen, Camera, FileImage, Flower, Grid3X3, Heart, List, Moon, MoreHorizontal, Pencil, Plus, Search, Ticket, Trash2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 import { fetchJournalBooks, fetchStandalonePostcards } from '../features/journal/journalService'
 import { getJournalBackgroundPreset } from '../features/journal/journalBackgrounds'
 import { fetchAllOshis } from '../features/oshis/oshiService'
@@ -64,6 +65,7 @@ export function JournalHomePage() {
     coverStyle: 'cloth' as JournalCoverStyle,
     coverDecoration: 'ticket' as JournalCoverDecoration,
   })
+  const initialLoading = loading && items.length === 0
 
   useEffect(() => {
     loadShelf()
@@ -246,10 +248,8 @@ export function JournalHomePage() {
           </button>
         </div>
 
-        {loading ? (
-          <div className="flex min-h-80 items-center justify-center text-text-muted">
-            <Loader2 size={24} className="animate-spin" />
-          </div>
+        {initialLoading ? (
+          <PageLoadingState label={t('common.loading')} layout={viewMode === 'list' ? 'rows' : 'cards'} />
         ) : filteredItems.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border-color bg-bg-secondary/25 px-6 py-16 text-center">
             <BookOpen size={42} className="mx-auto mb-3 text-accent" />
