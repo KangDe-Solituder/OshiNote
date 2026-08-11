@@ -181,7 +181,7 @@ body {
 
 .overview-content-grid {
   grid-template-columns: 1fr;
-  gap: 20px;
+  gap: 12px;
 }
 
 .settings-layout-grid {
@@ -197,15 +197,24 @@ body {
   .overview-links-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .overview-content-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .overview-recent-notes {
+    grid-column: span 2 / span 2;
+  }
+
+  .overview-recent-side {
+    grid-column: span 1 / span 1;
+  }
 }
 
 @container app-content (min-width: 1080px) {
   .overview-links-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .overview-content-grid {
-    grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.75fr);
   }
 
   .settings-layout-grid {

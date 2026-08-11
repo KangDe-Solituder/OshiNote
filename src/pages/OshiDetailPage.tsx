@@ -13,7 +13,7 @@ import { useOshiStore } from '../stores/oshiStore'
 import { fetchOshiById } from '../features/oshis/oshiService'
 import { getOshiArchiveNoteCounts } from '../features/notes/noteService'
 import type { Archive, CardStyle, Oshi, OshiArchiveNoteCounts, OshiNoteArchiveFilter } from '../types'
-import { usePageTransition } from '../components/features/themes/uiMotion'
+import { MOTION_EASING, useMotionTiming, usePageTransition } from '../components/features/themes/uiMotion'
 import { useI18n } from '../i18n/useI18n'
 import { ADAPTIVE_NOTE_GRID_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 
@@ -39,6 +39,7 @@ export function OshiDetailPage() {
   const [archiveCounts, setArchiveCounts] = useState<OshiArchiveNoteCounts>(EMPTY_ARCHIVE_COUNTS)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const pageTransition = usePageTransition()
+  const motionTiming = useMotionTiming()
 
   const { archives, fetchByOshi: fetchArchivesByOshi, createArchive, updateArchiveList, deleteArchive } = useArchiveStore()
   const {
@@ -262,11 +263,11 @@ export function OshiDetailPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full pl-9 pr-4 py-2 rounded-xl border border-border-color bg-bg-secondary text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
+              className="h-10 w-full rounded-xl border border-border-color bg-bg-secondary pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
             />
           </div>
 
-          <div className="flex gap-1 bg-bg-secondary rounded-xl p-1">
+          <div className="flex h-10 w-40 shrink-0 items-center justify-center gap-1 rounded-full bg-bg-secondary p-1">
             {[
               { mode: 'card' as const, icon: LayoutGrid, title: t('notes.cardView') },
               { mode: 'list' as const, icon: List, title: t('notes.listView') },
@@ -275,12 +276,19 @@ export function OshiDetailPage() {
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === mode ? 'bg-bg-primary text-accent shadow-sm' : 'text-text-muted hover:text-text-primary'
+                className={`relative rounded-lg p-2 transition-colors ${
+                  viewMode === mode ? 'text-accent' : 'text-text-muted hover:text-text-primary'
                 }`}
                 title={title}
               >
-                <Icon size={18} />
+                {viewMode === mode && (
+                  <motion.span
+                    layoutId="oshi-note-view-indicator"
+                    className="absolute inset-0 rounded-lg bg-bg-primary shadow-sm"
+                    transition={{ duration: motionTiming.micro, ease: MOTION_EASING.standard }}
+                  />
+                )}
+                <Icon size={18} className="relative z-10" />
               </button>
             ))}
           </div>
@@ -294,7 +302,7 @@ export function OshiDetailPage() {
                 setShowAddArchive(false)
               }}
               className={clsx(
-                'flex items-center gap-1.5 rounded-lg border border-border-color bg-bg-secondary px-2.5 py-2 text-sm transition-colors',
+                'flex h-10 w-40 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border-color bg-bg-secondary px-4 text-sm transition-colors',
                 showCardStyleMenu ? 'text-accent ring-2 ring-accent-soft' : 'text-text-secondary hover:text-text-primary'
               )}
               title="Card skin"
@@ -331,7 +339,7 @@ export function OshiDetailPage() {
         )}
 
         <Link to={`/oshis/${oshiId}/notes/new`}>
-          <Button size="sm">
+          <Button size="sm" className="h-10 w-40 shrink-0 rounded-full px-4">
             <Plus size={16} />
             {t('notes.new')}
           </Button>
@@ -345,7 +353,7 @@ export function OshiDetailPage() {
       <div className="relative flex-1 min-h-0 overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={viewMode}
+            key={`${activeArchiveFilter}:${viewMode}`}
             {...pageTransition}
             className="absolute inset-0 overflow-y-auto px-[var(--page-gutter)] py-6"
           >
@@ -707,14 +715,15 @@ function ArchiveTab({
   onDelete?: () => void
   deleteTitle: string
 }) {
+  const motionTiming = useMotionTiming()
   return (
     <div className="group flex items-center gap-1">
       <button
         type="button"
         onClick={onSelect}
         className={clsx(
-          'border-b-2 px-1 pb-3 text-sm font-semibold transition-colors',
-          active ? 'border-accent text-accent' : 'border-transparent text-text-muted hover:text-text-primary'
+          'relative border-b-2 border-transparent px-1 pb-3 text-sm font-semibold transition-colors',
+          active ? 'text-accent' : 'text-text-muted hover:text-text-primary'
         )}
       >
         <span>{tab.label}</span>
@@ -724,6 +733,13 @@ function ArchiveTab({
         )}>
           {tab.count}
         </span>
+        {active && (
+          <motion.span
+            layoutId="oshi-note-archive-indicator"
+            className="absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full bg-accent"
+            transition={{ duration: motionTiming.micro, ease: MOTION_EASING.standard }}
+          />
+        )}
       </button>
 
       {active && onDelete && (

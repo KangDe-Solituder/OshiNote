@@ -50,13 +50,15 @@ export async function fetchIllustrations(params: IllustrationSearchParams): Prom
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
   const orderBy = params.sort === 'oldest'
-    ? 'COALESCE(date, created_at) ASC, created_at ASC'
+    ? 'COALESCE(date, created_at) ASC, created_at ASC, id ASC'
     : params.sort === 'title'
-      ? 'title COLLATE NOCASE ASC, created_at DESC'
-      : 'COALESCE(date, created_at) DESC, created_at DESC'
+      ? 'title COLLATE NOCASE ASC, created_at DESC, id ASC'
+      : 'COALESCE(date, created_at) DESC, created_at DESC, id ASC'
+  const limit = params.limit && params.limit > 0 ? ' LIMIT ?' : ''
+  if (limit) bindings.push(Math.floor(params.limit!))
 
   const rows = await db.select<IllustrationRow[]>(
-    `SELECT * FROM illustrations ${where} ORDER BY ${orderBy}`,
+    `SELECT * FROM illustrations ${where} ORDER BY ${orderBy}${limit}`,
     bindings
   )
   return rows.map(deserializeIllustration)

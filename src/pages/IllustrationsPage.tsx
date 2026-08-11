@@ -22,6 +22,7 @@ import {
 import { useI18n } from '../i18n/useI18n'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
+import { MasonryLayout } from '../components/ui/MasonryLayout'
 
 type IllustrationCategoryFilter = 'all' | IllustrationCategory
 type IllustrationViewMode = 'masonry' | 'grid' | 'list'
@@ -195,7 +196,7 @@ export function IllustrationsPage() {
               </Button>
             </div>
           ) : viewMode === 'masonry' ? (
-            <div className="columns-1 gap-3 pb-8 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5">
+            <MasonryLayout className="mb-8">
               {illustrations.map((illustration) => (
                 <IllustrationMasonryCard
                   key={illustration.id}
@@ -205,7 +206,7 @@ export function IllustrationsPage() {
                   onToggleFavorite={handleToggleFavorite}
                 />
               ))}
-            </div>
+            </MasonryLayout>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {illustrations.map((illustration) => (
@@ -285,6 +286,7 @@ function IllustrationCard({
             fallbackPath={illustration.original_path}
             alt={illustration.title || illustration.original_filename}
             className="h-full w-full object-cover"
+            reserveHeight={false}
           />
           <CategoryBadge category={illustration.category} />
         </div>
@@ -322,14 +324,18 @@ function IllustrationMasonryCard({
 }) {
   const { t } = useI18n()
   return (
-    <article className="mb-3 break-inside-avoid overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
+    <article className="overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
       <button type="button" onClick={() => onSelect(illustration.id)} className="block w-full text-left">
-        <div className="relative bg-bg-tertiary">
+        <div
+          className="relative bg-bg-tertiary"
+          style={{ aspectRatio: illustration.width && illustration.height ? `${illustration.width} / ${illustration.height}` : '4 / 3' }}
+        >
           <MediaImage
             path={illustration.thumbnail_path || illustration.original_path}
             fallbackPath={illustration.original_path}
             alt={illustration.title || illustration.original_filename}
-            className="w-full object-cover"
+            className="h-full w-full object-cover"
+            reserveHeight={false}
           />
           <CategoryBadge category={illustration.category} />
         </div>
@@ -375,6 +381,7 @@ function IllustrationRow({
           fallbackPath={illustration.original_path}
           alt={illustration.title || illustration.original_filename}
           className="h-full w-full object-cover"
+          reserveHeight={false}
         />
       </button>
       <button type="button" onClick={() => onSelect(illustration.id)} className="min-w-0 flex-1 text-left">

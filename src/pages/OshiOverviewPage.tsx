@@ -9,9 +9,11 @@ import { fetchOshiById, getOshiNoteCount, updateOshi } from '../features/oshis/o
 import { fetchRecentNotesByOshi, getTagsByOshi } from '../features/notes/noteService'
 import { fetchIllustrations, getIllustrationCountByOshi } from '../features/illustrations/illustrationService'
 import { useI18n } from '../i18n/useI18n'
-import { releaseMediaUrl, resolveMediaUrl } from '../services/media/illustrationMedia'
+import { getCachedMediaUrlWithFallback, releaseMediaUrl, resolveMediaUrlWithFallback } from '../services/media/illustrationMedia'
 import type { CreateOshiInput, Illustration, Note, Oshi } from '../types'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
+
+const RECENT_ILLUSTRATION_LIMIT = 4
 
 export function OshiOverviewPage() {
   const { t } = useI18n()
@@ -34,14 +36,14 @@ export function OshiOverviewPage() {
           getOshiNoteCount(oshiId!),
           getIllustrationCountByOshi(oshiId!),
           getTagsByOshi(oshiId!),
-          fetchRecentNotesByOshi(oshiId!, 5),
-          fetchIllustrations({ oshiId: oshiId!, sort: 'newest' }),
+          fetchRecentNotesByOshi(oshiId!, 4),
+          fetchIllustrations({ oshiId: oshiId!, sort: 'newest', limit: RECENT_ILLUSTRATION_LIMIT }),
         ])
         if (cancelled) return
         setOshi(oshiRecord)
         setStats({ notes: noteCount, illustrations: illustrationCount, tags: tags.length })
         setNotes(recentNotes)
-        setIllustrations(recentIllustrations.slice(0, 4))
+        setIllustrations(recentIllustrations)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -131,7 +133,7 @@ export function OshiOverviewPage() {
         </section>
 
         <div className="overview-content-grid">
-          <section className="rounded-2xl border border-border-color bg-bg-card p-5">
+          <section className="overview-recent-notes rounded-2xl border border-border-color bg-bg-card p-5">
             <SectionHeader title={t('oshiOverview.recentNotes')} to={`/oshis/${oshiId}/notes`} />
             {notes.length === 0 ? (
               <EmptyLine text={t('oshiOverview.noNotes')} action={t('notes.new')} to={`/oshis/${oshiId}/notes/new`} />
@@ -152,22 +154,24 @@ export function OshiOverviewPage() {
             )}
           </section>
 
-          <div className="grid gap-5">
-            <section className="rounded-2xl border border-border-color bg-bg-card p-5">
-              <SectionHeader title={t('oshiOverview.recentIllustrations')} to={`/oshis/${oshiId}/illustrations`} />
-              {illustrations.length === 0 ? (
-                <EmptyLine text={t('oshiOverview.noIllustrations')} action={t('illustrations.add')} to={`/oshis/${oshiId}/illustrations`} />
-              ) : (
-                <div className="grid grid-cols-4 gap-3">
-                  {illustrations.map((illustration) => (
-                    <Link key={illustration.id} to={`/oshis/${oshiId}/illustrations`} className="aspect-square overflow-hidden rounded-xl bg-bg-tertiary">
-                      <OverviewMediaImage path={illustration.thumbnail_path || illustration.original_path} alt={illustration.title} />
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+          <section className="overview-recent-side rounded-2xl border border-border-color bg-bg-card p-5">
+            <SectionHeader title={t('oshiOverview.recentIllustrations')} to={`/oshis/${oshiId}/illustrations`} />
+            {illustrations.length === 0 ? (
+              <EmptyLine text={t('oshiOverview.noIllustrations')} action={t('illustrations.add')} to={`/oshis/${oshiId}/illustrations`} />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {illustrations.map((illustration) => (
+                  <Link key={illustration.id} to={`/oshis/${oshiId}/illustrations`} className="aspect-square overflow-hidden rounded-xl bg-bg-tertiary">
+                    <OverviewMediaImage
+                      path={illustration.thumbnail_path || illustration.original_path}
+                      fallbackPath={illustration.original_path}
+                      alt={illustration.title}
+                    />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
         </div>
       </main>
@@ -220,27 +224,37 @@ function EmptyLine({ text, action, to }: { text: string; action: string; to: str
   )
 }
 
-function OverviewMediaImage({ path, alt }: { path: string | null; alt: string }) {
-  const [src, setSrc] = useState('')
+function OverviewMediaImage({ path, fallbackPath, alt }: { path: string | null; fallbackPath?: string | null; alt: string }) {
+  const [src, setSrc] = useState(() => getCachedMediaUrlWithFallback(path, fallbackPath))
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let alive = true
     let currentUrl = ''
-    resolveMediaUrl(path)
+    setSrc(getCachedMediaUrlWithFallback(path, fallbackPath))
+    setFailed(false)
+    resolveMediaUrlWithFallback(path, fallbackPath)
       .then((url) => {
+        if (!url) throw new Error('Media file not found')
         currentUrl = url
         if (alive) setSrc(url)
         else releaseMediaUrl(url)
       })
       .catch(() => {
-        if (alive) setSrc('')
+        if (alive) setFailed(true)
       })
     return () => {
       alive = false
       releaseMediaUrl(currentUrl)
     }
-  }, [path])
-  if (!src) return <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={20} /></div>
-  return <img src={src} alt={alt} className="h-full w-full object-cover" />
+  }, [fallbackPath, path])
+  if (!src) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-text-muted">
+        {failed && <ImageIcon size={20} />}
+      </div>
+    )
+  }
+  return <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" decoding="async" />
 }
 
 function normalizeWebUrl(value: string): string | null {

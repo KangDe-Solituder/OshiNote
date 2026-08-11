@@ -37,6 +37,8 @@ import {
   updateIllustration,
 } from '../features/illustrations/illustrationService'
 import {
+  discardCachedMediaUrl,
+  getCachedMediaUrlWithFallback,
   releaseMediaUrl,
   resolveMediaUrlWithFallback,
   storeIllustrationImage,
@@ -55,9 +57,10 @@ import type {
 import { formatDate, formatImageSize, getOshiName } from '../features/illustrations/illustrationFormat'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
+import { MasonryLayout } from '../components/ui/MasonryLayout'
 import { OVERLAY_Z_INDEX } from '../components/ui/overlay'
 import { useI18n } from '../i18n/useI18n'
-import { useUiMotionSeconds } from '../components/features/themes/uiMotion'
+import { MOTION_EASING, useMotionTiming, usePageTransition, useUiMotionSeconds } from '../components/features/themes/uiMotion'
 import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
 import { StampControl } from '../components/features/stamps/StampControl'
 import { StampOverlay } from '../components/features/stamps/StampOverlay'
@@ -80,6 +83,7 @@ export function OshiIllustrationsPage() {
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
   const [activeTab, setActiveTab] = useState<IllustrationTab>('all')
+  const [renderedTab, setRenderedTab] = useState<IllustrationTab>('all')
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState('')
   const [sort, setSort] = useState<IllustrationSort>('newest')
@@ -87,6 +91,9 @@ export function OshiIllustrationsPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const loadRequestIdRef = useRef(0)
+  const motionTiming = useMotionTiming()
+  const pageTransition = usePageTransition()
 
   const selected = useMemo(
     () => illustrations.find((illustration) => illustration.id === selectedId) || null,
@@ -96,6 +103,7 @@ export function OshiIllustrationsPage() {
 
   async function load() {
     if (!oshiId) return
+    const requestId = ++loadRequestIdRef.current
     setLoading(true)
     try {
       const [oshiRows, rows, tagRows] = await Promise.all([
@@ -110,12 +118,14 @@ export function OshiIllustrationsPage() {
         }),
         getIllustrationTags(oshiId),
       ])
+      if (requestId !== loadRequestIdRef.current) return
       setOshis(oshiRows)
       setIllustrations(rows)
       setTags(tagRows)
+      setRenderedTab(activeTab)
       if (selectedId && !rows.some((row) => row.id === selectedId)) setSelectedId(null)
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestIdRef.current) setLoading(false)
     }
   }
 
@@ -155,13 +165,20 @@ export function OshiIllustrationsPage() {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={clsx(
-                    'border-b-2 px-1 pb-3 text-sm font-semibold transition-colors',
+                    'relative border-b-2 border-transparent px-1 pb-3 text-sm font-semibold transition-colors',
                     activeTab === item.id
-                      ? 'border-accent text-accent'
-                      : 'border-transparent text-text-muted hover:text-text-primary'
+                      ? 'text-accent'
+                      : 'text-text-muted hover:text-text-primary'
                   )}
                 >
                   {t(item.labelKey)}
+                  {activeTab === item.id && (
+                    <motion.span
+                      layoutId="oshi-illustration-tab-indicator"
+                      className="absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full bg-accent"
+                      transition={{ duration: motionTiming.micro, ease: MOTION_EASING.standard }}
+                    />
+                  )}
                 </button>
               ))}
             </div>
@@ -169,13 +186,13 @@ export function OshiIllustrationsPage() {
           </div>
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[260px] flex-1">
+            <div className="relative min-w-[220px] flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t('illustrations.searchShort')}
-                className="w-full rounded-2xl border border-border-color bg-bg-secondary py-2.5 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
+                className="h-10 w-full rounded-2xl border border-border-color bg-bg-secondary pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft"
               />
             </div>
             <div className="relative">
@@ -188,7 +205,7 @@ export function OshiIllustrationsPage() {
                   ...tags.map((item) => ({ value: item.tag, label: `#${item.tag}` })),
                 ]}
                 ariaLabel={t('notes.allTags')}
-                buttonClassName="min-w-[180px] pl-10"
+                buttonClassName="w-[clamp(150px,18cqw,180px)] pl-10"
                 menuClassName="w-[220px]"
               />
             </div>
@@ -201,48 +218,58 @@ export function OshiIllustrationsPage() {
                 { value: 'title', label: t('illustrations.titleSort') },
               ]}
               ariaLabel={t('illustrations.sortLabel')}
+              buttonClassName="w-[clamp(120px,14cqw,160px)]"
               menuClassName="w-[196px]"
             />
-            <div className="ml-auto flex rounded-xl bg-bg-secondary p-1">
+            <Button size="sm" className="h-10 w-[clamp(120px,14cqw,160px)] shrink-0 rounded-full px-4" onClick={() => setShowCreate(true)}>
+              <Plus size={16} className="shrink-0" />
+              <span className="truncate">{t('illustrations.add')}</span>
+            </Button>
+            <div className="flex h-10 w-[clamp(120px,14cqw,160px)] shrink-0 items-center justify-center rounded-full bg-bg-secondary p-1">
               <IconToggle active={viewMode === 'masonry'} title={t('illustrations.masonryView')} onClick={() => setViewMode('masonry')}><GalleryVerticalEnd size={17} /></IconToggle>
               <IconToggle active={viewMode === 'grid'} title={t('illustrations.gridView')} onClick={() => setViewMode('grid')}><LayoutGrid size={17} /></IconToggle>
               <IconToggle active={viewMode === 'list'} title={t('illustrations.listView')} onClick={() => setViewMode('list')}><List size={17} /></IconToggle>
             </div>
           </div>
 
-          {initialLoading ? (
-            <PageLoadingState
-              label={t('common.loading')}
-              layout={viewMode === 'list' ? 'rows' : 'cards'}
-              className="flex-1"
-            />
-          ) : illustrations.length === 0 ? (
-            <EmptyState onCreate={() => setShowCreate(true)} />
-          ) : viewMode === 'masonry' ? (
-            <IllustrationMasonry
-              illustrations={illustrations}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onToggleFavorite={handleToggleFavorite}
-              onCreate={() => setShowCreate(true)}
-            />
-          ) : viewMode === 'grid' ? (
-            <IllustrationGrid
-              illustrations={illustrations}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onToggleFavorite={handleToggleFavorite}
-              onCreate={() => setShowCreate(true)}
-            />
-          ) : (
-            <IllustrationList
-              illustrations={illustrations}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onToggleFavorite={handleToggleFavorite}
-              onCreate={() => setShowCreate(true)}
-            />
-          )}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={`${renderedTab}:${viewMode}`}
+              {...pageTransition}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              {initialLoading ? (
+                <PageLoadingState
+                  label={t('common.loading')}
+                  layout={viewMode === 'list' ? 'rows' : 'cards'}
+                  className="flex-1"
+                />
+              ) : illustrations.length === 0 ? (
+                <EmptyState onCreate={() => setShowCreate(true)} />
+              ) : viewMode === 'masonry' ? (
+                <IllustrationMasonry
+                  illustrations={illustrations}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+              ) : viewMode === 'grid' ? (
+                <IllustrationGrid
+                  illustrations={illustrations}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+              ) : (
+                <IllustrationList
+                  illustrations={illustrations}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 
@@ -281,32 +308,34 @@ function IllustrationMasonry({
   selectedId,
   onSelect,
   onToggleFavorite,
-  onCreate,
 }: {
   illustrations: Illustration[]
   selectedId: string | null
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
-  onCreate: () => void
 }) {
   const { t } = useI18n()
   return (
-    <div className="columns-1 gap-3 pb-8 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5">
+    <MasonryLayout className="mb-8">
       {illustrations.map((illustration) => (
         <article
           key={illustration.id}
           className={clsx(
-            'mb-3 break-inside-avoid overflow-hidden rounded-xl border bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg',
+            'overflow-hidden rounded-xl border bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg',
             selectedId === illustration.id ? 'border-accent ring-2 ring-accent-soft' : 'border-border-color'
           )}
         >
           <button type="button" onClick={() => onSelect(illustration.id)} className="block w-full text-left">
-            <div className="relative bg-bg-tertiary">
+            <div
+              className="relative bg-bg-tertiary"
+              style={{ aspectRatio: illustration.width && illustration.height ? `${illustration.width} / ${illustration.height}` : '4 / 3' }}
+            >
               <MediaImage
                 path={illustration.thumbnail_path || illustration.original_path}
                 fallbackPath={illustration.original_path}
                 alt={illustration.title || illustration.original_filename}
-                className="w-full object-cover"
+                className="h-full w-full object-cover"
+                reserveHeight={false}
               />
               <span className={clsx(
                 'absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm backdrop-blur',
@@ -349,8 +378,7 @@ function IllustrationMasonry({
           </div>
         </article>
       ))}
-      <AddIllustrationTile onCreate={onCreate} variant="masonry" />
-    </div>
+    </MasonryLayout>
   )
 }
 
@@ -359,13 +387,11 @@ function IllustrationGrid({
   selectedId,
   onSelect,
   onToggleFavorite,
-  onCreate,
 }: {
   illustrations: Illustration[]
   selectedId: string | null
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
-  onCreate: () => void
 }) {
   const { t } = useI18n()
   return (
@@ -385,6 +411,7 @@ function IllustrationGrid({
                 fallbackPath={illustration.original_path}
                 alt={illustration.title || illustration.original_filename}
                 className="h-full w-full object-cover"
+                reserveHeight={false}
               />
               <span className={clsx(
                 'absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm backdrop-blur',
@@ -416,7 +443,6 @@ function IllustrationGrid({
           </div>
         </article>
       ))}
-      <AddIllustrationTile onCreate={onCreate} variant="grid" />
     </div>
   )
 }
@@ -426,13 +452,11 @@ function IllustrationList({
   selectedId,
   onSelect,
   onToggleFavorite,
-  onCreate,
 }: {
   illustrations: Illustration[]
   selectedId: string | null
   onSelect: (id: string) => void
   onToggleFavorite: (id: string) => void
-  onCreate: () => void
 }) {
   const { t } = useI18n()
   return (
@@ -451,6 +475,7 @@ function IllustrationList({
               fallbackPath={illustration.original_path}
               alt={illustration.title || illustration.original_filename}
               className="h-full w-full object-cover"
+              reserveHeight={false}
             />
           </button>
           <button type="button" onClick={() => onSelect(illustration.id)} className="min-w-0 flex-1 text-left">
@@ -468,7 +493,6 @@ function IllustrationList({
           <FavoriteIconButton illustration={illustration} onToggleFavorite={onToggleFavorite} />
         </div>
       ))}
-      <AddIllustrationListRow onCreate={onCreate} />
     </div>
   )
 }
@@ -491,47 +515,17 @@ function FavoriteIconButton({ illustration, onToggleFavorite }: { illustration: 
 }
 
 function IconToggle({ active, title, onClick, children }: { active: boolean; title: string; onClick: () => void; children: React.ReactNode }) {
+  const motionTiming = useMotionTiming()
   return (
-    <button type="button" title={title} onClick={onClick} className={`rounded-lg p-2 transition-colors ${active ? 'bg-bg-primary text-accent shadow-sm' : 'text-text-muted hover:text-text-primary'}`}>
-      {children}
-    </button>
-  )
-}
-
-function AddIllustrationTile({ onCreate, variant }: { onCreate: () => void; variant: 'masonry' | 'grid' }) {
-  const { t } = useI18n()
-  return (
-    <button
-      type="button"
-      onClick={onCreate}
-      className={clsx(
-        'flex min-h-48 w-full flex-col items-center justify-center rounded-xl border border-dashed border-border-color bg-bg-secondary/25 p-5 text-center text-text-muted transition-all hover:border-accent hover:bg-accent-soft/20 hover:text-accent',
-        variant === 'masonry' && 'mb-3 break-inside-avoid',
-        variant === 'grid' && 'aspect-[4/3]'
+    <button type="button" title={title} onClick={onClick} className={`relative rounded-lg p-2 transition-colors ${active ? 'text-accent' : 'text-text-muted hover:text-text-primary'}`}>
+      {active && (
+        <motion.span
+          layoutId="oshi-illustration-view-indicator"
+          className="absolute inset-0 rounded-lg bg-bg-primary shadow-sm"
+          transition={{ duration: motionTiming.micro, ease: MOTION_EASING.standard }}
+        />
       )}
-    >
-      <Plus size={28} />
-      <span className="mt-3 text-sm font-semibold">{t('illustrations.add')}</span>
-      <span className="mt-1 text-xs">{t('illustrations.addDescription')}</span>
-    </button>
-  )
-}
-
-function AddIllustrationListRow({ onCreate }: { onCreate: () => void }) {
-  const { t } = useI18n()
-  return (
-    <button
-      type="button"
-      onClick={onCreate}
-      className="flex w-full items-center gap-3 rounded-lg border border-dashed border-border-color px-3 py-3 text-left text-text-muted transition-colors hover:border-accent hover:bg-accent-soft/20 hover:text-accent"
-    >
-      <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded-lg bg-bg-secondary/70">
-        <Plus size={22} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">{t('illustrations.add')}</span>
-        <span className="mt-0.5 block text-xs">{t('illustrations.addDescription')}</span>
-      </span>
+      <span className="relative z-10 flex">{children}</span>
     </button>
   )
 }
@@ -1066,29 +1060,31 @@ export function MediaImage({
   fallbackPath,
   alt,
   className,
+  reserveHeight = true,
 }: {
   path: string | null
   fallbackPath?: string | null
   alt: string
   className?: string
+  reserveHeight?: boolean
 }) {
   const candidates = useMemo(
     () => Array.from(new Set([path, fallbackPath].filter((candidate): candidate is string => Boolean(candidate)))),
     [fallbackPath, path]
   )
-  const [src, setSrc] = useState('')
+  const [src, setSrc] = useState(() => getCachedMediaUrlWithFallback(path, fallbackPath))
   const [sourceIndex, setSourceIndex] = useState(0)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     setSourceIndex(0)
     setFailed(false)
-    setSrc('')
+    setSrc(getCachedMediaUrlWithFallback(candidates[0], candidates[1]))
   }, [candidates])
 
   useEffect(() => {
     let alive = true
-    setSrc('')
+    setSrc(getCachedMediaUrlWithFallback(candidates[sourceIndex], candidates[sourceIndex + 1]))
     let currentUrl = ''
     resolveMediaUrlWithFallback(candidates[sourceIndex], candidates[sourceIndex + 1])
       .then((url) => {
@@ -1112,7 +1108,7 @@ export function MediaImage({
   }, [candidates, sourceIndex])
 
   function handleImageError() {
-    releaseMediaUrl(src)
+    discardCachedMediaUrl(src)
     if (sourceIndex < candidates.length - 1) {
       setSourceIndex((index) => index + 1)
       return
@@ -1123,12 +1119,12 @@ export function MediaImage({
 
   if (!src || failed) {
     return (
-      <div className={clsx('flex min-h-48 items-center justify-center bg-bg-tertiary text-text-muted', className)}>
-        <ImageIcon size={26} />
+      <div className={clsx('flex items-center justify-center bg-bg-tertiary text-text-muted', reserveHeight && 'min-h-48', className)}>
+        {failed && <ImageIcon size={26} />}
       </div>
     )
   }
-  return <img src={src} alt={alt} className={className} loading="lazy" onError={handleImageError} />
+  return <img src={src} alt={alt} className={className} loading="lazy" decoding="async" onError={handleImageError} />
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {

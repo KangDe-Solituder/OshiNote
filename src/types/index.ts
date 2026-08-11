@@ -140,6 +140,7 @@ export interface IllustrationSearchParams {
   tag?: string
   includeArchived?: boolean
   sort: IllustrationSort
+  limit?: number
 }
 
 export type StampTargetType = 'note' | 'illustration' | 'journal_page' | 'postcard'

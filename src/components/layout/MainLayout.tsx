@@ -18,7 +18,7 @@ export function MainLayout() {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <Sidebar />
         <main className="app-main-container relative isolate min-h-0 flex-1 overflow-hidden">
-          <AnimatePresence mode="sync" initial={false}>
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location.pathname}
               className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-bg-primary"
@@ -27,8 +27,8 @@ export function MainLayout() {
                 opacity: 1,
                 y: 0,
                 transition: {
-                  opacity: { duration: timing.routeEnter, delay: timing.routeExit, ease: MOTION_EASING.enter },
-                  y: { duration: timing.routeEnter, delay: timing.routeExit, ease: MOTION_EASING.enter },
+                  opacity: { duration: timing.routeEnter, ease: MOTION_EASING.enter },
+                  y: { duration: timing.routeEnter, ease: MOTION_EASING.enter },
                 },
               }}
               exit={animateRoute ? {
@@ -39,7 +39,7 @@ export function MainLayout() {
                   y: { duration: timing.routeExit, ease: MOTION_EASING.exit },
                 },
               } : undefined}
-              style={animateRoute ? { willChange: 'opacity, transform' } : undefined}
+              style={{ contain: 'layout paint', backfaceVisibility: 'hidden' }}
             >
               {outlet}
             </motion.div>
