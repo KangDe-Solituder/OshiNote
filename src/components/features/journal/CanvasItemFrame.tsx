@@ -70,7 +70,7 @@ export function CanvasItemFrame({ item, note, illustration, selected, orientatio
     event.currentTarget.style.top = `${layout.y}px`
     event.currentTarget.style.width = `${layout.width}px`
     event.currentTarget.style.height = `${layout.height}px`
-    event.currentTarget.style.transform = `rotate(${layout.rotation}deg)`
+    event.currentTarget.style.transform = `rotate(${layout.rotation}deg) translateZ(0)`
   }
 
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
@@ -92,7 +92,7 @@ export function CanvasItemFrame({ item, note, illustration, selected, orientatio
       onPointerUp={handlePointerUp}
       onPointerCancel={() => { dragRef.current = null }}
       className={clsx('absolute touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
-      style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg)` }}
+      style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
     >
       <JournalDraftItemRenderer item={item} note={note} illustration={illustration} />
       {selected && (

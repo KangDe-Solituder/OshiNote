@@ -172,6 +172,20 @@ body {
   }
 }
 
+.journal-canvas-viewport {
+  background-color: var(--journal-canvas-bg);
+  background-image:
+    radial-gradient(var(--journal-canvas-dot) 0.8px, transparent 1.4px),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-bg-secondary, #f2eee7) 46%, transparent), transparent 34%);
+  background-size: 24px 24px, 100% 100%;
+}
+
+.journal-paper-page {
+  border-radius: 8px;
+  outline: 1px solid color-mix(in srgb, var(--color-text-primary, #2e2a25) 8%, transparent);
+  box-shadow: var(--shadow-e3);
+}
+
 .overview-links-grid,
 .overview-stats-grid,
 .overview-content-grid,

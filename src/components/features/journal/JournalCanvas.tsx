@@ -57,7 +57,7 @@ export function JournalCanvas({
   const viewportRef = useJournalWheelZoom(zoom, onZoomChange)
 
   return (
-    <div ref={viewportRef} className="relative h-full min-h-0 min-w-0 flex-1 overflow-auto bg-[var(--journal-canvas-bg)]">
+    <div ref={viewportRef} className="journal-canvas-viewport relative h-full min-h-0 min-w-0 flex-1 overflow-auto">
       <div
         className="sticky top-4 z-[60] flex h-10 w-max items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur"
         style={{ left: `max(16px, calc(100% - 178px - ${zoomControlsRightOffset}px))` }}
@@ -73,7 +73,7 @@ export function JournalCanvas({
       <div className="flex min-h-[calc(100%-56px)] min-w-full justify-center p-6 pt-2">
       <div style={{ width: canvasSize.width * zoom, height: Math.max(canvasSize.height * zoom, 1) }}>
         <div
-          className="relative overflow-visible bg-[var(--journal-canvas-bg)]"
+          className="journal-paper-page relative overflow-visible bg-[var(--journal-canvas-bg)]"
           style={{
             width: canvasSize.width,
             height: canvasSize.height,

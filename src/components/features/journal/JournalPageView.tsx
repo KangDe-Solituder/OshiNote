@@ -656,6 +656,7 @@ function PagePreviewItem({
   t: Translate
 }) {
   const [imageSrc, setImageSrc] = useState('')
+  const [imageLoaded, setImageLoaded] = useState(false)
   const isIllustration = item.item_type === 'illustration'
 
   useEffect(() => {
@@ -665,6 +666,7 @@ function PagePreviewItem({
     }
     let alive = true
     let currentUrl = ''
+    setImageLoaded(false)
     resolveMediaUrlWithFallback(item.illustration?.thumbnail_path, item.illustration?.original_path)
       .then((url) => {
         currentUrl = url
@@ -685,7 +687,7 @@ function PagePreviewItem({
     top: `${(item.y / canvasSize.height) * 100}%`,
     width: `${(item.width / canvasSize.width) * 100}%`,
     height: `${(item.height / canvasSize.height) * 100}%`,
-    transform: `rotate(${item.rotation}deg)`,
+    transform: `rotate(${item.rotation}deg) translateZ(0)`,
   }
 
   if (item.item_type === 'note') {
@@ -730,7 +732,18 @@ function PagePreviewItem({
           style={{ padding: `${imagePadding}px ${imagePadding}px ${bottomPadding}px`, borderRadius: imageStyle.radius }}
         >
           {imageSrc ? (
-            <img src={imageSrc} alt={item.illustration?.title || ''} className="block h-full w-full" style={{ objectFit: imageStyle.fit, borderRadius: imageStyle.radius }} draggable={false} />
+            <img
+              src={imageSrc}
+              alt={item.illustration?.title || ''}
+              className={`block h-full w-full transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              style={{ objectFit: imageStyle.fit, borderRadius: imageStyle.radius }}
+              draggable={false}
+              decoding="async"
+              ref={(el) => {
+                if (el?.complete && el.naturalWidth > 0) setImageLoaded(true)
+              }}
+              onLoad={() => setImageLoaded(true)}
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center bg-bg-tertiary text-text-muted">
               <ImageIcon size={compact ? 12 : 16} />

@@ -57,11 +57,13 @@ function DraftNoteBody({ item, note }: { item: JournalDraftItem; note?: Note }) 
 
 function DraftIllustrationBody({ item, illustration }: { item: JournalDraftItem; illustration?: Illustration }) {
   const [imageSrc, setImageSrc] = useState('')
+  const [imageLoaded, setImageLoaded] = useState(false)
   const imageStyle = getDraftImageItemStyle(item)
 
   useEffect(() => {
     let alive = true
     let currentUrl = ''
+    setImageLoaded(false)
     if (!illustration) {
       setImageSrc('')
       return
@@ -85,7 +87,18 @@ function DraftIllustrationBody({ item, illustration }: { item: JournalDraftItem;
     <div className="h-full w-full overflow-hidden" style={getImageFrameStyle(imageStyle)}>
       <div className="h-full w-full overflow-hidden" style={{ padding: `${imagePadding}px ${imagePadding}px ${bottomPadding}px`, borderRadius: imageStyle.radius }}>
         {imageSrc ? (
-          <img src={imageSrc} alt={illustration?.title || ''} className="h-full w-full" style={{ objectFit: imageStyle.fit }} draggable={false} />
+          <img
+            src={imageSrc}
+            alt={illustration?.title || ''}
+            className={clsx('h-full w-full transition-opacity duration-300', imageLoaded ? 'opacity-100' : 'opacity-0')}
+            style={{ objectFit: imageStyle.fit }}
+            draggable={false}
+            decoding="async"
+            ref={(el) => {
+              if (el?.complete && el.naturalWidth > 0) setImageLoaded(true)
+            }}
+            onLoad={() => setImageLoaded(true)}
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={28} /></div>
         )}

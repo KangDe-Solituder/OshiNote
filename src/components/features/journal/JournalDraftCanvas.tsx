@@ -101,7 +101,7 @@ export function JournalDraftCanvas({
   }
 
   return (
-    <div ref={viewportRef} className="relative flex h-full min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto bg-[var(--journal-canvas-bg)] p-6">
+    <div ref={viewportRef} className="journal-canvas-viewport relative flex h-full min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6">
       <div className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
         <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
         <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>
@@ -112,7 +112,7 @@ export function JournalDraftCanvas({
         <div
           ref={pageRef}
           data-journal-draft-page="true"
-          className="relative overflow-hidden rounded-xl border border-border-color shadow-[0_18px_42px_rgba(40,46,70,0.18)]"
+          className="journal-paper-page relative overflow-hidden"
           style={{ width: pageSize.width, height: pageSize.height, transform: `scale(${zoom})`, transformOrigin: 'top left', ...getPageBackground(background) }}
           onClick={(event) => {
             if (event.currentTarget === event.target) {

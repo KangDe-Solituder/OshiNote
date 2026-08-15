@@ -117,7 +117,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
         width: item.width,
         height: item.height,
         zIndex: item.z_index,
-        transform: `rotate(${item.rotation}deg)`,
+        transform: `rotate(${item.rotation}deg) translateZ(0)`,
         backgroundColor: sharedDraftItem ? 'transparent' : item.item_type === 'illustration' ? 'var(--color-bg-card)' : getStickerBackground(item.color),
         borderColor: selected ? 'var(--color-accent)' : 'rgba(120, 100, 120, 0.22)',
       }}
