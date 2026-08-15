@@ -43,6 +43,14 @@ const DEFAULT_HOTKEYS: Record<string, ThemeId> = {
   'ctrl+6': 'rainy-cafe',
 }
 
+const LEGACY_DEFAULT_HOTKEYS: Record<string, ThemeId> = {
+  'ctrl+1': 'pink-cozy',
+  'ctrl+2': 'dark-night',
+  'ctrl+3': 'soft-blue',
+  'ctrl+4': 'sakura',
+  'ctrl+5': 'rainy-cafe',
+}
+
 const VALID_THEMES: ThemeId[] = ['warm-paper', 'pink-cozy', 'dark-night', 'soft-blue', 'sakura', 'rainy-cafe']
 
 function applyFontSize(size: FontSize) {
@@ -63,15 +71,20 @@ function coerceTheme(value: string): { theme: ThemeId; glassEnabled?: boolean } 
   return { theme: 'warm-paper' }
 }
 
-function sanitizeHotkeys(value: unknown): Record<string, ThemeId> {
-  if (!value || typeof value !== 'object') return { ...DEFAULT_HOTKEYS }
+export function normalizeThemeHotkeys(value: unknown): { hotkeys: Record<string, ThemeId>; migrated: boolean } {
+  if (!value || typeof value !== 'object') return { hotkeys: { ...DEFAULT_HOTKEYS }, migrated: false }
   const parsed = value as Record<string, string>
+  const keys = Object.keys(parsed)
+  const isLegacyDefaults = Object.entries(LEGACY_DEFAULT_HOTKEYS).every(([key, theme]) => parsed[key] === theme) &&
+    keys.every((key) => key in LEGACY_DEFAULT_HOTKEYS || (key === 'ctrl+6' && parsed[key] === 'rainy-cafe'))
+  if (isLegacyDefaults) return { hotkeys: { ...DEFAULT_HOTKEYS }, migrated: true }
+
   const hotkeys: Record<string, ThemeId> = { ...DEFAULT_HOTKEYS }
   for (const [key, theme] of Object.entries(parsed)) {
     const coerced = coerceTheme(theme)
     hotkeys[key] = coerced.theme
   }
-  return hotkeys
+  return { hotkeys, migrated: false }
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
@@ -178,7 +191,13 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
             }
             break
           case 'hotkeys':
-            try { set({ themeHotkeys: sanitizeHotkeys(JSON.parse(row.value)) }) } catch {
+            try {
+              const normalized = normalizeThemeHotkeys(JSON.parse(row.value))
+              set({ themeHotkeys: normalized.hotkeys })
+              if (normalized.migrated) {
+                db.execute("UPDATE settings SET value = ? WHERE key = 'hotkeys'", [JSON.stringify(normalized.hotkeys)]).catch(() => {})
+              }
+            } catch {
               // Ignore invalid saved settings.
             }
             break

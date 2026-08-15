@@ -47,6 +47,7 @@ const SETTINGS_ALLOWLIST = [
   'hotkeys',
   'fontSize',
   'uiMotionDuration',
+  'textTone',
   'locale',
 ]
 

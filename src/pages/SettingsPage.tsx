@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import { Card } from '../components/ui/Card'
 import { MediaImage } from '../components/ui/MediaImage'
-import { storeCustomBackground } from '../services/media/backgroundImage'
+import { removeCustomBackground, storeCustomBackground } from '../services/media/backgroundImage'
 import { useThemeStore } from '../stores/themeStore'
 import { useUpdateStore } from '../stores/updateStore'
 import type { TextTone, ThemeId, UiMotionDuration } from '../types'
@@ -266,16 +266,19 @@ export function SettingsPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 className="hidden"
                 onChange={async (e) => {
-                  const file = e.target.files?.[0]
+                  const input = e.currentTarget
+                  const file = input.files?.[0]
                   if (!file) return
                   if (isTauri()) {
                     try {
-                      setCustomBackground(await storeCustomBackground(file))
+                      setCustomBackground(await storeCustomBackground(file, customBackground))
                     } catch {
                       // Keep the current background when the file cannot be stored.
+                    } finally {
+                      input.value = ''
                     }
                     return
                   }
@@ -285,6 +288,7 @@ export function SettingsPage() {
                     // Ignore read errors.
                   }
                   reader.readAsDataURL(file)
+                  input.value = ''
                 }}
               />
               <button
@@ -297,7 +301,9 @@ export function SettingsPage() {
               {customBackground && (
                 <button
                   onClick={() => {
+                    const previousBackground = customBackground
                     setCustomBackground(null)
+                    void removeCustomBackground(previousBackground)
                     if (fileInputRef.current) fileInputRef.current.value = ''
                   }}
                   className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
