@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client'
+import './styles/themes/warm-paper.css'
 import './styles/themes/pink-cozy.css'
 import './styles/themes/dark-night.css'
 import './styles/themes/soft-blue.css'

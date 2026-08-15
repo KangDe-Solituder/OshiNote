@@ -240,10 +240,11 @@ export interface StampPreset {
   updated_at: string
 }
 
-export type ThemeId = 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'
+export type ThemeId = 'warm-paper' | 'pink-cozy' | 'dark-night' | 'soft-blue' | 'sakura' | 'rainy-cafe'
 
 export type Locale = 'en' | 'zh' | 'ja'
 export type UiMotionDuration = 'off' | 'fast' | 'normal' | 'slow'
+export type TextTone = 'colored' | 'neutral'
 
 export type ViewMode = 'card' | 'list' | 'graph' | 'journal'
 export type CardStyle = 'basic' | 'sticky' | 'bookshelf' | 'postcard'

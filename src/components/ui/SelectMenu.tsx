@@ -142,7 +142,7 @@ export function SelectMenu({
             transition: { duration: timing.viewExit, ease: MOTION_EASING.exit },
           }}
           className={clsx(
-            'overflow-hidden rounded-xl border border-border-color bg-bg-primary p-1 shadow-lg transform-gpu will-change-[transform,opacity]',
+            'overflow-hidden rounded-xl border border-border-color bg-bg-primary p-1 shadow-e2 transform-gpu will-change-[transform,opacity]',
             menuOrigin,
             menuClassName
           )}
@@ -197,11 +197,11 @@ export function SelectMenu({
         aria-expanded={open}
         aria-label={ariaLabel}
         className={clsx(
-          'inline-flex items-center justify-between gap-3 rounded-full border font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50',
+          'inline-flex items-center justify-between gap-3 rounded-lg border font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50',
           size === 'sm' ? 'h-8 min-w-[92px] px-3 text-xs' : 'h-10 min-w-[132px] px-4 text-sm',
           open
             ? 'border-accent bg-accent/5 text-text-primary ring-1 ring-accent/35'
-            : 'border-border-color bg-bg-secondary text-text-secondary hover:border-accent hover:text-accent',
+            : 'border-border-color bg-bg-card text-text-secondary hover:border-border-hover hover:text-text-primary',
           buttonClassName
         )}
       >

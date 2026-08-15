@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { Card } from '../components/ui/Card'
 import { useThemeStore } from '../stores/themeStore'
 import { useUpdateStore } from '../stores/updateStore'
-import type { ThemeId, UiMotionDuration } from '../types'
+import type { TextTone, ThemeId, UiMotionDuration } from '../types'
 import { checkForUpdate, getCurrentAppVersion, installPendingUpdate, type UpdateInfo, type UpdateInstallProgress } from '../services/update/updateService'
 import { Download, Loader2, RefreshCw, Sparkles, Trash2, Upload, Volume2 } from 'lucide-react'
 import clsx from 'clsx'
@@ -18,6 +18,7 @@ import { useStampFontStore } from '../stores/stampFontStore'
 import { PAGE_CONTENT_CLASS, PAGE_FORM_FRAME_CLASS } from '../components/layout/pageShell'
 
 const THEMES: { id: ThemeId }[] = [
+  { id: 'warm-paper' },
   { id: 'pink-cozy' },
   { id: 'dark-night' },
   { id: 'soft-blue' },
@@ -42,6 +43,7 @@ export function SettingsPage() {
     backgroundFilters, setFilter,
     fontSize, setFontSize,
     uiMotionDuration, setUiMotionDuration,
+    textTone, setTextTone,
   } = useThemeStore()
   const { checkOnStartup, setCheckOnStartup, loadFromDB: loadUpdateSettings } = useUpdateStore()
   const dragEnabled = useSidebarStore((s) => s.dragEnabled)
@@ -376,6 +378,22 @@ export function SettingsPage() {
                 label: t(`settings.motion.${option.value}`),
               }))}
               ariaLabel={t('settings.animationSpeed')}
+              menuAlign="right"
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text-primary">{t('settings.textTone')}</p>
+              <p className="text-xs text-text-muted">{t('settings.textToneDescription')}</p>
+            </div>
+            <SelectMenu
+              value={textTone}
+              onChange={(value) => setTextTone(value as TextTone)}
+              options={[
+                { value: 'colored', label: t('settings.textTone.colored') },
+                { value: 'neutral', label: t('settings.textTone.neutral') },
+              ]}
+              ariaLabel={t('settings.textTone')}
               menuAlign="right"
             />
           </div>

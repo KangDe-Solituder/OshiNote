@@ -31,14 +31,14 @@ export function Modal({ open, onClose, title, children, contentClassName }: Moda
       {open && (
         <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
           <motion.div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/30 backdrop-blur-[3px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: timing.viewEnter, ease: MOTION_EASING.standard } }}
             exit={{ opacity: 0, transition: { duration: timing.viewExit, ease: MOTION_EASING.exit } }}
             onClick={onClose}
           />
           <motion.div
-            className={`relative mx-4 max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-6 shadow-2xl ${contentClassName || 'max-w-lg'}`}
+            className={`relative mx-4 max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-6 shadow-e3 ${contentClassName || 'max-w-lg'}`}
             initial={{ opacity: 0, scale: timing.viewEnter === 0 ? 1 : 0.975, y: timing.viewEnter === 0 ? 0 : 8 }}
             animate={{
               opacity: 1,

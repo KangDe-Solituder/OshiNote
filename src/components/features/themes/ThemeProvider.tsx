@@ -7,6 +7,7 @@ import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts'
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const currentTheme = useThemeStore((s) => s.currentTheme)
   const glassEnabled = useThemeStore((s) => s.glassEnabled)
+  const textTone = useThemeStore((s) => s.textTone)
   const customBackground = useThemeStore((s) => s.customBackground)
   const backgroundFilters = useThemeStore((s) => s.backgroundFilters)
   const loadTheme = useThemeStore((s) => s.loadFromDB)
@@ -28,6 +29,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute('data-glass', glassEnabled ? 'true' : 'false')
   }, [glassEnabled])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-text-tone', textTone)
+  }, [textTone])
 
   useEffect(() => {
     const styleId = 'custom-bg-style'

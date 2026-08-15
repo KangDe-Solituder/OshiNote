@@ -14,10 +14,10 @@ export function Card({ glass = true, hover = true, padding = 'md', className, ch
   return (
     <motion.div
       className={clsx(
-        'rounded-xl border',
-        glass && 'bg-bg-card backdrop-blur-md border-white/20 shadow-glass',
+        'rounded-xl border transition-shadow',
+        glass && 'bg-bg-card border-border-color shadow-e1',
         !glass && 'bg-bg-secondary border-border-color',
-        hover && 'cursor-pointer',
+        hover && 'cursor-pointer hover:shadow-e2 hover:border-border-hover',
         {
           'p-0': padding === 'none',
           'p-3': padding === 'sm',
@@ -26,7 +26,6 @@ export function Card({ glass = true, hover = true, padding = 'md', className, ch
         },
         className
       )}
-      whileHover={hover && motionSeconds > 0 ? { y: -2 } : undefined}
       transition={{ duration: motionSeconds, ease: MOTION_EASING.enter }}
       {...props}
     >

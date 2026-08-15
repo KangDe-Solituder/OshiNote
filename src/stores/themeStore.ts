@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ThemeId, BackgroundFilters, UiMotionDuration } from '../types'
+import type { ThemeId, BackgroundFilters, UiMotionDuration, TextTone } from '../types'
 import { getDb } from '../database'
 
 export type FontSize = 'small' | 'medium' | 'large'
@@ -18,6 +18,7 @@ interface ThemeState {
   themeHotkeys: Record<string, ThemeId>
   fontSize: FontSize
   uiMotionDuration: UiMotionDuration
+  textTone: TextTone
 
   setTheme: (id: ThemeId) => void
   setGlassEnabled: (enabled: boolean) => void
@@ -26,20 +27,22 @@ interface ThemeState {
   setThemeHotkey: (key: string, themeId: ThemeId) => void
   setFontSize: (size: FontSize) => void
   setUiMotionDuration: (duration: UiMotionDuration) => void
+  setTextTone: (tone: TextTone) => void
 
   loadFromDB: () => Promise<void>
   persistToDB: () => Promise<void>
 }
 
 const DEFAULT_HOTKEYS: Record<string, ThemeId> = {
-  'ctrl+1': 'pink-cozy',
-  'ctrl+2': 'dark-night',
-  'ctrl+3': 'soft-blue',
-  'ctrl+4': 'sakura',
-  'ctrl+5': 'rainy-cafe',
+  'ctrl+1': 'warm-paper',
+  'ctrl+2': 'pink-cozy',
+  'ctrl+3': 'dark-night',
+  'ctrl+4': 'soft-blue',
+  'ctrl+5': 'sakura',
+  'ctrl+6': 'rainy-cafe',
 }
 
-const VALID_THEMES: ThemeId[] = ['pink-cozy', 'dark-night', 'soft-blue', 'sakura', 'rainy-cafe']
+const VALID_THEMES: ThemeId[] = ['warm-paper', 'pink-cozy', 'dark-night', 'soft-blue', 'sakura', 'rainy-cafe']
 
 function applyFontSize(size: FontSize) {
   document.documentElement.style.fontSize = FONT_SIZE_MAP[size]
@@ -49,10 +52,14 @@ function applyGlass(enabled: boolean) {
   document.documentElement.setAttribute('data-glass', enabled ? 'true' : 'false')
 }
 
+function applyTextTone(tone: TextTone) {
+  document.documentElement.setAttribute('data-text-tone', tone)
+}
+
 function coerceTheme(value: string): { theme: ThemeId; glassEnabled?: boolean } {
   if (value === 'frosted-blue') return { theme: 'soft-blue', glassEnabled: true }
   if (VALID_THEMES.includes(value as ThemeId)) return { theme: value as ThemeId }
-  return { theme: 'pink-cozy' }
+  return { theme: 'warm-paper' }
 }
 
 function sanitizeHotkeys(value: unknown): Record<string, ThemeId> {
@@ -67,13 +74,14 @@ function sanitizeHotkeys(value: unknown): Record<string, ThemeId> {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  currentTheme: 'pink-cozy',
+  currentTheme: 'warm-paper',
   glassEnabled: false,
   customBackground: null,
   backgroundFilters: { blur: 0, brightness: 100, opacity: 100, saturation: 100 },
   themeHotkeys: { ...DEFAULT_HOTKEYS },
   fontSize: 'medium',
   uiMotionDuration: 'normal',
+  textTone: 'colored',
 
   setTheme: (id) => {
     set({ currentTheme: id })
@@ -117,11 +125,17 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     get().persistToDB()
   },
 
+  setTextTone: (tone) => {
+    set({ textTone: tone })
+    applyTextTone(tone)
+    get().persistToDB()
+  },
+
   loadFromDB: async () => {
     try {
       const db = await getDb()
       const rows = await db.select<{ key: string; value: string }[]>(
-        "SELECT key, value FROM settings WHERE key IN ('theme', 'glassEnabled', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration')"
+        "SELECT key, value FROM settings WHERE key IN ('theme', 'glassEnabled', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration', 'textTone')"
       )
       for (const row of rows) {
         switch (row.key) {
@@ -168,6 +182,12 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
               set({ uiMotionDuration: row.value })
             }
             break
+          case 'textTone':
+            if (row.value === 'colored' || row.value === 'neutral') {
+              set({ textTone: row.value })
+              applyTextTone(row.value)
+            }
+            break
         }
       }
     } catch {
@@ -186,6 +206,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('hotkeys', ?)", [JSON.stringify(state.themeHotkeys)])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('fontSize', ?)", [state.fontSize])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('uiMotionDuration', ?)", [state.uiMotionDuration])
+      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('textTone', ?)", [state.textTone])
     } catch {
       // Silently fail
     }
