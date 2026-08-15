@@ -35,7 +35,7 @@ export function OshiModuleHeader({
           className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white shadow-md"
           style={{ backgroundColor: oshi.color || '#EC4899' }}
         >
-          {oshi.avatar ? <img src={oshi.avatar} alt="" className="h-full w-full object-cover" /> : oshi.name.charAt(0).toUpperCase()}
+          {oshi.avatar ? <img src={oshi.avatar} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" /> : oshi.name.charAt(0).toUpperCase()}
         </div>
       ) : Icon ? (
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft/25 text-accent">

@@ -1,10 +1,10 @@
 import { Search, ImageIcon, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '../../ui/Button'
 import type { Illustration } from '../../../types'
 import { usePopoverTransition } from '../themes/uiMotion'
-import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
+import { MediaImage } from '../../ui/MediaImage'
 import { useI18n } from '../../../i18n/useI18n'
 import { OVERLAY_Z_INDEX } from '../../ui/overlay'
 
@@ -95,29 +95,15 @@ export function JournalIllustrationPicker({ illustrations, onPlaceIllustration, 
 }
 
 function PickerImage({ illustration }: { illustration: Illustration }) {
-  const [src, setSrc] = useState('')
-
-  useEffect(() => {
-    let alive = true
-    let currentUrl = ''
-    resolveMediaUrlWithFallback(illustration.thumbnail_path || illustration.original_path, illustration.original_path)
-      .then((url) => {
-        currentUrl = url
-        if (alive) setSrc(url)
-        else releaseMediaUrl(url)
-      })
-      .catch(() => {
-        if (alive) setSrc('')
-      })
-    return () => {
-      alive = false
-      releaseMediaUrl(currentUrl)
-    }
-  }, [illustration.original_path, illustration.thumbnail_path])
-
   return (
     <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-tertiary text-text-muted">
-      {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : <ImageIcon size={22} />}
+      <MediaImage
+        path={illustration.thumbnail_path || illustration.original_path}
+        fallbackPath={illustration.original_path}
+        alt=""
+        className="h-full w-full object-cover"
+        reserveHeight={false}
+      />
     </span>
   )
 }

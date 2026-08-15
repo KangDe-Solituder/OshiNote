@@ -110,6 +110,28 @@ export async function fetchJournalBooks(oshiId: string): Promise<JournalBook[]> 
   return rows.map(deserializeBook)
 }
 
+export async function fetchAllJournalBooks(): Promise<JournalBook[]> {
+  const db = await getDb()
+  const rows = await db.select<JournalBook[]>(
+    `SELECT jb.*, COUNT(jp.id) as page_count
+     FROM journal_books jb
+     LEFT JOIN journal_pages jp ON jp.book_id = jb.id AND jp.standalone = 0
+     GROUP BY jb.id
+     ORDER BY jb.sort_order ASC, jb.created_at ASC`
+  )
+  return rows.map(deserializeBook)
+}
+
+export async function fetchAllStandalonePostcards(): Promise<JournalPage[]> {
+  const db = await getDb()
+  const rows = await db.select<JournalPageRow[]>(
+    `SELECT * FROM journal_pages
+     WHERE page_type = 'postcard' AND standalone = 1
+     ORDER BY updated_at DESC, created_at DESC`
+  )
+  return rows.map(deserializePage)
+}
+
 export async function getJournalBookCountByOshi(oshiId: string): Promise<number> {
   const db = await getDb()
   const rows = await db.select<{ count: number }[]>(

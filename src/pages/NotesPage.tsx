@@ -207,7 +207,7 @@ export function NotesPage() {
 function NoteCard({ note }: { note: NoteLibraryItem }) {
   const { t } = useI18n()
   return (
-    <Link to={`/notes/${note.id}`} className="block rounded-lg border border-border-color bg-bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg">
+    <Link to={`/notes/${note.id}`} className="block rounded-lg border border-border-color bg-bg-card p-4 transition-shadow hover:shadow-e2 hover:border-border-hover">
       <div className="flex items-start gap-3">
         <OshiAvatar note={note} />
         <div className="min-w-0 flex-1">
@@ -249,7 +249,7 @@ function NoteMeta({ note }: { note: NoteLibraryItem }) {
 function OshiAvatar({ note }: { note: NoteLibraryItem }) {
   return (
     <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white" style={{ backgroundColor: note.oshi_color || '#A78BFA' }}>
-      {note.oshi_avatar ? <img src={note.oshi_avatar} alt="" className="h-full w-full object-cover" /> : (note.oshi_name?.charAt(0).toUpperCase() || '?')}
+      {note.oshi_avatar ? <img src={note.oshi_avatar} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" /> : (note.oshi_name?.charAt(0).toUpperCase() || '?')}
     </span>
   )
 }

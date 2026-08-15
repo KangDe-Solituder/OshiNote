@@ -22,7 +22,7 @@ export function OshiCard({ oshi, noteCount, onEdit, onDelete }: OshiCardProps) {
     >
       <Link
         to={`/oshis/${oshi.id}`}
-        className="block min-h-[164px] overflow-hidden rounded-2xl border border-white/20 bg-bg-card p-5 shadow-glass backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
+        className="block min-h-[164px] overflow-hidden rounded-2xl border border-border-color bg-bg-card p-5 shadow-e1 transition-shadow hover:shadow-e2 hover:border-border-hover"
       >
         <div className="flex min-w-0 flex-col items-center justify-center gap-2.5 overflow-hidden text-center">
           <div
@@ -30,7 +30,7 @@ export function OshiCard({ oshi, noteCount, onEdit, onDelete }: OshiCardProps) {
             style={{ backgroundColor: oshi.color || '#EC4899' }}
           >
             {oshi.avatar ? (
-              <img src={oshi.avatar} alt="" className="w-full h-full object-cover" />
+              <img src={oshi.avatar} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : (
               oshi.name.charAt(0).toUpperCase()
             )}

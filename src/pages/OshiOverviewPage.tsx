@@ -9,7 +9,7 @@ import { fetchOshiById, getOshiNoteCount, updateOshi } from '../features/oshis/o
 import { fetchRecentNotesByOshi, getTagsByOshi } from '../features/notes/noteService'
 import { fetchIllustrations, getIllustrationCountByOshi } from '../features/illustrations/illustrationService'
 import { useI18n } from '../i18n/useI18n'
-import { getCachedMediaUrlWithFallback, releaseMediaUrl, resolveMediaUrlWithFallback } from '../services/media/illustrationMedia'
+import { MediaImage } from '../components/ui/MediaImage'
 import type { CreateOshiInput, Illustration, Note, Oshi } from '../types'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
 
@@ -162,10 +162,12 @@ export function OshiOverviewPage() {
               <div className="grid grid-cols-2 gap-3">
                 {illustrations.map((illustration) => (
                   <Link key={illustration.id} to={`/oshis/${oshiId}/illustrations`} className="aspect-square overflow-hidden rounded-xl bg-bg-tertiary">
-                    <OverviewMediaImage
+                    <MediaImage
                       path={illustration.thumbnail_path || illustration.original_path}
                       fallbackPath={illustration.original_path}
                       alt={illustration.title}
+                      className="h-full w-full object-cover"
+                      reserveHeight={false}
                     />
                   </Link>
                 ))}
@@ -188,7 +190,7 @@ export function OshiOverviewPage() {
 
 function StatCard({ icon: Icon, label, value, to }: { icon: typeof FileText; label: string; value: number; to: string }) {
   return (
-    <Link to={to} className="rounded-2xl border border-border-color bg-bg-card p-3.5 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-lg">
+    <Link to={to} className="rounded-2xl border border-border-color bg-bg-card p-3.5 shadow-e1 transition-shadow hover:border-border-hover hover:shadow-e2">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft/25 text-accent">
           <Icon size={18} />
@@ -222,39 +224,6 @@ function EmptyLine({ text, action, to }: { text: string; action: string; to: str
       </Link>
     </div>
   )
-}
-
-function OverviewMediaImage({ path, fallbackPath, alt }: { path: string | null; fallbackPath?: string | null; alt: string }) {
-  const [src, setSrc] = useState(() => getCachedMediaUrlWithFallback(path, fallbackPath))
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    let alive = true
-    let currentUrl = ''
-    setSrc(getCachedMediaUrlWithFallback(path, fallbackPath))
-    setFailed(false)
-    resolveMediaUrlWithFallback(path, fallbackPath)
-      .then((url) => {
-        if (!url) throw new Error('Media file not found')
-        currentUrl = url
-        if (alive) setSrc(url)
-        else releaseMediaUrl(url)
-      })
-      .catch(() => {
-        if (alive) setFailed(true)
-      })
-    return () => {
-      alive = false
-      releaseMediaUrl(currentUrl)
-    }
-  }, [fallbackPath, path])
-  if (!src) {
-    return (
-      <div className="flex h-full w-full items-center justify-center text-text-muted">
-        {failed && <ImageIcon size={20} />}
-      </div>
-    )
-  }
-  return <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" decoding="async" />
 }
 
 function normalizeWebUrl(value: string): string | null {

@@ -1,4 +1,4 @@
-import { Children, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { Children, isValidElement, useLayoutEffect, useRef, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { calculateMasonryLayout } from './masonryLayoutGeometry'
 
@@ -76,7 +76,7 @@ export function MasonryLayout({ children, className }: MasonryLayoutProps) {
     >
       {items.map((child, index) => (
         <div
-          key={index}
+          key={isValidElement(child) && child.key != null ? child.key : index}
           ref={(node) => {
             itemRefs.current[index] = node
             if (node && node.dataset.masonryReady !== 'true') {

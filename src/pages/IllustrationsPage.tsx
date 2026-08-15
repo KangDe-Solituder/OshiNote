@@ -17,8 +17,8 @@ import { formatDate, getOshiName } from '../features/illustrations/illustrationF
 import {
   IllustrationCreateModal,
   IllustrationDetailDrawer,
-  MediaImage,
 } from './OshiIllustrationsPage'
+import { MediaImage } from '../components/ui/MediaImage'
 import { useI18n } from '../i18n/useI18n'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
@@ -33,6 +33,7 @@ export function IllustrationsPage() {
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([])
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [oshiId, setOshiId] = useState('')
   const [category, setCategory] = useState<IllustrationCategoryFilter>('all')
   const [tag, setTag] = useState('')
@@ -59,7 +60,7 @@ export function IllustrationsPage() {
           unassigned: oshiId === '__none',
           category: category === 'all' ? undefined : category,
           favorite: favorite || undefined,
-          query,
+          query: debouncedQuery,
           tag: tag || undefined,
           sort,
         }),
@@ -75,25 +76,39 @@ export function IllustrationsPage() {
   }
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, favorite, oshiId, query, sort, tag])
+  }, [category, favorite, oshiId, debouncedQuery, sort, tag])
 
   async function handleToggleFavorite(id: string) {
     await toggleIllustrationFavorite(id)
-    await load()
+    if (favorite) {
+      await load()
+      return
+    }
+    setIllustrations((current) =>
+      current.map((row) => (row.id === id ? { ...row, favorite: !row.favorite } : row))
+    )
   }
 
   async function handleDelete(illustration: Illustration) {
     if (!confirm(t('illustrations.delete.confirm', { title: illustration.title || t('common.untitled') }))) return
     await deleteIllustration(illustration.id)
     setSelectedId(null)
-    await load()
+    setIllustrations((current) => current.filter((row) => row.id !== illustration.id))
   }
 
   async function handleUpdate(id: string, input: UpdateIllustrationInput) {
     await updateIllustration(id, input)
-    await load()
+    setIllustrations((current) =>
+      current.map((row) => (row.id === id ? { ...row, ...input } : row))
+    )
+    getIllustrationTags(oshiId || undefined).then(setTags).catch(() => {})
   }
 
   return (
@@ -278,7 +293,7 @@ function IllustrationCard({
 }) {
   const { t } = useI18n()
   return (
-    <article className="overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
+    <article className="overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-e1 transition-shadow hover:shadow-e2 hover:border-border-hover">
       <button type="button" onClick={() => onSelect(illustration.id)} className="block w-full text-left">
         <div className="relative aspect-[4/3] bg-bg-tertiary">
           <MediaImage
@@ -324,7 +339,7 @@ function IllustrationMasonryCard({
 }) {
   const { t } = useI18n()
   return (
-    <article className="overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
+    <article className="overflow-hidden rounded-xl border border-border-color bg-bg-card shadow-e1 transition-shadow hover:shadow-e2 hover:border-border-hover">
       <button type="button" onClick={() => onSelect(illustration.id)} className="block w-full text-left">
         <div
           className="relative bg-bg-tertiary"

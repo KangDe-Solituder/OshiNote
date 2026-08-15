@@ -797,7 +797,7 @@ function getArchiveFilterKind(filter: NoteArchiveFilterValue): OshiNoteArchiveFi
 
 function getNoteCardClass(cardStyle: CardStyle, index: number): string {
   return clsx(
-    'relative block min-h-[150px] overflow-hidden p-4 border backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+    'relative block min-h-[150px] overflow-hidden p-4 border backdrop-blur-sm transition-shadow hover:shadow-e2 hover:border-border-hover',
     cardStyle === 'basic' && 'rounded-xl border-border-color bg-bg-card shadow-sm',
     cardStyle === 'sticky' && [
       'rounded-xl border-yellow-200/70 bg-[#fff7c7]/80 shadow-md',

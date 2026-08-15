@@ -37,10 +37,6 @@ import {
   updateIllustration,
 } from '../features/illustrations/illustrationService'
 import {
-  discardCachedMediaUrl,
-  getCachedMediaUrlWithFallback,
-  releaseMediaUrl,
-  resolveMediaUrlWithFallback,
   storeIllustrationImage,
   validateIllustrationFile,
 } from '../services/media/illustrationMedia'
@@ -66,6 +62,9 @@ import { StampControl } from '../components/features/stamps/StampControl'
 import { StampOverlay } from '../components/features/stamps/StampOverlay'
 import { StampPlacementLayer } from '../components/features/stamps/StampPlacementLayer'
 import { useStampSettingsStore } from '../stores/stampSettingsStore'
+import { MediaImage } from '../components/ui/MediaImage'
+
+export { MediaImage } from '../components/ui/MediaImage'
 
 const TABS: { id: IllustrationTab; labelKey: 'illustrations.all' | 'common.official' | 'common.fanart' | 'common.favorites' }[] = [
   { id: 'all', labelKey: 'illustrations.all' },
@@ -321,7 +320,7 @@ function IllustrationMasonry({
         <article
           key={illustration.id}
           className={clsx(
-            'overflow-hidden rounded-xl border bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg',
+            'overflow-hidden rounded-xl border bg-bg-card shadow-e1 transition-shadow hover:shadow-e2 hover:border-border-hover',
             selectedId === illustration.id ? 'border-accent ring-2 ring-accent-soft' : 'border-border-color'
           )}
         >
@@ -400,7 +399,7 @@ function IllustrationGrid({
         <article
           key={illustration.id}
           className={clsx(
-            'overflow-hidden rounded-xl border bg-bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg',
+            'overflow-hidden rounded-xl border bg-bg-card shadow-e1 transition-shadow hover:shadow-e2 hover:border-border-hover',
             selectedId === illustration.id ? 'border-accent ring-2 ring-accent-soft' : 'border-border-color'
           )}
         >
@@ -1053,78 +1052,6 @@ function IllustrationFormFields({
       </Field>
     </div>
   )
-}
-
-export function MediaImage({
-  path,
-  fallbackPath,
-  alt,
-  className,
-  reserveHeight = true,
-}: {
-  path: string | null
-  fallbackPath?: string | null
-  alt: string
-  className?: string
-  reserveHeight?: boolean
-}) {
-  const candidates = useMemo(
-    () => Array.from(new Set([path, fallbackPath].filter((candidate): candidate is string => Boolean(candidate)))),
-    [fallbackPath, path]
-  )
-  const [src, setSrc] = useState(() => getCachedMediaUrlWithFallback(path, fallbackPath))
-  const [sourceIndex, setSourceIndex] = useState(0)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    setSourceIndex(0)
-    setFailed(false)
-    setSrc(getCachedMediaUrlWithFallback(candidates[0], candidates[1]))
-  }, [candidates])
-
-  useEffect(() => {
-    let alive = true
-    setSrc(getCachedMediaUrlWithFallback(candidates[sourceIndex], candidates[sourceIndex + 1]))
-    let currentUrl = ''
-    resolveMediaUrlWithFallback(candidates[sourceIndex], candidates[sourceIndex + 1])
-      .then((url) => {
-        if (!url) throw new Error('Media file not found')
-        currentUrl = url
-        if (alive) setSrc(url)
-        else releaseMediaUrl(url)
-      })
-      .catch(() => {
-        if (!alive) return
-        if (sourceIndex < candidates.length - 1) {
-          setSourceIndex((index) => index + 1)
-        } else {
-          setFailed(true)
-        }
-      })
-    return () => {
-      alive = false
-      releaseMediaUrl(currentUrl)
-    }
-  }, [candidates, sourceIndex])
-
-  function handleImageError() {
-    discardCachedMediaUrl(src)
-    if (sourceIndex < candidates.length - 1) {
-      setSourceIndex((index) => index + 1)
-      return
-    }
-    setFailed(true)
-    setSrc('')
-  }
-
-  if (!src || failed) {
-    return (
-      <div className={clsx('flex items-center justify-center bg-bg-tertiary text-text-muted', reserveHeight && 'min-h-48', className)}>
-        {failed && <ImageIcon size={26} />}
-      </div>
-    )
-  }
-  return <img src={src} alt={alt} className={className} loading="lazy" decoding="async" onError={handleImageError} />
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {

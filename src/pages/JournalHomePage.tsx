@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/Modal'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
-import { fetchJournalBooks, fetchStandalonePostcards } from '../features/journal/journalService'
+import { fetchAllJournalBooks, fetchAllStandalonePostcards } from '../features/journal/journalService'
 import { getJournalBackgroundPreset } from '../features/journal/journalBackgrounds'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import { useJournalStore } from '../stores/journalStore'
@@ -74,22 +74,24 @@ export function JournalHomePage() {
   async function loadShelf() {
     setLoading(true)
     try {
-      const oshis = await fetchAllOshis()
+      const [oshis, allBooks, allPostcards] = await Promise.all([
+        fetchAllOshis(),
+        fetchAllJournalBooks(),
+        fetchAllStandalonePostcards(),
+      ])
       setOshis(oshis)
       setBookDraft((current) => ({ ...current, oshiId: current.oshiId || oshis[0]?.id || '' }))
-      const rows = await Promise.all(
-        oshis.map(async (oshi) => {
-          const [books, postcards] = await Promise.all([
-            fetchJournalBooks(oshi.id),
-            fetchStandalonePostcards(oshi.id),
-          ])
-          return [
-            ...postcards.map((page): JournalLoosePageItem => ({ kind: 'postcard', page, oshi })),
-            ...books.map((book): JournalBookItem => ({ kind: 'book', book, oshi })),
-          ]
-        })
-      )
-      setItems(rows.flat().sort(sortShelfItem))
+      const oshiById = new Map(oshis.map((oshi) => [oshi.id, oshi]))
+      const rows: JournalShelfItem[] = []
+      for (const page of allPostcards) {
+        const oshi = oshiById.get(page.oshi_id)
+        if (oshi) rows.push({ kind: 'postcard', page, oshi })
+      }
+      for (const book of allBooks) {
+        const oshi = oshiById.get(book.oshi_id)
+        if (oshi) rows.push({ kind: 'book', book, oshi })
+      }
+      setItems(rows.sort(sortShelfItem))
     } finally {
       setLoading(false)
     }

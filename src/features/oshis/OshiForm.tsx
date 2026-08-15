@@ -93,7 +93,7 @@ export function OshiForm({ open, onClose, onSubmit, editing }: OshiFormProps) {
               style={{ backgroundColor: color }}
             >
               {avatar ? (
-                <img src={avatar} alt="" className="w-full h-full object-cover" />
+                <img src={avatar} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
               ) : (
                 name.trim().charAt(0).toUpperCase() || '?'
               )}

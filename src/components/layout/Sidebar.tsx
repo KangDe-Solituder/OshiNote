@@ -266,7 +266,7 @@ function OshiAvatar({ name, avatar, color }: { name: string; avatar?: string; co
       className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white shadow-sm"
       style={{ backgroundColor: color || '#EC4899' }}
     >
-      {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : name.charAt(0).toUpperCase()}
+      {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" /> : name.charAt(0).toUpperCase()}
     </span>
   )
 }
