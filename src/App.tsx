@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './components/features/themes/ThemeProvider'
 import { MotionProvider } from './components/features/themes/MotionProvider'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { MainLayout } from './components/layout/MainLayout'
 import { HomePage } from './pages/HomePage'
 import { OshiListPage } from './pages/OshiListPage'
@@ -28,8 +29,9 @@ export default function App() {
       <MotionProvider>
         <BrowserRouter>
           <UpdateNotifier />
-          <Routes>
-            <Route element={<MainLayout />}>
+          <ErrorBoundary>
+            <Routes>
+              <Route element={<MainLayout />}>
               <Route index element={<HomePage />} />
               <Route path="oshis" element={<OshiListPage />} />
               <Route path="oshis/:oshiId" element={<OshiOverviewPage />} />
@@ -55,7 +57,8 @@ export default function App() {
               <Route path="export" element={<ExportPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
-          </Routes>
+            </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </MotionProvider>
     </ThemeProvider>

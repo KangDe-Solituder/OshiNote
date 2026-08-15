@@ -205,17 +205,16 @@ export function JournalEditorPage() {
     const savePlan = createDraftSavePlan(draft.items, canvasItems)
     await Promise.all(savePlan.existingItemsToRemove.map((item) => removeJournalItem(item.id)))
 
-    for (const item of savePlan.itemsToUpdate) {
+    await Promise.all(savePlan.itemsToUpdate.map(async (item) => {
       const layout = draftItemToJournalLayout(item)
-      if (item.originItemId) {
-        await updateItemLayout(item.originItemId, layout)
-        if (item.stylePayload !== undefined) {
-          await updateItemStyle(item.originItemId, { style_payload: item.stylePayload })
-        }
+      if (!item.originItemId) return
+      await updateItemLayout(item.originItemId, layout)
+      if (item.stylePayload !== undefined) {
+        await updateItemStyle(item.originItemId, { style_payload: item.stylePayload })
       }
-    }
+    }))
 
-    for (const item of savePlan.itemsToCreate) {
+    await Promise.all(savePlan.itemsToCreate.map(async (item) => {
       const layout = draftItemToJournalLayout(item)
       if (item.itemType === 'note' && item.sourceId) {
         const created = await createJournalItemForNote(activePage.id, item.sourceId, layout)
@@ -226,7 +225,7 @@ export function JournalEditorPage() {
       } else if (item.itemType === 'material' && item.materialId) {
         await createJournalItemForMaterial(activePage.id, item.materialId, layout, item.stylePayload)
       }
-    }
+    }))
 
     setStampDraft(await persistStampForTarget('journal_page', activePage.id, draft.stamp))
     await openPageForEditing(activePage.id, activePage.oshi_id)

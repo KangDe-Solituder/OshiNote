@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ThemeId, BackgroundFilters, UiMotionDuration, TextTone } from '../types'
 import { getDb } from '../database'
+import { migrateLegacyBackgroundDataUrl } from '../services/media/backgroundImage'
 
 export type FontSize = 'small' | 'medium' | 'large'
 
@@ -159,7 +160,17 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
             }
             break
           case 'customBg':
-            set({ customBackground: row.value || null })
+            {
+              let value = row.value || null
+              if (value && value.startsWith('data:')) {
+                const migrated = await migrateLegacyBackgroundDataUrl(value)
+                if (migrated) {
+                  value = migrated
+                  db.execute("UPDATE settings SET value = ? WHERE key = 'customBg'", [migrated]).catch(() => {})
+                }
+              }
+              set({ customBackground: value })
+            }
             break
           case 'bgFilters':
             try { set({ backgroundFilters: JSON.parse(row.value) }) } catch {

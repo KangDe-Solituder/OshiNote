@@ -1,5 +1,8 @@
 import { useRef } from 'react'
+import { isTauri } from '@tauri-apps/api/core'
 import { Card } from '../components/ui/Card'
+import { MediaImage } from '../components/ui/MediaImage'
+import { storeCustomBackground } from '../services/media/backgroundImage'
 import { useThemeStore } from '../stores/themeStore'
 import { useUpdateStore } from '../stores/updateStore'
 import type { TextTone, ThemeId, UiMotionDuration } from '../types'
@@ -243,11 +246,21 @@ export function SettingsPage() {
             <div className="flex items-center gap-2">
               {customBackground && (
                 <div className="w-10 h-10 rounded-lg overflow-hidden border border-border-color bg-bg-secondary">
-                  <img
-                    src={customBackground}
-                    alt={t('settings.backgroundPreview')}
-                    className="w-full h-full object-cover"
-                  />
+                  {customBackground.startsWith('data:') || customBackground.startsWith('blob:') ? (
+                    <img
+                      src={customBackground}
+                      alt={t('settings.backgroundPreview')}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <MediaImage
+                      path={customBackground}
+                      alt={t('settings.backgroundPreview')}
+                      className="w-full h-full object-cover"
+                      reserveHeight={false}
+                      eager
+                    />
+                  )}
                 </div>
               )}
               <input
@@ -255,9 +268,17 @@ export function SettingsPage() {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
+                  if (isTauri()) {
+                    try {
+                      setCustomBackground(await storeCustomBackground(file))
+                    } catch {
+                      // Keep the current background when the file cannot be stored.
+                    }
+                    return
+                  }
                   const reader = new FileReader()
                   reader.onload = () => setCustomBackground(String(reader.result))
                   reader.onerror = () => {

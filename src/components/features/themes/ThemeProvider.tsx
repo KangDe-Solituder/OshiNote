@@ -3,6 +3,7 @@ import { useThemeStore } from '../../../stores/themeStore'
 import { useAiStore } from '../../../stores/aiStore'
 import { useLanguageStore } from '../../../stores/languageStore'
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts'
+import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const currentTheme = useThemeStore((s) => s.currentTheme)
@@ -36,8 +37,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const styleId = 'custom-bg-style'
-    let style = document.getElementById(styleId)
-    if (customBackground) {
+    let alive = true
+    let resolvedUrl = ''
+
+    function removeStyle() {
+      document.getElementById(styleId)?.remove()
+    }
+
+    function applyStyle(url: string) {
+      let style = document.getElementById(styleId)
       if (!style) {
         style = document.createElement('style')
         style.id = styleId
@@ -48,7 +56,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           content: '';
           position: fixed;
           inset: 0;
-          background-image: url('${customBackground}');
+          background-image: url('${url}');
           background-size: cover;
           background-position: center;
           background-repeat: no-repeat;
@@ -60,8 +68,36 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           pointer-events: none;
         }
       `
-    } else {
-      style?.remove()
+    }
+
+    if (!customBackground) {
+      removeStyle()
+      return
+    }
+
+    if (customBackground.startsWith('data:') || customBackground.startsWith('blob:')) {
+      applyStyle(customBackground)
+      return () => removeStyle()
+    }
+
+    resolveMediaUrl(customBackground)
+      .then((url) => {
+        if (!url) throw new Error('Background file not found')
+        if (!alive) {
+          releaseMediaUrl(url)
+          return
+        }
+        resolvedUrl = url
+        applyStyle(url)
+      })
+      .catch(() => {
+        if (alive) removeStyle()
+      })
+
+    return () => {
+      alive = false
+      if (resolvedUrl) releaseMediaUrl(resolvedUrl)
+      removeStyle()
     }
   }, [customBackground, backgroundFilters])
 
