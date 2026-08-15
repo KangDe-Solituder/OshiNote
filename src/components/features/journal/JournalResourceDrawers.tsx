@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Check, ChevronLeft, ChevronRight, ImageIcon, Loader2, Search, Sparkles, StickyNote } from 'lucide-react'
-import { useMemo, type PointerEvent, type ReactNode } from 'react'
+import { useMemo, useState, type PointerEvent, type ReactNode } from 'react'
 import type { Illustration, JournalMaterialKind, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
@@ -11,6 +11,11 @@ import { StampControl } from '../stamps/StampControl'
 import { JournalMaterialTile } from './JournalMaterialTile'
 import type { DragPayload } from './JournalDraftCanvas'
 import type { JournalImageFilter, JournalNoteFilter } from './journalCreationTypes'
+import {
+  JournalResourceHoverPreview,
+  type JournalResourcePreview,
+  type JournalResourcePreviewAnchor,
+} from './JournalResourceHoverPreview'
 
 const NOTE_PAGE_SIZE = 20
 const IMAGE_PAGE_SIZE = 20
@@ -66,6 +71,7 @@ export function JournalNotesDrawer({ notes, loading, query, filter, page, placed
           tags={note.tags}
           placed={placedIds.has(note.id)}
           payload={{ kind: 'note', id: note.id }}
+          preview={{ kind: 'note', note }}
           onPointerPlace={onPointerPlace}
         />
       ))}
@@ -123,6 +129,7 @@ export function JournalImagesDrawer({ illustrations, loading, query, filter, pag
           tags={illustration.tags}
           placed={placedIds.has(illustration.id)}
           payload={{ kind: 'illustration', id: illustration.id }}
+          preview={{ kind: 'illustration', illustration }}
           leading={<ImageIcon size={18} />}
           onPointerPlace={onPointerPlace}
         />
@@ -143,7 +150,7 @@ export function JournalMaterialsDrawer({ kind, page, onKindChange, onPageChange,
   const totalPages = Math.max(1, Math.ceil(filtered.length / MATERIAL_PAGE_SIZE))
   const pageItems = filtered.slice((page - 1) * MATERIAL_PAGE_SIZE, page * MATERIAL_PAGE_SIZE)
   return (
-    <div>
+    <div className="min-w-0 overflow-x-hidden">
       <div className="mb-3 flex flex-wrap gap-1.5">
         {JOURNAL_MATERIAL_KINDS.map((item) => (
           <button
@@ -241,7 +248,7 @@ function DrawerSection({ searchValue, searchPlaceholder, filters, activeFilter, 
   onPageChange: (page: number) => void
 }) {
   return (
-    <div>
+    <div className="min-w-0 overflow-x-hidden">
       <label className="relative mb-3 block">
         <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input value={searchValue} onChange={(event) => onSearchChange(event.target.value)} className={`${fieldClassName} w-full pl-9`} placeholder={searchPlaceholder} />
@@ -264,36 +271,56 @@ function DrawerSection({ searchValue, searchPlaceholder, filters, activeFilter, 
   )
 }
 
-function ResourceRow({ title, meta, tags, placed, payload, leading, onPointerPlace }: {
+function ResourceRow({ title, meta, tags, placed, payload, preview, leading, onPointerPlace }: {
   title: string
   meta: string
   tags: string[]
   placed: boolean
   payload: DragPayload
+  preview: JournalResourcePreview
   leading?: ReactNode
   onPointerPlace: (payload: DragPayload, event: PointerEvent<HTMLElement>) => void
 }) {
   const { t } = useI18n()
+  const [previewAnchor, setPreviewAnchor] = useState<JournalResourcePreviewAnchor | null>(null)
+
+  function updatePreviewAnchor(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType && event.pointerType !== 'mouse') return
+    setPreviewAnchor({ clientX: event.clientX, clientY: event.clientY })
+  }
+
   return (
-    <div
-      role="button"
-      tabIndex={placed ? -1 : 0}
-      draggable={!placed}
-      onDragStart={(event) => setDragPayload(event.dataTransfer, payload)}
-      onPointerDown={(event) => { if (!placed) onPointerPlace(payload, event) }}
-      className={clsx('flex min-h-[76px] w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors', placed ? 'cursor-default border-accent bg-accent-soft/45 text-accent' : 'cursor-grab border-border-color bg-bg-primary/70 hover:border-border-hover active:cursor-grabbing')}
-    >
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-accent">
-        {placed ? <Check size={16} /> : leading || <StickyNote size={17} />}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-text-primary">{title}</span>
-        <span className="mt-0.5 block truncate text-xs text-text-muted">{placed ? t('journalCreate.placed') : meta}</span>
-        <span className="mt-2 flex gap-1 overflow-hidden">
-          {tags.slice(0, 3).map((tag) => <span key={tag} className="shrink-0 rounded-full bg-bg-secondary px-2 py-0.5 text-[11px] text-text-muted">{tag}</span>)}
+    <>
+      <div
+        role="button"
+        tabIndex={placed ? -1 : 0}
+        draggable={!placed}
+        onDragStart={(event) => {
+          setPreviewAnchor(null)
+          setDragPayload(event.dataTransfer, payload)
+        }}
+        onPointerEnter={updatePreviewAnchor}
+        onPointerMove={updatePreviewAnchor}
+        onPointerLeave={() => setPreviewAnchor(null)}
+        onPointerDown={(event) => {
+          setPreviewAnchor(null)
+          if (!placed) onPointerPlace(payload, event)
+        }}
+        className={clsx('flex min-h-[76px] w-full max-w-full items-start gap-3 overflow-hidden rounded-xl border p-3 text-left transition-colors', placed ? 'cursor-default border-accent bg-accent-soft/45 text-accent' : 'cursor-grab border-border-color bg-bg-primary/70 hover:border-border-hover active:cursor-grabbing')}
+      >
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-accent">
+          {placed ? <Check size={16} /> : leading || <StickyNote size={17} />}
         </span>
-      </span>
-    </div>
+        <span className="min-w-0 flex-1 overflow-hidden">
+          <span className="block truncate text-sm font-semibold text-text-primary">{title}</span>
+          <span className="mt-0.5 block truncate text-xs text-text-muted">{placed ? t('journalCreate.placed') : meta}</span>
+          <span className="mt-2 flex gap-1 overflow-hidden">
+            {tags.slice(0, 3).map((tag) => <span key={tag} className="shrink-0 rounded-full bg-bg-secondary px-2 py-0.5 text-[11px] text-text-muted">{tag}</span>)}
+          </span>
+        </span>
+      </div>
+      {previewAnchor ? <JournalResourceHoverPreview preview={preview} anchor={previewAnchor} /> : null}
+    </>
   )
 }
 

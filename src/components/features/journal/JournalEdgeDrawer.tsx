@@ -63,7 +63,7 @@ export function JournalEdgeDrawer({
     >
       <div
         className={clsx(
-          'pointer-events-auto border-border-color bg-bg-card/95 shadow-xl backdrop-blur transition-[opacity,transform] duration-200 ease-out',
+          'pointer-events-auto isolate overflow-hidden border-border-color bg-bg-primary shadow-xl transition-[opacity,transform] duration-200 ease-out',
           getDrawerPanelPositionClass(dock),
           horizontal ? 'h-[300px] max-h-[45vh] w-full border-b' : 'h-full w-80 border-r',
           dock === 'right' && 'border-l border-r-0',
@@ -95,7 +95,7 @@ export function JournalEdgeDrawer({
             {pinned ? <PinOff size={16} /> : <Pin size={16} />}
           </button>
         </div>
-        <div className="h-[calc(100%-3.5rem)] overflow-y-auto p-3">{children}</div>
+        <div className="h-[calc(100%-3.5rem)] min-w-0 overflow-x-hidden overflow-y-auto p-3">{children}</div>
       </div>
       <button
         type="button"
