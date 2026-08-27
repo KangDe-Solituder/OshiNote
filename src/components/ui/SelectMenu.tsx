@@ -122,7 +122,7 @@ export function SelectMenu({
   }, [measureMenuRect, open])
 
   const menu = menuRect ? (
-    <AnimatePresence initial={false} onExitComplete={() => setMenuRect(null)}>
+    <AnimatePresence onExitComplete={() => setMenuRect(null)}>
       {open && !disabled && (
       <div
         className="fixed"
@@ -154,7 +154,7 @@ export function SelectMenu({
             menuClassName
           )}
           style={{
-            minWidth: menuRect.width,
+            width: menuRect.width,
             maxHeight: menuRect.maxHeight,
             contain: 'layout paint',
           }}
