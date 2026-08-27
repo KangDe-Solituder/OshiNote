@@ -10,6 +10,8 @@ import { fetchRecentNotesByOshi, getTagsByOshi } from '../features/notes/noteSer
 import { fetchIllustrations, getIllustrationCountByOshi } from '../features/illustrations/illustrationService'
 import { useI18n } from '../i18n/useI18n'
 import { MediaImage } from '../components/ui/MediaImage'
+import { OshiCalendar } from '../components/features/calendar/OshiCalendar'
+import { ThisWeekCard } from '../components/features/calendar/ThisWeekCard'
 import type { CreateOshiInput, Illustration, Note, Oshi } from '../types'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
 
@@ -24,6 +26,7 @@ export function OshiOverviewPage() {
   const [stats, setStats] = useState({ notes: 0, illustrations: 0, tags: 0 })
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [calendarRefreshToken, setCalendarRefreshToken] = useState(0)
 
   useEffect(() => {
     if (!oshiId) return
@@ -131,6 +134,21 @@ export function OshiOverviewPage() {
           <StatCard icon={ImageIcon} label={t('nav.illustrations')} value={stats.illustrations} to={`/oshis/${oshiId}/illustrations`} />
           <StatCard icon={Tag} label={t('nav.tags')} value={stats.tags} to={`/oshis/${oshiId}/tags`} />
         </section>
+
+        <div className="overview-calendar-grid mb-5">
+          <div className="overview-calendar-main min-w-0">
+            <OshiCalendar
+              oshi={oshi}
+              onOshiUpdated={() => {
+                fetchOshiById(oshiId).then((next) => next && setOshi(next)).catch(() => {})
+                setCalendarRefreshToken((token) => token + 1)
+              }}
+            />
+          </div>
+          <div className="overview-calendar-side min-w-0">
+            <ThisWeekCard oshi={oshi} refreshToken={calendarRefreshToken} />
+          </div>
+        </div>
 
         <div className="overview-content-grid">
           <section className="overview-recent-notes rounded-2xl border border-border-color bg-bg-card p-5">

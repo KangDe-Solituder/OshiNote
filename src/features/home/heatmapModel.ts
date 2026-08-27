@@ -59,10 +59,11 @@ export function buildHeatmapGrid(activities: Map<string, DayActivity>, startKey:
   return weeks
 }
 
-/** Month labels above the columns: a label appears on the first week that contains a day of that month. */
+/** Month labels above the columns: a label appears on the first week that contains a day of that month.
+ *  Labels crammed within 3 columns of the next one are dropped to avoid overlap at range edges. */
 export function getColumnMonthLabels(weeks: HeatmapCell[][]): (string | null)[] {
   let lastMonth = ''
-  return weeks.map((week) => {
+  const raw = weeks.map((week) => {
     const firstVisible = week.find((cell) => !cell.future) || week[0]
     const month = firstVisible.date.slice(5, 7)
     if (month !== lastMonth) {
@@ -70,6 +71,14 @@ export function getColumnMonthLabels(weeks: HeatmapCell[][]): (string | null)[] 
       return month
     }
     return null
+  })
+  const labelIndices = raw.map((label, index) => (label ? index : -1)).filter((index) => index >= 0)
+  return raw.map((label, index) => {
+    if (!label) return null
+    const position = labelIndices.indexOf(index)
+    const nextIndex = labelIndices[position + 1]
+    if (nextIndex !== undefined && nextIndex - index < 3) return null
+    return label
   })
 }
 

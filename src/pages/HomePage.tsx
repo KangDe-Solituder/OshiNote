@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Heart, FileText, Tag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
+import { RecordHeatmap } from '../components/features/home/RecordHeatmap'
 import { getTotalOshiCount, getTotalNoteCount, getTotalTagCount } from '../features/notes/noteService'
 import { useI18n } from '../i18n/useI18n'
 import { PAGE_CONTENT_CLASS, PAGE_DASHBOARD_FRAME_CLASS } from '../components/layout/pageShell'
@@ -52,6 +53,10 @@ export function HomePage() {
             </Card>
           </Link>
         ))}
+      </div>
+
+      <div className="mb-8">
+        <RecordHeatmap />
       </div>
 
       {stats.notes === 0 && (

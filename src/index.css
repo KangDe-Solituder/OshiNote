@@ -189,6 +189,7 @@ body {
 .overview-links-grid,
 .overview-stats-grid,
 .overview-content-grid,
+.overview-calendar-grid,
 .settings-layout-grid {
   display: grid;
 }
@@ -204,6 +205,11 @@ body {
 }
 
 .overview-content-grid {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.overview-calendar-grid {
   grid-template-columns: 1fr;
   gap: 12px;
 }
@@ -239,6 +245,19 @@ body {
 @container app-content (min-width: 1080px) {
   .overview-links-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .overview-calendar-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .overview-calendar-main {
+    grid-column: span 2 / span 2;
+  }
+
+  .overview-calendar-side {
+    grid-column: span 1 / span 1;
   }
 
   .settings-layout-grid {

@@ -569,6 +569,7 @@ interface DetailsPanelProps {
 }
 
 function DetailsPanel(props: DetailsPanelProps) {
+  const { t } = useI18n()
   return (
     <Panel title="Details">
       <FieldLabel icon={<UserRound size={15} />} label="Oshi">
@@ -632,7 +633,7 @@ function DetailsPanel(props: DetailsPanelProps) {
       )}
       {props.archiveError && <p className="-mt-1 text-xs text-red-400">{props.archiveError}</p>}
 
-      <FieldLabel icon={<CalendarClock size={15} />} label="Date">
+      <FieldLabel icon={<CalendarClock size={15} />} label={t('noteEditor.streamDate')}>
         <input
           type="datetime-local"
           value={props.createdAt}
@@ -641,7 +642,7 @@ function DetailsPanel(props: DetailsPanelProps) {
         />
       </FieldLabel>
 
-      <FieldLabel icon={<Link2 size={15} />} label="Stream URL">
+      <FieldLabel icon={<Link2 size={15} />} label={t('noteEditor.streamUrl')}>
         <div className="flex gap-2">
           <input
             type="url"
