@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { GripHorizontal, GripVertical, Pin, PinOff } from 'lucide-react'
 import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import { useI18n } from '../../../i18n/useI18n'
 import type { JournalDrawerDock } from './journalCreationTypes'
 
@@ -29,6 +30,13 @@ export function JournalEdgeDrawer({
   const dragRef = useRef<{ x: number; y: number; dragging: boolean } | null>(null)
   const [dockHint, setDockHint] = useState<JournalDrawerDock | null>(null)
   const horizontal = dock === 'top' || dock === 'bottom'
+  const animated = motionSeconds > 0
+  // Same easing family as the work board tray so both drawers feel identical.
+  const panelTransition = { duration: motionSeconds + 0.16, ease: [0.16, 1, 0.3, 1] as const }
+  const closedOffset = dock === 'left' || dock === 'top' ? '-100%' : '100%'
+  const panelAnimate = open
+    ? { opacity: 1, ...(horizontal ? { y: 0 } : { x: 0 }) }
+    : { opacity: 0, ...(horizontal ? { y: closedOffset } : { x: closedOffset }) }
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -56,21 +64,21 @@ export function JournalEdgeDrawer({
 
   return (
     <aside
-      className={clsx('pointer-events-none absolute z-[60] transition-[inset,opacity] duration-200', getDrawerOuterClass(dock))}
-      style={{ transitionDuration: `${motionSeconds}s` }}
+      className={clsx('pointer-events-none absolute z-[60]', getDrawerOuterClass(dock))}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
     >
-      <div
+      <motion.div
+        initial={false}
+        animate={animated ? panelAnimate : open ? { opacity: 1, ...(horizontal ? { y: 0 } : { x: 0 }) } : { opacity: 0, ...(horizontal ? { y: closedOffset } : { x: closedOffset }) }}
+        transition={panelTransition}
         className={clsx(
-          'pointer-events-auto isolate overflow-hidden border-border-color bg-bg-primary shadow-xl transition-[opacity,transform] duration-200 ease-out',
+          'pointer-events-auto isolate overflow-hidden border-border-color bg-bg-primary shadow-xl',
           getDrawerPanelPositionClass(dock),
           horizontal ? 'h-[300px] max-h-[45vh] w-full border-b' : 'h-full w-80 border-r',
           dock === 'right' && 'border-l border-r-0',
-          dock === 'bottom' && 'border-t border-b-0',
-          open ? 'translate-x-0 translate-y-0 opacity-100' : getDrawerClosedClass(dock)
+          dock === 'bottom' && 'border-t border-b-0'
         )}
-        style={{ transitionDuration: `${motionSeconds}s` }}
       >
         <div
           className="flex h-14 cursor-grab touch-none items-center justify-between gap-3 border-b border-border-color px-4 active:cursor-grabbing"
@@ -96,19 +104,21 @@ export function JournalEdgeDrawer({
           </button>
         </div>
         <div className="h-[calc(100%-3.5rem)] min-w-0 overflow-x-hidden overflow-y-auto p-3">{children}</div>
-      </div>
-      <button
+      </motion.div>
+      <motion.button
         type="button"
+        initial={false}
+        animate={animated ? { opacity: open ? 0 : 1, scale: open ? 0.9 : 1 } : { opacity: open ? 0 : 1, scale: 1 }}
+        transition={panelTransition}
         onClick={() => onPinnedChange(!pinned)}
         className={clsx(
-          'pointer-events-auto flex items-center justify-center border-border-color bg-bg-card text-xs font-semibold text-accent shadow-sm transition-transform duration-200',
-          open && 'pointer-events-none opacity-0',
+          'pointer-events-auto flex items-center justify-center border-border-color bg-bg-card text-xs font-semibold text-accent shadow-sm',
+          open && 'pointer-events-none',
           getDrawerHandleClass(dock)
         )}
-        style={{ transitionDuration: `${motionSeconds}s` }}
       >
         <span className={horizontal ? '' : '[writing-mode:vertical-rl]'}>{label}</span>
-      </button>
+      </motion.button>
       {dockHint ? <div className={clsx('pointer-events-none absolute rounded-2xl border-2 border-accent/70 bg-accent-soft/25 transition-opacity', getDockHintClass(dockHint))} /> : null}
     </aside>
   )
@@ -126,13 +136,6 @@ function getDrawerPanelPositionClass(dock: JournalDrawerDock): string {
   if (dock === 'right') return 'absolute bottom-0 right-0 top-0'
   if (dock === 'top') return 'absolute left-0 right-0 top-0'
   return 'absolute bottom-0 left-0 right-0'
-}
-
-function getDrawerClosedClass(dock: JournalDrawerDock): string {
-  if (dock === 'left') return '-translate-x-full opacity-0'
-  if (dock === 'right') return 'translate-x-full opacity-0'
-  if (dock === 'top') return '-translate-y-full opacity-0'
-  return 'translate-y-full opacity-0'
 }
 
 function getDrawerHandleClass(dock: JournalDrawerDock): string {

@@ -156,15 +156,30 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-full rounded-xl border border-border-color bg-bg-primary p-0.5" /></label>
+  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-full rounded-xl border border-border-color bg-transparent p-0.5" /></label>
 }
 
 function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
-  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted"><span className="flex justify-between gap-2"><span>{label}</span><span>{value}</span></span><input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="accent-[var(--color-accent)]" /></label>
+  const percent = Math.round(((value - min) / (max - min || 1)) * 100)
+  return (
+    <label className="grid gap-1.5 text-xs font-semibold text-text-muted">
+      <span className="flex justify-between gap-2"><span>{label}</span><span>{value}</span></span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="journal-range"
+        style={{ '--range-fill': `linear-gradient(90deg, var(--color-accent) ${percent}%, color-mix(in srgb, var(--color-text-primary) 14%, transparent) ${percent}%)` } as React.CSSProperties}
+      />
+    </label>
+  )
 }
 
 function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <label className="flex items-center justify-between gap-3 rounded-xl border border-border-color bg-bg-primary px-3 py-2 text-xs font-semibold text-text-secondary">{label}<input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-[var(--color-accent)]" /></label>
+  return <label className="flex items-center justify-between gap-3 py-0.5 text-xs font-semibold text-text-secondary">{label}<input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-[var(--color-accent)]" /></label>
 }
 
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
@@ -192,4 +207,4 @@ const FONT_OPTIONS = [
 const TAPE_COLORS = ['#d9c4ff', '#f6b8d2', '#b8ddff', '#f8dfa0', '#b8ead8', '#f0c9ad']
 const STICKER_COLORS = ['#ef6f9f', '#f0b84a', '#7ab7e8', '#e58fbd', '#8a83d6', '#688ea8']
 const PAPER_COLORS = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed', '#fffdf8']
-const detailInputClass = 'min-w-0 rounded-xl border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft'
+const detailInputClass = 'min-w-0 rounded-xl border border-border-color bg-transparent px-3 py-2 text-sm text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft'
