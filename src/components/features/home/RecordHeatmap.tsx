@@ -92,28 +92,30 @@ export function RecordHeatmap() {
 
       <div className="overflow-x-auto pb-1">
         <div className="inline-block">
-          <div className="mb-1 grid auto-cols-[14px] grid-flow-col gap-[3px] text-[10px] text-text-muted">
+          <div className="mb-1.5 flex gap-[3px] text-[10px] leading-none text-text-muted">
             {monthLabels.map((label, index) => (
-              <span key={index} className="col-span-1 overflow-visible whitespace-nowrap">
+              <span key={index} className="w-[15px] shrink-0 overflow-visible whitespace-nowrap">
                 {label ? new Intl.DateTimeFormat(localeTag, { month: 'short' }).format(new Date(2026, Number(label) - 1, 1)) : ''}
               </span>
             ))}
           </div>
-          <div className="grid auto-cols-[14px] grid-flow-col grid-rows-7 gap-[3px]">
-            {weeks.map((week) =>
-              week.map((cell) => (
-                <HeatmapCellView
-                  key={cell.date}
-                  cell={cell}
-                  notes={dayNotesCache.get(cell.date)}
-                  oshiNameById={oshiNameById}
-                  localeTag={localeTag}
-                  onHover={prefetchDayNotes}
-                  onOpenNote={(noteId) => navigate(`/notes/${noteId}`)}
-                  t={t}
-                />
-              ))
-            )}
+          <div className="flex gap-[3px]">
+            {weeks.map((week) => (
+              <div key={week[0].date} className="flex flex-col gap-[3px]">
+                {week.map((cell) => (
+                  <HeatmapCellView
+                    key={cell.date}
+                    cell={cell}
+                    notes={dayNotesCache.get(cell.date)}
+                    oshiNameById={oshiNameById}
+                    localeTag={localeTag}
+                    onHover={prefetchDayNotes}
+                    onOpenNote={(noteId) => navigate(`/notes/${noteId}`)}
+                    t={t}
+                  />
+                ))}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -158,7 +160,7 @@ function HeatmapCellView({
         onMouseEnter={() => cell.total > 0 && onHover(cell.date)}
         onClick={() => notes?.[0] && onOpenNote(notes[0].id)}
         className={clsx(
-          'h-[14px] w-[14px] rounded-[3px] transition-transform',
+          'h-[15px] w-[15px] rounded-[4px] transition-transform',
           CELL_LEVEL_CLASSES[cell.level],
           cell.future && 'opacity-25',
           cell.total > 0 && 'cursor-pointer hover:scale-125 hover:ring-1 hover:ring-accent/60'

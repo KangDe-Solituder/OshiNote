@@ -196,9 +196,9 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
         </div>
       </header>
 
-      <div className="mb-1 grid grid-cols-7 gap-1">
+      <div className="mb-2 grid grid-cols-7 gap-1 border-b border-border-color/60 pb-2">
         {WEEKDAY_LABEL_KEYS.map((key) => (
-          <div key={key} className="pb-1 text-center text-[11px] font-medium text-text-muted">
+          <div key={key} className="text-center text-[11px] font-medium tracking-wide text-text-muted">
             {t(`calendar.weekday.${key}`)}
           </div>
         ))}
@@ -218,8 +218,8 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
               <div
                 key={week[0].dateKey}
                 className={clsx(
-                  'grid grid-cols-7 gap-1 rounded-xl px-0.5 py-0.5',
-                  week.some((day) => day.inCurrentWeek) && 'bg-bg-secondary/45'
+                  'grid grid-cols-7 gap-1 rounded-xl px-1 py-0.5',
+                  week.some((day) => day.inCurrentWeek) && 'bg-accent/10 ring-1 ring-accent/15'
                 )}
               >
                 {week.map((day) => (
@@ -293,18 +293,18 @@ function DayCell({
         onClick={onSelect}
         disabled={!hasContent && !day.inMonth}
         className={clsx(
-          'flex h-14 w-full flex-col items-center justify-between rounded-lg px-1 pb-1.5 pt-1 text-left transition-colors',
-          day.inMonth ? 'text-text-primary' : 'text-text-muted/45',
-          hasContent ? 'hover:bg-bg-tertiary/60' : 'hover:bg-bg-secondary/40',
-          selected && 'bg-bg-tertiary/70 ring-1 ring-accent/60'
+          'flex h-[52px] w-full flex-col items-center justify-center gap-1 rounded-lg transition-colors',
+          day.inMonth ? 'text-text-primary' : 'text-text-muted/40',
+          hasContent ? 'hover:bg-bg-tertiary/70' : 'hover:bg-bg-secondary/40',
+          selected && 'bg-bg-tertiary/80 ring-1 ring-accent/60'
         )}
         aria-label={day.dateKey}
       >
-        <span className="flex w-full items-start justify-between">
+        <span className="flex items-center justify-center gap-0.5">
           <span
             className={clsx(
-              'flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium',
-              day.isToday && 'bg-accent font-semibold text-white'
+              'flex h-6 w-6 items-center justify-center rounded-full text-[13px] font-medium',
+              day.isToday && 'bg-accent font-semibold text-white shadow-sm'
             )}
           >
             {dayNumber}
@@ -313,7 +313,7 @@ function DayCell({
             <Cake size={11} className="text-amber-500" aria-label={t('calendar.anniversary')} />
           )}
         </span>
-        <span className="flex h-1.5 items-end justify-center gap-1">
+        <span className="flex h-1.5 items-center justify-center gap-1">
           {day.notes.length > 0 && <span className="h-1 w-3.5 rounded-full bg-accent" title={t('calendar.recorded')} />}
           {day.entries.map((entry) => (
             <EntryMarker key={`${entry.schedule.id}-${entry.date}`} entry={entry} />

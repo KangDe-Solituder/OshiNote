@@ -1,22 +1,27 @@
 import type { Config } from 'tailwindcss'
 
+// Theme colors live in CSS variables. Wrapping them in color-mix with <alpha-value>
+// lets Tailwind generate opacity-modified utilities (bg-accent/10, ring-accent/60…);
+// with a plain var(--x) definition those classes are silently dropped.
+const themed = (variable: string) => `color-mix(in srgb, var(${variable}) calc(<alpha-value> * 100%), transparent)`
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        'bg-primary': 'var(--color-bg-primary)',
-        'bg-secondary': 'var(--color-bg-secondary)',
-        'bg-tertiary': 'var(--color-bg-tertiary)',
-        'bg-card': 'var(--color-bg-card)',
-        'text-primary': 'var(--color-text-primary)',
-        'text-secondary': 'var(--color-text-secondary)',
-        'text-muted': 'var(--color-text-muted)',
-        accent: 'var(--color-accent)',
-        'accent-hover': 'var(--color-accent-hover)',
-        'accent-soft': 'var(--color-accent-soft)',
-        'border-color': 'var(--color-border)',
-        'border-hover': 'var(--color-border-hover)',
+        'bg-primary': themed('--color-bg-primary'),
+        'bg-secondary': themed('--color-bg-secondary'),
+        'bg-tertiary': themed('--color-bg-tertiary'),
+        'bg-card': themed('--color-bg-card'),
+        'text-primary': themed('--color-text-primary'),
+        'text-secondary': themed('--color-text-secondary'),
+        'text-muted': themed('--color-text-muted'),
+        accent: themed('--color-accent'),
+        'accent-hover': themed('--color-accent-hover'),
+        'accent-soft': themed('--color-accent-soft'),
+        'border-color': themed('--color-border'),
+        'border-hover': themed('--color-border-hover'),
       },
       fontFamily: {
         cozy: ['var(--font-family)', 'sans-serif'],
