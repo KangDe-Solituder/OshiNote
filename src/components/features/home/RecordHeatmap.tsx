@@ -140,7 +140,7 @@ export function RecordHeatmap() {
         ) : (
           <motion.div
             key={range}
-            className="space-y-2"
+            className="space-y-3.5"
             initial={animated ? { opacity: 0, y: 8 } : false}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
@@ -232,7 +232,7 @@ function MonthStrip({
   return (
     <div className="flex items-center gap-3">
       <span className="w-16 shrink-0 text-right text-xs font-medium text-text-muted">{monthLabel}</span>
-      <div className="flex flex-1 gap-[3px]">
+      <div className="flex flex-1 gap-[4px]">
         {row.cells.map((cell) => (
           <button
             key={cell.date}
@@ -241,10 +241,10 @@ function MonthStrip({
             onMouseEnter={(event) => onEnter(cell, event.currentTarget)}
             onMouseLeave={onLeave}
             className={clsx(
-              'h-[18px] min-w-[10px] flex-1 rounded-[4px] transition-transform',
+              'h-[24px] min-w-[10px] flex-1 rounded-[5px] transition-transform',
               CELL_LEVEL_CLASSES[cell.level],
               cell.future && 'opacity-25',
-              cell.total > 0 && 'cursor-pointer hover:scale-y-125'
+              cell.total > 0 && 'cursor-pointer hover:scale-y-110'
             )}
           />
         ))}
