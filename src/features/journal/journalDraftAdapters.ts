@@ -40,6 +40,7 @@ export function journalItemToDraftItem(item: JournalItemWithNote): JournalDraftI
   const base = {
     draftId: `existing-${item.id}`,
     originItemId: item.id,
+    staged: item.staged,
     x: item.x,
     y: item.y,
     width: item.width,

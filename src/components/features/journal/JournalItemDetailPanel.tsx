@@ -30,7 +30,7 @@ export interface JournalItemDetailPanelProps {
 export function JournalItemDetailPanel({ item, note, illustration, orientation, onUpdateItem, onRemoveItem, onClose }: JournalItemDetailPanelProps) {
   const { t } = useI18n()
   return (
-    <aside className="fixed bottom-5 right-5 top-20 z-[85] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-card/95 p-4 shadow-2xl backdrop-blur">
+    <aside data-journal-detail-panel="true" className="fixed bottom-5 right-5 top-20 z-[85] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-card/95 p-4 shadow-2xl backdrop-blur">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{t('journalCreate.detailPanel')}</p>
@@ -156,7 +156,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-xl border border-border-color bg-bg-primary p-1" /></label>
+  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-full rounded-xl border border-border-color bg-bg-primary p-0.5" /></label>
 }
 
 function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {

@@ -28,9 +28,10 @@ export interface CanvasItemFrameProps {
   onSelect: (itemId: string) => void
   onOpenDetail: (itemId: string) => void
   onUpdateItem: (itemId: string, layout: JournalLayoutInput & { zIndex?: number; stylePayload?: string }) => void
+  onStageItem?: (itemId: string) => void
 }
 
-export function CanvasItemFrame({ item, note, illustration, selected, orientation, zoom, pageRef, onSelect, onOpenDetail, onUpdateItem }: CanvasItemFrameProps) {
+export function CanvasItemFrame({ item, note, illustration, selected, orientation, zoom, pageRef, onSelect, onOpenDetail, onUpdateItem, onStageItem }: CanvasItemFrameProps) {
   const dragRef = useRef<FrameDragState | null>(null)
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
   const constraints = getDraftItemConstraints(item)
@@ -79,6 +80,10 @@ export function CanvasItemFrame({ item, note, illustration, selected, orientatio
     dragRef.current = null
     event.currentTarget.releasePointerCapture(event.pointerId)
     if (!drag.moved) return
+    if (onStageItem && document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-journal-workboard="true"]')) {
+      onStageItem(item.draftId)
+      return
+    }
     const rect = pageRef.current?.getBoundingClientRect() || null
     onUpdateItem(item.draftId, getDraggedLayout(drag, event, zoom, orientation, constraints, rect))
   }

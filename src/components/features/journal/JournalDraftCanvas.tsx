@@ -1,5 +1,5 @@
-import { ArrowUp, ImageIcon, Minus, Plus, RotateCcw, StickyNote, Trash2 } from 'lucide-react'
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { ArrowUp, ImageIcon, Inbox, Minus, Plus, RotateCcw, StickyNote, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import type { Illustration, JournalDraftItem, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { clampLayout, getJournalPageSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { getDraftItemConstraints } from '../../../features/journal/journalItemSizing'
@@ -10,6 +10,7 @@ import { useI18n } from '../../../i18n/useI18n'
 import { getPageBackground } from './journalCanvasStyle'
 import { CanvasItemFrame } from './CanvasItemFrame'
 import { JournalItemDetailPanel } from './JournalItemDetailPanel'
+import { JournalWorkBoard } from './JournalWorkBoard'
 import { getItemLayout } from './journalDraftCanvasGeometry'
 import { StampOverlay } from '../stamps/StampOverlay'
 import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
@@ -33,6 +34,8 @@ interface JournalDraftCanvasProps {
   onRemoveItem: (itemId: string) => void
   onBringForward: (itemId: string) => void
   onDropResource: (payload: DragPayload, point: { x: number; y: number }) => void
+  onStageItem: (itemId: string) => void
+  onDragStartStaged: (item: JournalDraftItem, event: React.PointerEvent<HTMLElement>) => void
   onStampPlace: (stamp: StampInput) => void
   onStampPlacementComplete: () => void
   onStampPlacementCancel: () => void
@@ -42,6 +45,7 @@ export type DragPayload =
   | { kind: 'note'; id: string }
   | { kind: 'illustration'; id: string }
   | { kind: 'material'; id: string }
+  | { kind: 'staged'; id: string }
 
 export function JournalDraftCanvas({
   background,
@@ -61,6 +65,8 @@ export function JournalDraftCanvas({
   onRemoveItem,
   onBringForward,
   onDropResource,
+  onStageItem,
+  onDragStartStaged,
   onStampPlace,
   onStampPlacementComplete,
   onStampPlacementCancel,
@@ -69,10 +75,13 @@ export function JournalDraftCanvas({
   const pageSize = getJournalPageSize(orientation)
   const viewportRef = useJournalWheelZoom(zoom, onZoomChange)
   const pageRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
-  const selectedItem = items.find((item) => item.draftId === selectedItemId) || null
-  const detailItem = items.find((item) => item.draftId === detailItemId) || null
-  const filledTemplateSlotIds = new Set(items.map((item) => item.templateSlotId).filter(Boolean))
+  const canvasItems = useMemo(() => items.filter((item) => !item.staged), [items])
+  const stagedItems = useMemo(() => items.filter((item) => item.staged), [items])
+  const selectedItem = canvasItems.find((item) => item.draftId === selectedItemId) || null
+  const detailItem = canvasItems.find((item) => item.draftId === detailItemId) || null
+  const filledTemplateSlotIds = new Set(canvasItems.map((item) => item.templateSlotId).filter(Boolean))
   const emptyTemplateSlots = getMaterializedTemplateSlots(templateId, orientation).filter((templateSlot) => !filledTemplateSlotIds.has(templateSlot.id))
 
   useEffect(() => {
@@ -82,8 +91,63 @@ export function JournalDraftCanvas({
   }, [])
 
   useEffect(() => {
-    if (detailItemId && !items.some((item) => item.draftId === detailItemId)) setDetailItemId(null)
-  }, [detailItemId, items])
+    if (detailItemId && !canvasItems.some((item) => item.draftId === detailItemId)) setDetailItemId(null)
+  }, [detailItemId, canvasItems])
+
+  // Click anywhere outside the detail panel dismisses it, matching the context-menu popover.
+  useEffect(() => {
+    if (!detailItemId) return
+    function handlePointerDown(event: globalThis.PointerEvent) {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('[data-journal-detail-panel="true"]')) return
+      setDetailItemId(null)
+    }
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => window.removeEventListener('pointerdown', handlePointerDown)
+  }, [detailItemId])
+
+  // The work board reveals when the pointer nears the canvas top edge (like the side rail)
+  // and retracts shortly after the pointer leaves it. Held-pointer drags keep it open so
+  // items can be dropped onto the tray.
+  const boardRef = useRef<HTMLDivElement>(null)
+  const boardCloseTimer = useRef<number | null>(null)
+  const [boardOpen, setBoardOpen] = useState(false)
+
+  useEffect(() => {
+    function handlePointerMove(event: globalThis.PointerEvent) {
+      const rootRect = rootRef.current?.getBoundingClientRect()
+      if (!rootRect) return
+      const withinCanvas = event.clientX >= rootRect.left && event.clientX <= rootRect.right
+        && event.clientY >= rootRect.top && event.clientY <= rootRect.bottom
+      const boardRect = boardRef.current?.getBoundingClientRect()
+      const insideBoard = boardRect
+        ? event.clientX >= boardRect.left && event.clientX <= boardRect.right
+          && event.clientY >= boardRect.top - 8 && event.clientY <= boardRect.bottom + 8
+        : false
+      const nearTop = withinCanvas && event.clientY <= rootRect.top + 32
+
+      if (nearTop || insideBoard) {
+        if (boardCloseTimer.current !== null) {
+          window.clearTimeout(boardCloseTimer.current)
+          boardCloseTimer.current = null
+        }
+        setBoardOpen(true)
+        return
+      }
+      if (event.buttons === 0 && boardCloseTimer.current === null) {
+        boardCloseTimer.current = window.setTimeout(() => {
+          setBoardOpen(false)
+          boardCloseTimer.current = null
+        }, 260)
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      if (boardCloseTimer.current !== null) window.clearTimeout(boardCloseTimer.current)
+    }
+  }, [])
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
@@ -101,7 +165,17 @@ export function JournalDraftCanvas({
   }
 
   return (
-    <div ref={viewportRef} className="journal-canvas-viewport relative flex h-full min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6">
+    <div ref={rootRef} className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+      <JournalWorkBoard
+        boardRef={boardRef}
+        open={boardOpen}
+        items={stagedItems}
+        notesById={notesById}
+        illustrationsById={illustrationsById}
+        onDragStartItem={onDragStartStaged}
+        onRemoveItem={onRemoveItem}
+      />
+      <div ref={viewportRef} className="journal-canvas-viewport relative flex min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6">
       <div className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
         <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
         <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>
@@ -123,7 +197,7 @@ export function JournalDraftCanvas({
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' }}
           onDrop={handleDrop}
         >
-          {items.every((item) => item.itemType === 'material') && emptyTemplateSlots.length === 0 && (
+          {canvasItems.every((item) => item.itemType === 'material') && emptyTemplateSlots.length === 0 && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-center text-sm text-text-muted">{t('journalCreate.dragHint')}</div>
           )}
 
@@ -140,7 +214,7 @@ export function JournalDraftCanvas({
             )
           })}
 
-          {items.map((item) => (
+          {canvasItems.map((item) => (
             <CanvasItemFrame
               key={item.draftId}
               item={item}
@@ -153,6 +227,7 @@ export function JournalDraftCanvas({
               onSelect={onSelectItem}
               onOpenDetail={(itemId) => { onSelectItem(itemId); setDetailItemId(itemId) }}
               onUpdateItem={onUpdateItem}
+              onStageItem={onStageItem}
             />
           ))}
 
@@ -171,6 +246,7 @@ export function JournalDraftCanvas({
           <button className={toolButtonClass} type="button" onClick={() => onUpdateItem(selectedItem.draftId, getItemLayout({ ...selectedItem, rotation: 0 }))}><RotateCcw size={15} /></button>
           <button className={toolButtonClass} type="button" onClick={() => rotateSelected(selectedItem, 5, orientation, onUpdateItem)}>+5</button>
           <button className={toolButtonClass} type="button" onClick={() => onBringForward(selectedItem.draftId)}><ArrowUp size={15} /></button>
+          <button className={toolButtonClass} type="button" onClick={() => onStageItem(selectedItem.draftId)} title={t('journal.returnToBoard')}><Inbox size={15} /></button>
           {selectedItem.itemType === 'material' && (
             <label className="flex h-9 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-text-muted">
               {t('journalCreate.glassStrength')}
@@ -192,6 +268,7 @@ export function JournalDraftCanvas({
           onClose={() => setDetailItemId(null)}
         />
       )}
+      </div>
     </div>
   )
 }

@@ -349,6 +349,7 @@ export interface JournalItem {
   height: number
   rotation: number
   z_index: number
+  staged: boolean
   sticker_style: JournalItemStyle
   color: string | null
   border_style: string | null
@@ -367,6 +368,7 @@ export interface JournalDraftItem {
   templateSlotId?: string
   templateSourceId?: string
   templateGenerated?: boolean
+  staged?: boolean
   itemType: JournalDraftItemType
   sourceId?: string
   materialId?: string
@@ -380,9 +382,10 @@ export interface JournalDraftItem {
   zIndex: number
 }
 
-export interface JournalItemRow extends Omit<JournalItem, 'item_type' | 'sticker_style'> {
+export interface JournalItemRow extends Omit<JournalItem, 'item_type' | 'sticker_style' | 'staged'> {
   item_type: string
   sticker_style: string
+  staged: number
 }
 
 export interface JournalItemWithNote extends JournalItem {

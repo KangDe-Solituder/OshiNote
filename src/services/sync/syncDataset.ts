@@ -34,7 +34,7 @@ const TABLES: readonly TableDefinition[] = [
   { name: 'journal_books', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'description', 'cover_style', 'cover_color', 'cover_decoration', 'date_label', 'sort_order', 'created_at', 'updated_at'] },
   { name: 'journal_pages', primaryKey: 'id', columns: ['id', 'book_id', 'oshi_id', 'page_type', 'title', 'description', 'date_label', 'standalone', 'page_index', 'background', 'orientation', 'created_at', 'updated_at'] },
   { name: 'note_images', primaryKey: 'id', columns: ['id', 'note_id', 'data_url', 'sort_order', 'created_at'] },
-  { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
+  { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'staged', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
   { name: 'stamps', primaryKey: 'id', columns: ['id', 'target_type', 'target_id', 'template_id', 'template_snapshot', 'label', 'color', 'position', 'x', 'y', 'rotation', 'size', 'opacity', 'created_at', 'updated_at'] },
   { name: 'templates', primaryKey: 'id', columns: ['id', 'type', 'name', 'description', 'source', 'payload', 'hidden', 'deleted', 'created_at', 'updated_at'] },
   { name: 'oshi_schedules', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'archive_id', 'kind', 'weekday', 'date', 'time', 'status', 'note_id', 'created_at', 'updated_at'] },

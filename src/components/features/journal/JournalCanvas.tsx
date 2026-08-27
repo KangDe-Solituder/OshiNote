@@ -109,7 +109,7 @@ export function JournalCanvas({
             </div>
           )}
 
-          {items.map((item) => (
+          {items.filter((item) => !item.staged).map((item) => (
             <JournalSticker
               key={item.id}
               item={item}

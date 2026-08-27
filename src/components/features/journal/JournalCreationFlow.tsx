@@ -267,13 +267,32 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       window.removeEventListener('pointerup', handlePointerUp)
       setDragGhost(null)
       const distance = Math.abs(nextEvent.clientX - startX) + Math.abs(nextEvent.clientY - startY)
-      if (distance < 8) {
-        addDraftItem(payload)
+      const overBoard = Boolean(document.elementFromPoint(nextEvent.clientX, nextEvent.clientY)?.closest('[data-journal-workboard="true"]'))
+      const pageElement = document.querySelector<HTMLElement>('[data-journal-draft-page="true"]')
+      const rect = pageElement?.getBoundingClientRect()
+      const overPage = rect
+        ? nextEvent.clientX >= rect.left && nextEvent.clientX <= rect.right && nextEvent.clientY >= rect.top && nextEvent.clientY <= rect.bottom
+        : false
+
+      // Dragging a staged chip out of the work board
+      if (payload.kind === 'staged') {
+        if (overBoard) return
+        if (overPage && rect) {
+          const x = Math.min(Math.max(nextEvent.clientX, rect.left), rect.right)
+          const y = Math.min(Math.max(nextEvent.clientY, rect.top), rect.bottom)
+          addDraftItem(payload, { x: (x - rect.left) / zoom, y: (y - rect.top) / zoom })
+        } else if (distance < 8) {
+          addDraftItem(payload)
+        }
         return
       }
-      const pageElement = document.querySelector<HTMLElement>('[data-journal-draft-page="true"]')
-      if (!pageElement) return
-      const rect = pageElement.getBoundingClientRect()
+
+      // Resources from drawers: drop on board to stage, click stages too, drop on page places directly
+      if (overBoard || distance < 8) {
+        stageDraftItem(payload)
+        return
+      }
+      if (!pageElement || !rect) return
       const x = Math.min(Math.max(nextEvent.clientX, rect.left), rect.right)
       const y = Math.min(Math.max(nextEvent.clientY, rect.top), rect.bottom)
       addDraftItem(payload, { x: (x - rect.left) / zoom, y: (y - rect.top) / zoom })
@@ -300,6 +319,10 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   }
 
   function addDraftItem(payload: DragPayload, point?: { x: number; y: number }) {
+    if (payload.kind === 'staged') {
+      placeStagedItem(payload.id, point)
+      return
+    }
     if ((payload.kind === 'note' && placedNoteIds.has(payload.id)) || (payload.kind === 'illustration' && placedIllustrationIds.has(payload.id))) return
     const base = getDraftItemBase(payload)
     if (!base) return
@@ -321,6 +344,48 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     }
     setItems((current) => [...current, draftItem])
     setSelectedItemId(draftItem.draftId)
+  }
+
+  /** Click or drop a drawer resource onto the work board: stage it for later placement. */
+  function stageDraftItem(payload: DragPayload) {
+    if (payload.kind === 'staged') return
+    if ((payload.kind === 'note' && placedNoteIds.has(payload.id)) || (payload.kind === 'illustration' && placedIllustrationIds.has(payload.id))) return
+    const base = getDraftItemBase(payload)
+    if (!base) return
+    const draftItem: JournalDraftItem = {
+      ...base,
+      draftId: createDraftId(),
+      staged: true,
+      x: 0,
+      y: 0,
+      zIndex: Math.max(0, ...items.map((item) => item.zIndex)) + 1,
+    }
+    setItems((current) => [...current, draftItem])
+  }
+
+  /** Move a staged chip onto the page (drop point or center). */
+  function placeStagedItem(draftId: string, point?: { x: number; y: number }) {
+    const pageSize = getJournalPageSize(orientation)
+    const nextZ = Math.max(0, ...items.map((item) => item.zIndex)) + 1
+    setItems((current) => current.map((item) => {
+      if (item.draftId !== draftId) return item
+      const x = point ? point.x - item.width / 2 : pageSize.width / 2 - item.width / 2
+      const y = point ? point.y - item.height / 2 : pageSize.height / 2 - item.height / 2
+      return {
+        ...item,
+        staged: false,
+        x: Math.max(24, Math.min(x, pageSize.width - item.width - 24)),
+        y: Math.max(24, Math.min(y, pageSize.height - item.height - 24)),
+        zIndex: nextZ,
+      }
+    }))
+    setSelectedItemId(draftId)
+  }
+
+  /** Return a canvas item to the work board. */
+  function stageExistingItem(draftId: string) {
+    setItems((current) => current.map((item) => item.draftId === draftId ? { ...item, staged: true } : item))
+    setSelectedItemId((current) => current === draftId ? null : current)
   }
 
   function getDraftItemBase(payload: DragPayload): Omit<JournalDraftItem, 'draftId' | 'x' | 'y' | 'zIndex'> | null {
@@ -471,6 +536,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               onRemoveItem={removeItem}
               onBringForward={bringForward}
               onDropResource={addDraftItem}
+              onStageItem={stageExistingItem}
+              onDragStartStaged={(item, event) => startPointerResourceDrag({ kind: 'staged', id: item.draftId }, event)}
               onStampPlace={setStampDraft}
               onStampPlacementComplete={() => setStampPlacementDraft(null)}
               onStampPlacementCancel={() => setStampPlacementDraft(null)}
@@ -503,25 +570,33 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
           </div>
         </div>
       </Modal>
-      <DragGhostPreview ghost={dragGhost} notesById={notesById} illustrationsById={illustrationsById} />
+      <DragGhostPreview ghost={dragGhost} items={items} notesById={notesById} illustrationsById={illustrationsById} />
     </div>
   )
 }
 
-function DragGhostPreview({ ghost, notesById, illustrationsById }: { ghost: DragGhost; notesById: Map<string, Note>; illustrationsById: Map<string, Illustration> }) {
+function DragGhostPreview({ ghost, items, notesById, illustrationsById }: { ghost: DragGhost; items: JournalDraftItem[]; notesById: Map<string, Note>; illustrationsById: Map<string, Illustration> }) {
   const { t } = useI18n()
   if (!ghost) return null
+  let payload = ghost.payload
+  if (payload.kind === 'staged') {
+    const stagedItem = items.find((item) => item.draftId === (payload as { id: string }).id)
+    if (!stagedItem) return null
+    payload = stagedItem.itemType === 'material'
+      ? { kind: 'material', id: stagedItem.materialId || '' }
+      : { kind: stagedItem.itemType, id: stagedItem.sourceId || '' } as DragPayload
+  }
   const style = { left: ghost.x, top: ghost.y }
-  if (ghost.payload.kind === 'material') {
-    const material = getJournalMaterialDefinition(ghost.payload.id)
+  if (payload.kind === 'material') {
+    const material = getJournalMaterialDefinition(payload.id)
     if (!material) return null
     return createPortal(<div className="pointer-events-none fixed z-[120] h-20 w-24 -translate-x-1/2 -translate-y-1/2 rotate-[-4deg] opacity-90 drop-shadow-xl" style={style}><JournalMaterialTile fill material={material} /></div>, document.body)
   }
-  if (ghost.payload.kind === 'illustration') {
-    const illustration = illustrationsById.get(ghost.payload.id)
+  if (payload.kind === 'illustration') {
+    const illustration = illustrationsById.get(payload.id)
     return createPortal(<div className="pointer-events-none fixed z-[120] flex h-20 w-28 -translate-x-1/2 -translate-y-1/2 rotate-2 items-center gap-2 rounded-xl border border-border-color bg-bg-card/95 p-3 text-accent shadow-xl" style={style}><ImageIcon size={22} /><span className="min-w-0 truncate text-sm font-semibold text-text-primary">{illustration?.title || t('common.untitled')}</span></div>, document.body)
   }
-  const note = notesById.get(ghost.payload.id)
+  const note = notesById.get(payload.kind === 'note' ? payload.id : '')
   return createPortal(<div className="pointer-events-none fixed z-[120] h-20 w-32 -translate-x-1/2 -translate-y-1/2 rotate-[-2deg] rounded-xl border border-border-color bg-[#fff7d6] p-3 shadow-xl" style={style}><p className="truncate text-sm font-semibold text-text-primary">{note?.title || t('common.untitled')}</p><p className="mt-1 line-clamp-2 text-xs text-text-muted">{note?.plain_text || t('common.noContent')}</p></div>, document.body)
 }
 

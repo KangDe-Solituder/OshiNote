@@ -200,7 +200,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       if (!page) throw new Error('Journal page not found')
 
       const pages = page.book_id ? await journalService.fetchJournalPages(page.book_id) : [page]
-      const items = await journalService.fetchJournalItems(page.id)
+      const items = await journalService.fetchJournalItems(page.id, true)
       const [unplacedNotes, unplacedIllustrations] = await Promise.all([
         journalService.fetchUnplacedNotes(page.id, oshiId),
         journalService.fetchUnplacedIllustrations(page.id, oshiId),

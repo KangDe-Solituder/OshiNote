@@ -1,7 +1,7 @@
 import type { JournalItemWithNote } from '../../../types'
 import { JOURNAL_PAGE } from '../../../features/journal/journalLayout'
 import { JournalInspector } from './JournalInspector'
-import { useLayoutEffect, useState, type ComponentProps } from 'react'
+import { useEffect, useLayoutEffect, useState, type ComponentProps } from 'react'
 import { motion } from 'framer-motion'
 import { usePopoverTransition } from '../themes/uiMotion'
 import type { JournalPopoverAnchor } from './JournalCanvas'
@@ -59,6 +59,17 @@ export function JournalStickerPopover(props: JournalStickerPopoverProps) {
       window.removeEventListener('scroll', updatePosition, true)
     }
   }, [anchor, selectedItem.height, selectedItem.id, selectedItem.width, selectedItem.x, selectedItem.y])
+
+  // Clicking anywhere outside dismisses the inspector; clicks inside are stopped
+  // by the popover's own pointerdown handler so they never reach the window.
+  const close = props.onClose
+  useEffect(() => {
+    function handlePointerDown() {
+      close?.()
+    }
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => window.removeEventListener('pointerdown', handlePointerDown)
+  }, [close])
 
   return (
     <motion.div

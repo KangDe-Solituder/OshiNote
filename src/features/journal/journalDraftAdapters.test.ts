@@ -59,6 +59,7 @@ function item(overrides: Partial<JournalItemWithNote>): JournalItemWithNote {
     height: 80,
     rotation: 0,
     z_index: 1,
+    staged: false,
     sticker_style: 'sticky',
     color: null,
     border_style: null,

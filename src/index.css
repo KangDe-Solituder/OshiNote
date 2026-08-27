@@ -329,6 +329,23 @@ body {
   display: none;
 }
 
+/* Native color inputs render their swatch with a built-in pill shape that
+   clashes with custom frames; normalize the swatch to inherit the input radius. */
+input[type='color'] {
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+}
+
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: inherit;
+}
+
 .stamp-ghost-preview {
   animation: stamp-ghost-float 1200ms ease-in-out infinite;
   filter: saturate(0.92) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.12));

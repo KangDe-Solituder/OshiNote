@@ -274,14 +274,15 @@ export async function createJournalPageFromDraft(input: CreateJournalPageDraftIn
   if (input.items) {
     for (const item of input.items) {
       const layout = draftItemToLayout(item)
+      const staged = item.staged === true
       if (item.itemType === 'note' && item.sourceId) {
-        const created = await createJournalItemForNote(page.id, item.sourceId, layout)
+        const created = await createJournalItemForNote(page.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'illustration' && item.sourceId) {
-        const created = await createJournalItemForIllustration(page.id, item.sourceId, layout)
+        const created = await createJournalItemForIllustration(page.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'material' && item.materialId) {
-        await createJournalItemForMaterial(page.id, item.materialId, layout, item.stylePayload)
+        await createJournalItemForMaterial(page.id, item.materialId, layout, item.stylePayload, staged)
       }
     }
   } else {
@@ -354,7 +355,7 @@ export async function deleteJournalPage(id: string): Promise<void> {
   await deleteStampForTarget('journal_page', id)
 }
 
-export async function fetchJournalItems(pageId: string): Promise<JournalItemWithNote[]> {
+export async function fetchJournalItems(pageId: string, includeStaged = false): Promise<JournalItemWithNote[]> {
   const db = await getDb()
   const rows = await db.select<JoinedJournalItemRow[]>(
     `SELECT
@@ -392,7 +393,7 @@ export async function fetchJournalItems(pageId: string): Promise<JournalItemWith
      FROM journal_items ji
      LEFT JOIN notes n ON n.id = ji.note_id
      LEFT JOIN illustrations i ON i.id = ji.illustration_id
-     WHERE ji.page_id = ?
+     WHERE ji.page_id = ?${includeStaged ? '' : ' AND ji.staged = 0'}
      ORDER BY ji.z_index ASC, ji.created_at ASC`,
     [pageId]
   )
@@ -429,7 +430,7 @@ export async function ensureJournalItemsForNotes(pageId: string, notes: Note[]):
   }
 }
 
-export async function createJournalItemForNote(pageId: string, noteId: string, initialLayout?: JournalLayoutUpdate): Promise<JournalItem> {
+export async function createJournalItemForNote(pageId: string, noteId: string, initialLayout?: JournalLayoutUpdate, staged = false): Promise<JournalItem> {
   const db = await getDb()
   const existing = await db.select<JournalItemRow[]>(
     'SELECT * FROM journal_items WHERE page_id = ? AND note_id = ?',
@@ -446,8 +447,8 @@ export async function createJournalItemForNote(pageId: string, noteId: string, i
   const id = generateId()
   await db.execute(
     `INSERT INTO journal_items
-     (id, page_id, note_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, material_snapshot, style_payload)
-     VALUES (?, ?, ?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, '{}', '{}')`,
+     (id, page_id, note_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, material_snapshot, style_payload, staged)
+     VALUES (?, ?, ?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, '{}', '{}', ?)`,
     [
       id,
       pageId,
@@ -460,12 +461,13 @@ export async function createJournalItemForNote(pageId: string, noteId: string, i
       layout.z_index,
       layout.sticker_style,
       layout.color,
+      staged ? 1 : 0,
     ]
   )
   return (await fetchJournalItemById(id))!
 }
 
-export async function createJournalItemForIllustration(pageId: string, illustrationId: string, initialLayout?: JournalLayoutUpdate): Promise<JournalItem> {
+export async function createJournalItemForIllustration(pageId: string, illustrationId: string, initialLayout?: JournalLayoutUpdate, staged = false): Promise<JournalItem> {
   const db = await getDb()
   const existing = await db.select<JournalItemRow[]>(
     'SELECT * FROM journal_items WHERE page_id = ? AND illustration_id = ?',
@@ -482,8 +484,8 @@ export async function createJournalItemForIllustration(pageId: string, illustrat
   const id = generateId()
   await db.execute(
     `INSERT INTO journal_items
-     (id, page_id, illustration_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, material_snapshot, style_payload)
-     VALUES (?, ?, ?, 'illustration', ?, ?, ?, ?, ?, ?, 'memo', ?, '{}', '{}')`,
+     (id, page_id, illustration_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, material_snapshot, style_payload, staged)
+     VALUES (?, ?, ?, 'illustration', ?, ?, ?, ?, ?, ?, 'memo', ?, '{}', '{}', ?)`,
     [
       id,
       pageId,
@@ -495,12 +497,13 @@ export async function createJournalItemForIllustration(pageId: string, illustrat
       layout.rotation,
       layout.z_index,
       '#eef6ff',
+      staged ? 1 : 0,
     ]
   )
   return (await fetchJournalItemById(id))!
 }
 
-export async function createJournalItemForMaterial(pageId: string, materialId: string, initialLayout?: JournalLayoutUpdate, stylePayloadOverride?: string): Promise<JournalItem> {
+export async function createJournalItemForMaterial(pageId: string, materialId: string, initialLayout?: JournalLayoutUpdate, stylePayloadOverride?: string, staged = false): Promise<JournalItem> {
   const material = getJournalMaterialDefinition(materialId)
   if (!material) throw new Error(`Unknown journal material: ${materialId}`)
 
@@ -525,8 +528,8 @@ export async function createJournalItemForMaterial(pageId: string, materialId: s
 
   await db.execute(
     `INSERT INTO journal_items
-     (id, page_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, material_id, material_snapshot, style_payload)
-     VALUES (?, ?, 'material', ?, ?, ?, ?, ?, ?, 'sticky', ?, NULL, ?, ?, ?)`,
+     (id, page_id, item_type, x, y, width, height, rotation, z_index, sticker_style, color, border_style, material_id, material_snapshot, style_payload, staged)
+     VALUES (?, ?, 'material', ?, ?, ?, ?, ?, ?, 'sticky', ?, NULL, ?, ?, ?, ?)`,
     [
       id,
       pageId,
@@ -540,9 +543,15 @@ export async function createJournalItemForMaterial(pageId: string, materialId: s
       material.id,
       getMaterialSnapshot(material),
       stylePayload,
+      staged ? 1 : 0,
     ]
   )
   return (await fetchJournalItemById(id))!
+}
+
+export async function setJournalItemStaged(id: string, staged: boolean): Promise<void> {
+  const db = await getDb()
+  await db.execute("UPDATE journal_items SET staged = ?, updated_at = datetime('now', 'localtime') WHERE id = ?", [staged ? 1 : 0, id])
 }
 
 export async function createJournalItemForTape(pageId: string): Promise<JournalItem> {
@@ -717,6 +726,7 @@ function deserializeItem(row: JournalItemRow): JournalItem {
   return {
     ...row,
     item_type: itemType,
+    staged: row.staged === 1,
     sticker_style: normalizeJournalItemStyle(itemType, row.sticker_style),
     material_id: row.material_id || null,
     material_snapshot: row.material_snapshot || '{}',

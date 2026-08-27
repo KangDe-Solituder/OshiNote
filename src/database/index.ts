@@ -45,6 +45,7 @@ async function runMigrations(db: Database): Promise<void> {
   await ensureJournalPagesOrientationSchema(db)
   await ensureJournalItemsAssetSchema(db)
   await ensureJournalItemsMaterialSchema(db)
+  await ensureJournalItemsStaged(db)
   await ensureScheduleTables(db)
   await rebuildNoteSearchIndex(db)
 }
@@ -395,6 +396,13 @@ async function ensureJournalItemsMaterialSchema(db: Database): Promise<void> {
   }
   if (!columnNames.has('style_payload')) {
     await db.execute("ALTER TABLE journal_items ADD COLUMN style_payload TEXT NOT NULL DEFAULT '{}'")
+  }
+}
+
+async function ensureJournalItemsStaged(db: Database): Promise<void> {
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_items)')
+  if (!columns.some((column) => column.name === 'staged')) {
+    await db.execute('ALTER TABLE journal_items ADD COLUMN staged INTEGER NOT NULL DEFAULT 0')
   }
 }
 

@@ -22,6 +22,7 @@ import {
   createJournalItemForNote,
   fetchJournalPageById,
   removeJournalItem,
+  setJournalItemStaged,
   updateJournalItemStyle,
   updateJournalPage,
 } from '../features/journal/journalService'
@@ -100,7 +101,7 @@ export function JournalEditorPage() {
     () => items.find((item) => item.id === selectedItemId) || null,
     [items, selectedItemId]
   )
-  const canvasItems = isDraftPage ? [] : items
+  const canvasItems = isDraftPage ? [] : items.filter((item) => !item.staged)
 
   useEffect(() => {
     if (!activePage) return
@@ -209,6 +210,7 @@ export function JournalEditorPage() {
       const layout = draftItemToJournalLayout(item)
       if (!item.originItemId) return
       await updateItemLayout(item.originItemId, layout)
+      await setJournalItemStaged(item.originItemId, item.staged === true)
       if (item.stylePayload !== undefined) {
         await updateItemStyle(item.originItemId, { style_payload: item.stylePayload })
       }
@@ -216,14 +218,15 @@ export function JournalEditorPage() {
 
     await Promise.all(savePlan.itemsToCreate.map(async (item) => {
       const layout = draftItemToJournalLayout(item)
+      const staged = item.staged === true
       if (item.itemType === 'note' && item.sourceId) {
-        const created = await createJournalItemForNote(activePage.id, item.sourceId, layout)
+        const created = await createJournalItemForNote(activePage.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'illustration' && item.sourceId) {
-        const created = await createJournalItemForIllustration(activePage.id, item.sourceId, layout)
+        const created = await createJournalItemForIllustration(activePage.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'material' && item.materialId) {
-        await createJournalItemForMaterial(activePage.id, item.materialId, layout, item.stylePayload)
+        await createJournalItemForMaterial(activePage.id, item.materialId, layout, item.stylePayload, staged)
       }
     }))
 
