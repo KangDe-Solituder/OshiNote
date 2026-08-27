@@ -346,6 +346,25 @@ input[type='color']::-webkit-color-swatch {
   border-radius: inherit;
 }
 
+/* Color swatch control: the fill IS the control. Zero padding + paired radii
+   (10px input / 10px swatch) keep the corners perfectly concentric. */
+.color-input {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 10px;
+}
+
 /* Flat range control for the journal item editors: transparent track with an
    accent fill driven by the --range-fill inline gradient. */
 .journal-range {

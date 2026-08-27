@@ -156,7 +156,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-full rounded-xl border border-border-color bg-transparent p-0.5" /></label>
+  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="color-input h-9 w-full rounded-[10px] ring-1 ring-border-color" /></label>
 }
 
 function RangeField({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
