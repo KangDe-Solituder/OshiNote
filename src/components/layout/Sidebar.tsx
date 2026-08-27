@@ -155,7 +155,7 @@ function OshiNavGroup({
   const toggleTitle = expanded ? t('nav.collapseSection', { title: oshi.name }) : t('nav.expandSection', { title: oshi.name })
 
   return (
-    <div className={clsx('rounded-2xl', !compact && 'p-1', expanded && !compact && 'bg-bg-secondary/30')}>
+    <div>
       <div className="flex items-center gap-1">
         <NavLink
           to={`/oshis/${oshi.id}`}
@@ -163,7 +163,7 @@ function OshiNavGroup({
             'flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors',
             compact && 'justify-center px-2',
             overviewActive
-              ? 'bg-accent/10 text-accent font-semibold'
+              ? 'text-accent font-semibold'
               : expanded
                 ? 'text-text-primary hover:bg-bg-secondary/40'
                 : 'text-text-secondary hover:bg-bg-secondary/40 hover:text-text-primary'
@@ -240,7 +240,7 @@ function SidebarLink({
         'flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
         compact && 'justify-center px-2',
         exactActive
-          ? 'bg-accent/10 text-accent font-semibold'
+          ? 'text-accent font-semibold'
           : 'text-text-secondary hover:bg-bg-secondary/40 hover:text-text-primary'
       )}
       title={label}
