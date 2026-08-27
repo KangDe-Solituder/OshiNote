@@ -4,7 +4,7 @@ import type { DayActivity } from '../home/heatmapModel'
 
 export interface ScheduleInput {
   title: string
-  platform: string
+  archive_id: string
   kind: 'weekly' | 'once'
   weekday?: number | null
   date?: string | null
@@ -32,8 +32,8 @@ export async function createSchedule(oshiId: string, input: ScheduleInput): Prom
   const db = await getDb()
   const id = generateId()
   await db.execute(
-    `INSERT INTO oshi_schedules (id, oshi_id, title, platform, kind, weekday, date, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, oshiId, input.title, input.platform, input.kind, input.weekday ?? null, input.date ?? null, input.time ?? null]
+    `INSERT INTO oshi_schedules (id, oshi_id, title, archive_id, kind, weekday, date, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, oshiId, input.title, input.archive_id, input.kind, input.weekday ?? null, input.date ?? null, input.time ?? null]
   )
   const rows = await db.select<OshiSchedule[]>('SELECT * FROM oshi_schedules WHERE id = ?', [id])
   return deserializeSchedule(rows[0])
@@ -44,7 +44,7 @@ export async function updateSchedule(id: string, input: Partial<ScheduleInput>):
   const sets: string[] = []
   const params: unknown[] = []
   if (input.title !== undefined) { sets.push('title = ?'); params.push(input.title) }
-  if (input.platform !== undefined) { sets.push('platform = ?'); params.push(input.platform) }
+  if (input.archive_id !== undefined) { sets.push('archive_id = ?'); params.push(input.archive_id) }
   if (input.kind !== undefined) { sets.push('kind = ?'); params.push(input.kind) }
   if (input.weekday !== undefined) { sets.push('weekday = ?'); params.push(input.weekday) }
   if (input.date !== undefined) { sets.push('date = ?'); params.push(input.date) }
@@ -102,7 +102,7 @@ export async function fetchOverrides(oshiId: string, startKey: string, endKey: s
 export async function fetchCalendarNotes(oshiId: string, startKey: string, endKey: string): Promise<CalendarNote[]> {
   const db = await getDb()
   return db.select<CalendarNote[]>(
-    `SELECT id, title, created_at, source_url FROM notes
+    `SELECT id, title, created_at, source_url, archive_id FROM notes
      WHERE oshi_id = ? AND date(created_at) >= ? AND date(created_at) <= ?
      ORDER BY created_at ASC`,
     [oshiId, startKey, endKey]
@@ -151,7 +151,7 @@ export async function fetchDailyActivity(startKey: string, endKey: string): Prom
 export async function fetchDayNotes(dayKey: string): Promise<(CalendarNote & { oshi_id: string | null })[]> {
   const db = await getDb()
   return db.select<(CalendarNote & { oshi_id: string | null })[]>(
-    `SELECT id, title, created_at, source_url, oshi_id FROM notes
+    `SELECT id, title, created_at, source_url, oshi_id, archive_id FROM notes
      WHERE date(created_at) = ? ORDER BY created_at ASC`,
     [dayKey]
   )

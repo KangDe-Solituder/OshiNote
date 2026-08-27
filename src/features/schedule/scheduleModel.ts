@@ -1,8 +1,5 @@
 import type { CalendarNote, OshiAnniversary, OshiSchedule, OshiScheduleOverride } from '../../types'
 
-export const SCHEDULE_PLATFORMS = ['nicovideo', 'youtube', 'twitch', 'twitcasting', 'showroom', 'other'] as const
-export type SchedulePlatform = (typeof SCHEDULE_PLATFORMS)[number]
-
 /** Occurrence resolution for one schedule on one day. */
 export type OccurrenceState = 'scheduled' | 'recorded' | 'missed' | 'done' | 'cancelled'
 
@@ -48,22 +45,6 @@ export function timeToMinutes(time: string | null): number | null {
   return hours * 60 + minutes
 }
 
-export function platformFromUrl(url: string): string {
-  if (!url) return ''
-  try {
-    const withProtocol = /^[a-z]+:\/\//i.test(url) ? url : `https://${url}`
-    const host = new URL(withProtocol).hostname.replace(/^www\./, '').toLowerCase()
-    if (host.endsWith('nicovideo.jp') || host.endsWith('nico.ms')) return 'nicovideo'
-    if (host.endsWith('youtube.com') || host === 'youtu.be') return 'youtube'
-    if (host.endsWith('twitch.tv')) return 'twitch'
-    if (host.endsWith('twitcasting.tv')) return 'twitcasting'
-    if (host.endsWith('showroom-live.com')) return 'showroom'
-    return 'other'
-  } catch {
-    return ''
-  }
-}
-
 /** All dates in [startKey, endKey] on which a schedule occurs. */
 export function expandOccurrences(schedule: OshiSchedule, startKey: string, endKey: string): string[] {
   if (schedule.kind === 'once') {
@@ -85,7 +66,7 @@ export function expandOccurrences(schedule: OshiSchedule, startKey: string, endK
 
 /**
  * A scheduled occurrence turns solid when a note exists that day and ANY of:
- * 1. the note's stream platform matches the schedule platform;
+ * 1. the note's archive matches the schedule's archive;
  * 2. the schedule has a time and the note's Date is within 3 hours of it;
  * 3. the schedule has no fixed time — any note that day counts.
  */
@@ -94,7 +75,7 @@ export function matchScheduleToNotes(schedule: OshiSchedule, notesOnDay: Calenda
   if (schedule.time == null) return notesOnDay[0]
   const scheduleMinutes = timeToMinutes(schedule.time)
   for (const note of notesOnDay) {
-    if (schedule.platform && platformFromUrl(note.source_url) === schedule.platform) return note
+    if (schedule.archive_id && note.archive_id === schedule.archive_id) return note
     const noteMinutes = noteTimeMinutes(note)
     if (scheduleMinutes != null && noteMinutes != null && Math.abs(noteMinutes - scheduleMinutes) <= 180) return note
   }

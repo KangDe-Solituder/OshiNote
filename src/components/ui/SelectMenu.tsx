@@ -44,22 +44,29 @@ export function SelectMenu({
   menuZIndex = OVERLAY_Z_INDEX.dropdown,
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false)
-  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number; openUp: boolean; maxHeight: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const timing = useMotionTiming()
   const selected = options.find((option) => option.value === value)
-  const menuOrigin = menuAlign === 'right' ? 'origin-top-right' : 'origin-top-left'
+  const menuOrigin = menuAlign === 'right' ? (menuRect?.openUp ? 'origin-bottom-right' : 'origin-top-right') : (menuRect?.openUp ? 'origin-bottom-left' : 'origin-top-left')
 
   const measureMenuRect = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
     if (!rect) return null
+    const itemHeight = size === 'sm' ? 33 : 37
+    const estimatedHeight = options.length * itemHeight + 14
+    const maxHeight = Math.min(estimatedHeight, 264)
+    const spaceBelow = window.innerHeight - rect.bottom - 8
+    const openUp = spaceBelow < maxHeight && rect.top > spaceBelow
     return {
-      top: rect.bottom + 8,
+      top: openUp ? Math.max(8, rect.top - maxHeight - 8) : rect.bottom + 8,
       left: menuAlign === 'right' ? rect.right : rect.left,
       width: rect.width,
+      openUp,
+      maxHeight,
     }
-  }, [menuAlign])
+  }, [menuAlign, options.length, size])
 
   function toggleOpen() {
     if (open) {
@@ -142,12 +149,13 @@ export function SelectMenu({
             transition: { duration: timing.viewExit, ease: MOTION_EASING.exit },
           }}
           className={clsx(
-            'overflow-hidden rounded-xl border border-border-color bg-bg-primary p-1 shadow-e2 transform-gpu will-change-[transform,opacity]',
+            'overflow-y-auto rounded-xl border border-border-color bg-bg-primary p-1 shadow-e2 transform-gpu will-change-[transform,opacity]',
             menuOrigin,
             menuClassName
           )}
           style={{
             minWidth: menuRect.width,
+            maxHeight: menuRect.maxHeight,
             contain: 'layout paint',
           }}
         >

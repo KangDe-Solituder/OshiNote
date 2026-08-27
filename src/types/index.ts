@@ -37,7 +37,7 @@ export interface OshiSchedule {
   id: string
   oshi_id: string
   title: string
-  platform: string
+  archive_id: string // '' = any archive; otherwise matches notes' archive_id
   kind: ScheduleKind
   weekday: number | null // 0 = Sunday ... 6 = Saturday (weekly)
   date: string | null // YYYY-MM-DD (once)
@@ -63,6 +63,7 @@ export interface CalendarNote {
   title: string
   created_at: string
   source_url: string
+  archive_id: string | null
 }
 
 export interface Archive {

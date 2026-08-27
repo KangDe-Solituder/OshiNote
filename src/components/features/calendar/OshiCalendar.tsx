@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
 import { Cake, CalendarCog, ChevronLeft, ChevronRight, Clock, FileText, Radio, RotateCcw, Video, X } from 'lucide-react'
-import type { CalendarNote, Oshi, OshiAnniversary, OshiSchedule, OshiScheduleOverride } from '../../../types'
+import type { Archive, CalendarNote, Oshi, OshiAnniversary, OshiSchedule, OshiScheduleOverride } from '../../../types'
 import {
   addDays,
   dateKeyToDate,
@@ -21,6 +21,7 @@ import {
   fetchSchedules,
   resolveOccurrence as persistOccurrence,
 } from '../../../features/schedule/scheduleService'
+import { fetchArchivesByOshi } from '../../../features/oshis/archiveService'
 import { useI18n } from '../../../i18n/useI18n'
 import { useMotionTiming } from '../themes/uiMotion'
 import { ScheduleManager } from './ScheduleManager'
@@ -44,6 +45,7 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
   const todayKey = toLocalDateKey(new Date())
   const [monthCursor, setMonthCursor] = useState(() => todayKey.slice(0, 7))
   const [schedules, setSchedules] = useState<OshiSchedule[]>([])
+  const [archives, setArchives] = useState<Archive[]>([])
   const [overrides, setOverrides] = useState<OshiScheduleOverride[]>([])
   const [notes, setNotes] = useState<CalendarNote[]>([])
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
@@ -66,12 +68,14 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
       fetchSchedules(oshi.id),
       fetchOverrides(oshi.id, gridRange.startKey, gridRange.endKey),
       fetchCalendarNotes(oshi.id, gridRange.startKey, gridRange.endKey),
+      fetchArchivesByOshi(oshi.id),
     ])
-      .then(([scheduleRows, overrideRows, noteRows]) => {
+      .then(([scheduleRows, overrideRows, noteRows, archiveRows]) => {
         if (requestRef.current !== requestId) return
         setSchedules(scheduleRows)
         setOverrides(overrideRows)
         setNotes(noteRows)
+        setArchives(archiveRows)
       })
       .catch(() => {})
   }, [oshi.id, gridRange])
@@ -118,6 +122,7 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
   }, [gridRange, monthCursor, notesByDay, oshi.anniversaries, overrides, schedules, todayKey])
 
   const nextBirthday = useMemo(() => getNextAnniversary(oshi.anniversaries, 'birthday', new Date()), [oshi.anniversaries])
+  const archiveNameById = useMemo(() => new Map(archives.map((archive) => [archive.id, archive.name])), [archives])
   const selectedModel = useMemo(() => weeks.flat().find((day) => day.dateKey === selectedDay) || null, [weeks, selectedDay])
 
   function shiftMonth(delta: number) {
@@ -242,6 +247,7 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
           <DayDetail
             key={selectedModel.dateKey}
             day={selectedModel}
+            archiveNameById={archiveNameById}
             onOpenNote={(noteId) => navigate(`/oshis/${oshi.id}/notes/${noteId}`)}
             onResolve={handleResolve}
             onRestore={handleRestore}
@@ -361,12 +367,14 @@ function EntryMarker({ entry }: { entry: DayScheduleEntry }) {
 
 function DayDetail({
   day,
+  archiveNameById,
   onOpenNote,
   onResolve,
   onRestore,
   onClose,
 }: {
   day: CalendarDayModel
+  archiveNameById: Map<string, string>
   onOpenNote: (noteId: string) => void
   onResolve: (entry: DayScheduleEntry, status: 'done' | 'cancelled', noteId?: string | null) => void
   onRestore: (entry: DayScheduleEntry) => void
@@ -406,7 +414,7 @@ function DayDetail({
                 <p className="truncate text-sm font-medium text-text-primary">{entry.schedule.title || t('calendar.untitledSchedule')}</p>
                 <p className="flex items-center gap-2 text-xs text-text-muted">
                   {entry.schedule.time && <span className="inline-flex items-center gap-1"><Clock size={11} />{entry.schedule.time}</span>}
-                  {entry.schedule.platform && <span>{t(`calendar.platform.${entry.schedule.platform}` as never)}</span>}
+                  {entry.schedule.archive_id && <span>{archiveNameById.get(entry.schedule.archive_id) || ''}</span>}
                   <EntryStateLabel state={entry.state} t={t} />
                 </p>
               </div>

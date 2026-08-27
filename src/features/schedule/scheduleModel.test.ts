@@ -6,7 +6,6 @@ import {
   getNextAnniversary,
   matchScheduleToNotes,
   noteDateKey,
-  platformFromUrl,
   resolveOccurrence,
   toLocalDateKey,
 } from './scheduleModel'
@@ -16,7 +15,7 @@ function makeSchedule(overrides: Partial<OshiSchedule>): OshiSchedule {
     id: 's1',
     oshi_id: 'o1',
     title: '定期配信',
-    platform: '',
+    archive_id: '',
     kind: 'once',
     weekday: null,
     date: null,
@@ -29,25 +28,9 @@ function makeSchedule(overrides: Partial<OshiSchedule>): OshiSchedule {
   }
 }
 
-function makeNote(createdAt: string, sourceUrl = ''): CalendarNote {
-  return { id: `n-${createdAt}`, title: '感想', created_at: createdAt, source_url: sourceUrl }
+function makeNote(createdAt: string, archiveId: string | null = null): CalendarNote {
+  return { id: `n-${createdAt}`, title: '感想', created_at: createdAt, source_url: '', archive_id: archiveId }
 }
-
-describe('platformFromUrl', () => {
-  it('detects known platforms', () => {
-    expect(platformFromUrl('https://live.nicovideo.jp/watch/lv123')).toBe('nicovideo')
-    expect(platformFromUrl('https://www.youtube.com/watch?v=abc')).toBe('youtube')
-    expect(platformFromUrl('https://youtu.be/abc')).toBe('youtube')
-    expect(platformFromUrl('https://www.twitch.tv/someone')).toBe('twitch')
-    expect(platformFromUrl('https://twitcasting.tv/someone')).toBe('twitcasting')
-  })
-
-  it('falls back for unknown or invalid urls', () => {
-    expect(platformFromUrl('https://example.com/x')).toBe('other')
-    expect(platformFromUrl('')).toBe('')
-    expect(platformFromUrl('not a url')).toBe('')
-  })
-})
 
 describe('expandOccurrences', () => {
   it('expands weekly schedules on matching weekdays', () => {
@@ -68,25 +51,25 @@ describe('expandOccurrences', () => {
 
 describe('matchScheduleToNotes', () => {
   it('matches any note when the schedule has no fixed time', () => {
-    const schedule = makeSchedule({ platform: 'nicovideo', time: null })
+    const schedule = makeSchedule({ archive_id: 'arc-nico', time: null })
     expect(matchScheduleToNotes(schedule, [makeNote('2026-08-22 23:00:00')])).not.toBeNull()
   })
 
-  it('matches by platform even when the time differs', () => {
-    const schedule = makeSchedule({ platform: 'youtube', time: '21:00' })
-    const notes = [makeNote('2026-08-22 10:00:00', 'https://www.youtube.com/watch?v=abc')]
+  it('matches by archive even when the time differs', () => {
+    const schedule = makeSchedule({ archive_id: 'arc-yt', time: '21:00' })
+    const notes = [makeNote('2026-08-22 10:00:00', 'arc-yt')]
     expect(matchScheduleToNotes(schedule, notes)).toBe(notes[0])
   })
 
-  it('matches by time within three hours when platform is unknown', () => {
-    const schedule = makeSchedule({ platform: 'nicovideo', time: '21:00' })
-    const notes = [makeNote('2026-08-22 23:30:00')]
+  it('matches by time within three hours when archive differs or is unset', () => {
+    const schedule = makeSchedule({ archive_id: 'arc-nico', time: '21:00' })
+    const notes = [makeNote('2026-08-22 23:30:00', 'arc-yt')]
     expect(matchScheduleToNotes(schedule, notes)).toBe(notes[0])
   })
 
-  it('does not match when neither platform nor time align', () => {
-    const schedule = makeSchedule({ platform: 'youtube', time: '21:00' })
-    const notes = [makeNote('2026-08-22 10:00:00', 'https://live.nicovideo.jp/watch/lv1')]
+  it('does not match when neither archive nor time align', () => {
+    const schedule = makeSchedule({ archive_id: 'arc-yt', time: '21:00' })
+    const notes = [makeNote('2026-08-22 10:00:00', 'arc-nico')]
     expect(matchScheduleToNotes(schedule, notes)).toBeNull()
   })
 })

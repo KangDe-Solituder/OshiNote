@@ -61,7 +61,7 @@ async function ensureScheduleTables(db: Database): Promise<void> {
     id         TEXT PRIMARY KEY,
     oshi_id    TEXT NOT NULL,
     title      TEXT NOT NULL DEFAULT '',
-    platform   TEXT NOT NULL DEFAULT '',
+    archive_id TEXT NOT NULL DEFAULT '',
     kind       TEXT NOT NULL DEFAULT 'once',
     weekday    INTEGER,
     date       TEXT,
@@ -72,6 +72,12 @@ async function ensureScheduleTables(db: Database): Promise<void> {
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE
   )`)
+
+  const scheduleColumns = await db.select<{ name: string }[]>('PRAGMA table_info(oshi_schedules)')
+  const scheduleColumnNames = new Set(scheduleColumns.map((column) => column.name))
+  if (scheduleColumnNames.has('platform') && !scheduleColumnNames.has('archive_id')) {
+    await db.execute('ALTER TABLE oshi_schedules RENAME COLUMN platform TO archive_id')
+  }
   await db.execute(`CREATE TABLE IF NOT EXISTS oshi_schedule_overrides (
     id          TEXT PRIMARY KEY,
     schedule_id TEXT NOT NULL,

@@ -11,6 +11,8 @@ import {
   type DayScheduleEntry,
 } from '../../../features/schedule/scheduleModel'
 import { fetchCalendarNotes, fetchOverrides, fetchSchedules } from '../../../features/schedule/scheduleService'
+import { fetchArchivesByOshi } from '../../../features/oshis/archiveService'
+import type { Archive } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 
 interface WeekEntry extends DayScheduleEntry {
@@ -23,6 +25,7 @@ export function ThisWeekCard({ oshi, refreshToken }: { oshi: Oshi; refreshToken?
   const navigate = useNavigate()
   const todayKey = toLocalDateKey(new Date())
   const [schedules, setSchedules] = useState<OshiSchedule[]>([])
+  const [archives, setArchives] = useState<Archive[]>([])
   const [overrides, setOverrides] = useState<OshiScheduleOverride[]>([])
   const [notes, setNotes] = useState<CalendarNote[]>([])
 
@@ -40,12 +43,14 @@ export function ThisWeekCard({ oshi, refreshToken }: { oshi: Oshi; refreshToken?
       fetchSchedules(oshi.id),
       fetchOverrides(oshi.id, weekRange.startKey, weekRange.endKey),
       fetchCalendarNotes(oshi.id, weekRange.startKey, weekRange.endKey),
+      fetchArchivesByOshi(oshi.id),
     ])
-      .then(([scheduleRows, overrideRows, noteRows]) => {
+      .then(([scheduleRows, overrideRows, noteRows, archiveRows]) => {
         if (!alive) return
         setSchedules(scheduleRows)
         setOverrides(overrideRows)
         setNotes(noteRows)
+        setArchives(archiveRows)
       })
       .catch(() => {})
     return () => { alive = false }
@@ -96,7 +101,7 @@ export function ThisWeekCard({ oshi, refreshToken }: { oshi: Oshi; refreshToken?
                 <p className="truncate text-sm font-medium text-text-primary">{entry.schedule.title || t('calendar.untitledSchedule')}</p>
                 <p className="flex items-center gap-2 text-[11px] text-text-muted">
                   {entry.schedule.time && <span className="inline-flex items-center gap-0.5"><Clock size={10} />{entry.schedule.time}</span>}
-                  {entry.schedule.platform && <span>{t(`calendar.platform.${entry.schedule.platform}` as never)}</span>}
+                  {entry.schedule.archive_id && <span>{archives.find((archive) => archive.id === entry.schedule.archive_id)?.name || ''}</span>}
                 </p>
               </div>
               <EntryStateChip entry={entry} t={t} />

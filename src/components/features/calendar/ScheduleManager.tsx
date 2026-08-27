@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
-import { Cake, Pencil, Plus, Trash2, Video } from 'lucide-react'
-import type { AnniversaryKind, Oshi, OshiAnniversary, OshiSchedule } from '../../../types'
+import { Cake, Check, Pencil, Plus, Trash2, Video } from 'lucide-react'
+import type { Archive, Oshi, OshiAnniversary, OshiSchedule } from '../../../types'
 import { generateId } from '../../../database'
 import { createSchedule, deleteSchedule, updateSchedule, type ScheduleInput } from '../../../features/schedule/scheduleService'
-import { SCHEDULE_PLATFORMS } from '../../../features/schedule/scheduleModel'
+import { fetchArchivesByOshi } from '../../../features/oshis/archiveService'
 import { updateOshi } from '../../../features/oshis/oshiService'
 import { Modal } from '../../ui/Modal'
 import { Button } from '../../ui/Button'
 import { SelectMenu } from '../../ui/SelectMenu'
+import { useMotionTiming } from '../themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
 
 interface ScheduleManagerProps {
@@ -23,22 +25,24 @@ const WEEKDAY_OPTION_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as
 
 export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: ScheduleManagerProps) {
   const { t } = useI18n()
+  const timing = useMotionTiming()
   const [tab, setTab] = useState<'schedules' | 'anniversaries'>('schedules')
+  const [archives, setArchives] = useState<Archive[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<ScheduleInput>({ title: '', platform: '', kind: 'weekly', weekday: 2, date: null, time: null })
+  const [draft, setDraft] = useState<ScheduleInput>({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
 
   useEffect(() => {
-    if (open) {
-      setEditingId(null)
-      setDraft({ title: '', platform: '', kind: 'weekly', weekday: 2, date: null, time: null })
-    }
-  }, [open])
+    if (!open) return
+    setEditingId(null)
+    setDraft({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
+    fetchArchivesByOshi(oshi.id).then(setArchives).catch(() => setArchives([]))
+  }, [open, oshi.id])
 
   function startEdit(schedule: OshiSchedule) {
     setEditingId(schedule.id)
     setDraft({
       title: schedule.title,
-      platform: schedule.platform,
+      archive_id: schedule.archive_id,
       kind: schedule.kind,
       weekday: schedule.weekday ?? 2,
       date: schedule.date,
@@ -49,7 +53,7 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
   async function handleSaveSchedule() {
     const payload: ScheduleInput = {
       title: draft.title.trim(),
-      platform: draft.platform,
+      archive_id: draft.archive_id,
       kind: draft.kind,
       weekday: draft.kind === 'weekly' ? draft.weekday ?? 2 : null,
       date: draft.kind === 'once' ? draft.date || null : null,
@@ -62,7 +66,7 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
       await createSchedule(oshi.id, payload)
     }
     setEditingId(null)
-    setDraft({ title: '', platform: '', kind: 'weekly', weekday: 2, date: null, time: null })
+    setDraft({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
     onChanged()
   }
 
@@ -95,30 +99,42 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
         ))}
       </div>
 
-      {tab === 'schedules' ? (
-        <ScheduleTab
-          schedules={schedules}
-          draft={draft}
-          editingId={editingId}
-          onDraftChange={setDraft}
-          onSave={handleSaveSchedule}
-          onEdit={startEdit}
-          onDelete={handleDeleteSchedule}
-          onCancelEdit={() => {
-            setEditingId(null)
-            setDraft({ title: '', platform: '', kind: 'weekly', weekday: 2, date: null, time: null })
-          }}
-          t={t}
-        />
-      ) : (
-        <AnniversaryTab anniversaries={oshi.anniversaries} onChange={handleAnniversariesChange} t={t} />
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={tab}
+          initial={timing.micro > 0 ? { opacity: 0, x: tab === 'schedules' ? -10 : 10 } : false}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: tab === 'schedules' ? 8 : -8 }}
+          transition={{ duration: timing.micro + 0.08, ease: 'easeOut' }}
+        >
+          {tab === 'schedules' ? (
+            <ScheduleTab
+              schedules={schedules}
+              archives={archives}
+              draft={draft}
+              editingId={editingId}
+              onDraftChange={setDraft}
+              onSave={handleSaveSchedule}
+              onEdit={startEdit}
+              onDelete={handleDeleteSchedule}
+              onCancelEdit={() => {
+                setEditingId(null)
+                setDraft({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
+              }}
+              t={t}
+            />
+          ) : (
+            <AnniversaryTab anniversaries={oshi.anniversaries} onChange={handleAnniversariesChange} t={t} />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </Modal>
   )
 }
 
 function ScheduleTab({
   schedules,
+  archives,
   draft,
   editingId,
   onDraftChange,
@@ -129,6 +145,7 @@ function ScheduleTab({
   t,
 }: {
   schedules: OshiSchedule[]
+  archives: Archive[]
   draft: ScheduleInput
   editingId: string | null
   onDraftChange: (draft: ScheduleInput) => void
@@ -139,6 +156,7 @@ function ScheduleTab({
   t: ReturnType<typeof useI18n>['t']
 }) {
   const saveDisabled = !draft.title.trim() || (draft.kind === 'once' && !draft.date)
+  const archiveName = (id: string) => archives.find((archive) => archive.id === id)?.name || ''
 
   return (
     <div className="space-y-4">
@@ -159,10 +177,10 @@ function ScheduleTab({
                   <p className="truncate text-sm font-medium text-text-primary">{schedule.title}</p>
                   <p className="text-xs text-text-muted">
                     {schedule.kind === 'weekly'
-                      ? t('calendar.everyWeek', { weekday: t(`calendar.weekday.${WEEKDAY_OPTION_KEYS[schedule.weekday ?? 0]}`) })
+                      ? t('calendar.everyWeek', { weekday: t(`calendar.weekdayFull.${WEEKDAY_OPTION_KEYS[schedule.weekday ?? 0]}`) })
                       : schedule.date}
                     {schedule.time ? ` · ${schedule.time}` : ''}
-                    {schedule.platform ? ` · ${t(`calendar.platform.${schedule.platform}` as never)}` : ''}
+                    {schedule.archive_id ? ` · ${archiveName(schedule.archive_id)}` : ''}
                   </p>
                 </div>
                 <button type="button" onClick={() => onEdit(schedule)} className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-accent" title={t('common.edit')}>
@@ -203,7 +221,7 @@ function ScheduleTab({
               <SelectMenu
                 value={String(draft.weekday ?? 2)}
                 onChange={(value) => onDraftChange({ ...draft, weekday: Number(value) })}
-                options={WEEKDAY_OPTION_KEYS.map((key, index) => ({ value: String(index), label: t(`calendar.weekday.${key}`) }))}
+                options={WEEKDAY_OPTION_KEYS.map((key, index) => ({ value: String(index), label: t(`calendar.weekdayFull.${key}`) }))}
                 ariaLabel={t('calendar.weekdayLabel')}
                 size="sm"
               />
@@ -223,10 +241,10 @@ function ScheduleTab({
               title={t('calendar.timeOptional')}
             />
             <SelectMenu
-              value={draft.platform}
-              onChange={(value) => onDraftChange({ ...draft, platform: value })}
-              options={[{ value: '', label: t('calendar.platform.any') }, ...SCHEDULE_PLATFORMS.map((platform) => ({ value: platform, label: t(`calendar.platform.${platform}`) }))]}
-              ariaLabel={t('calendar.platformLabel')}
+              value={draft.archive_id}
+              onChange={(value) => onDraftChange({ ...draft, archive_id: value })}
+              options={[{ value: '', label: t('calendar.archive.any') }, ...archives.map((archive) => ({ value: archive.id, label: archive.name }))]}
+              ariaLabel={t('calendar.archiveLabel')}
               size="sm"
             />
           </div>
@@ -257,14 +275,21 @@ function AnniversaryTab({
   const [label, setLabel] = useState('')
   const [month, setMonth] = useState('1')
   const [day, setDay] = useState('1')
-  const [kind, setKind] = useState<AnniversaryKind>('birthday')
+  const [isBirthday, setIsBirthday] = useState(false)
 
   async function handleAdd() {
     const monthNum = Number(month)
     const dayNum = Number(day)
     if (!label.trim() || monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) return
-    await onChange([...anniversaries, { id: generateId(), label: label.trim(), month: monthNum, day: dayNum, kind }])
+    await onChange([...anniversaries, {
+      id: generateId(),
+      label: label.trim(),
+      month: monthNum,
+      day: dayNum,
+      kind: isBirthday ? 'birthday' : 'other',
+    }])
     setLabel('')
+    setIsBirthday(false)
   }
 
   return (
@@ -306,35 +331,48 @@ function AnniversaryTab({
             className="rounded-lg border border-border-color bg-transparent px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
           />
           <div className="flex flex-wrap items-center gap-2.5">
-            <input
-              type="number"
-              min={1}
-              max={12}
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
-              className="h-8 w-20 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
-              title={t('calendar.month')}
-            />
-            <input
-              type="number"
-              min={1}
-              max={31}
-              value={day}
-              onChange={(event) => setDay(event.target.value)}
-              className="h-8 w-20 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
-              title={t('calendar.day')}
-            />
-            <SelectMenu
-              value={kind}
-              onChange={(value) => setKind(value as AnniversaryKind)}
-              options={[
-                { value: 'birthday', label: t('calendar.anniversaryKind.birthday') },
-                { value: 'debut', label: t('calendar.anniversaryKind.debut') },
-                { value: 'other', label: t('calendar.anniversaryKind.other') },
-              ]}
-              ariaLabel={t('calendar.anniversaryKindLabel')}
-              size="sm"
-            />
+            <label className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={month}
+                onChange={(event) => setMonth(event.target.value)}
+                className="h-8 w-16 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+              />
+              <span className="text-xs text-text-muted">{t('calendar.month')}</span>
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={day}
+                onChange={(event) => setDay(event.target.value)}
+                className="h-8 w-16 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+              />
+              <span className="text-xs text-text-muted">{t('calendar.day')}</span>
+            </label>
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={isBirthday}
+              onClick={() => setIsBirthday((value) => !value)}
+              className={clsx(
+                'inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors',
+                isBirthday
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border-color text-text-secondary hover:border-border-hover hover:text-text-primary'
+              )}
+            >
+              <span className={clsx(
+                'flex h-3.5 w-3.5 items-center justify-center rounded border transition-colors',
+                isBirthday ? 'border-accent bg-accent text-white' : 'border-text-muted/50'
+              )}>
+                {isBirthday && <Check size={11} />}
+              </span>
+              {t('calendar.anniversaryKind.birthday')}
+            </button>
             <Button size="sm" onClick={handleAdd} disabled={!label.trim()}>
               <Plus size={14} />
               {t('common.add')}
