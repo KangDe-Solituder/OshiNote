@@ -285,7 +285,7 @@ function StampSettingsForm({
                 type="color"
                 value={preview.color}
                 onChange={(event) => onChange({ ...preview, color: event.target.value })}
-                className="h-5 w-6 cursor-pointer border-0 bg-transparent p-0"
+                className="color-input h-5 w-6 cursor-pointer rounded-[6px] [--swatch-radius:6px]"
                 aria-label={t('stamps.customColor')}
               />
             </label>
