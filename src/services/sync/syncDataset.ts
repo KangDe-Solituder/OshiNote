@@ -27,7 +27,7 @@ interface SyncDatabaseStatement {
 }
 
 const TABLES: readonly TableDefinition[] = [
-  { name: 'oshis', primaryKey: 'id', columns: ['id', 'name', 'avatar', 'color', 'description', 'activity_links', 'created_at'] },
+  { name: 'oshis', primaryKey: 'id', columns: ['id', 'name', 'avatar', 'color', 'description', 'activity_links', 'anniversaries', 'created_at'] },
   { name: 'archives', primaryKey: 'id', columns: ['id', 'oshi_id', 'name', 'sort_order', 'created_at'] },
   { name: 'notes', primaryKey: 'id', columns: ['id', 'oshi_id', 'archive_id', 'title', 'content', 'plain_text', 'source_url', 'tags', 'favorite', 'created_at', 'updated_at'] },
   { name: 'illustrations', primaryKey: 'id', columns: ['id', 'oshi_id', 'category', 'title', 'original_path', 'thumbnail_path', 'original_filename', 'mime_type', 'file_size', 'width', 'height', 'date', 'owner', 'artist', 'source_url', 'tags', 'description', 'favorite', 'archived', 'created_at', 'updated_at'] },
@@ -37,6 +37,8 @@ const TABLES: readonly TableDefinition[] = [
   { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
   { name: 'stamps', primaryKey: 'id', columns: ['id', 'target_type', 'target_id', 'template_id', 'template_snapshot', 'label', 'color', 'position', 'x', 'y', 'rotation', 'size', 'opacity', 'created_at', 'updated_at'] },
   { name: 'templates', primaryKey: 'id', columns: ['id', 'type', 'name', 'description', 'source', 'payload', 'hidden', 'deleted', 'created_at', 'updated_at'] },
+  { name: 'oshi_schedules', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'archive_id', 'kind', 'weekday', 'date', 'time', 'status', 'note_id', 'created_at', 'updated_at'] },
+  { name: 'oshi_schedule_overrides', primaryKey: 'id', columns: ['id', 'schedule_id', 'date', 'status', 'note_id', 'created_at'] },
   { name: 'settings', primaryKey: 'key', columns: ['key', 'value'] },
 ]
 
