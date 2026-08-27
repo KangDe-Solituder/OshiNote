@@ -135,21 +135,6 @@ export function OshiOverviewPage() {
           <StatCard icon={Tag} label={t('nav.tags')} value={stats.tags} to={`/oshis/${oshiId}/tags`} />
         </section>
 
-        <div className="overview-calendar-grid mb-5">
-          <div className="overview-calendar-main min-w-0">
-            <OshiCalendar
-              oshi={oshi}
-              onOshiUpdated={() => {
-                fetchOshiById(oshiId).then((next) => next && setOshi(next)).catch(() => {})
-                setCalendarRefreshToken((token) => token + 1)
-              }}
-            />
-          </div>
-          <div className="overview-calendar-side min-w-0">
-            <ThisWeekCard oshi={oshi} refreshToken={calendarRefreshToken} />
-          </div>
-        </div>
-
         <div className="overview-content-grid">
           <section className="overview-recent-notes rounded-2xl border border-border-color bg-bg-card p-5">
             <SectionHeader title={t('oshiOverview.recentNotes')} to={`/oshis/${oshiId}/notes`} />
@@ -192,6 +177,21 @@ export function OshiOverviewPage() {
               </div>
             )}
           </section>
+        </div>
+
+        <div className="overview-calendar-grid mt-5">
+          <div className="overview-calendar-main min-w-0">
+            <OshiCalendar
+              oshi={oshi}
+              onOshiUpdated={() => {
+                fetchOshiById(oshiId).then((next) => next && setOshi(next)).catch(() => {})
+                setCalendarRefreshToken((token) => token + 1)
+              }}
+            />
+          </div>
+          <div className="overview-calendar-side min-w-0">
+            <ThisWeekCard oshi={oshi} refreshToken={calendarRefreshToken} />
+          </div>
         </div>
         </div>
       </main>
