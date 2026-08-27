@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHeatmapGrid, getColumnMonthLabels, getIntensityLevel, getRangeStartKey, type DayActivity } from './heatmapModel'
+import { buildHeatmapGrid, buildMonthRows, getColumnMonthLabels, getIntensityLevel, getRangeStartKey, type DayActivity } from './heatmapModel'
 
 describe('getIntensityLevel', () => {
   it('buckets totals into five levels', () => {
@@ -49,5 +49,23 @@ describe('buildHeatmapGrid', () => {
     expect(labels.length).toBe(weeks.length)
     expect(labels.filter(Boolean)).toContain('12')
     expect(labels.filter(Boolean)).toContain('01')
+  })
+})
+
+describe('buildMonthRows', () => {
+  it('groups days into one strip per month, covering month ends and future days', () => {
+    const activities = new Map<string, DayActivity>([
+      ['2026-08-22', { date: '2026-08-22', notes: 1, illustrations: 0, journalPages: 0 }],
+    ])
+    const rows = buildMonthRows(activities, '2026-07-15', '2026-08-27')
+    expect(rows.map((row) => row.monthKey)).toEqual(['2026-07', '2026-08'])
+    expect(rows[0].cells).toHaveLength(31)
+    expect(rows[1].cells).toHaveLength(31)
+    const hit = rows[1].cells.find((cell) => cell.date === '2026-08-22')
+    expect(hit?.total).toBe(1)
+    expect(hit?.level).toBe(1)
+    expect(rows[1].cells.find((cell) => cell.date === '2026-08-28')?.future).toBe(true)
+    // Days before the range start stay muted.
+    expect(rows[0].cells.find((cell) => cell.date === '2026-07-10')?.level).toBe(0)
   })
 })

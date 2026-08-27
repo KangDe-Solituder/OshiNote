@@ -89,3 +89,34 @@ export function emptyActivity(date: string): DayActivity {
 export function noteActivityDate(createdAt: string): string {
   return noteDateKey({ created_at: createdAt })
 }
+
+export interface MonthRow {
+  monthKey: string // YYYY-MM
+  cells: HeatmapCell[]
+}
+
+/** Row-per-month layout for short ranges: days flow left to right, month label at the left edge. */
+export function buildMonthRows(activities: Map<string, DayActivity>, startKey: string, todayKey: string): MonthRow[] {
+  const rows: MonthRow[] = []
+  let monthCursor = `${startKey.slice(0, 7)}-01`
+  while (monthCursor <= todayKey) {
+    const monthKey = monthCursor.slice(0, 7)
+    const cells: HeatmapCell[] = []
+    let day = monthCursor
+    while (day.slice(0, 7) === monthKey) {
+      const activity = activities.get(day) || emptyActivity(day)
+      const total = activity.notes + activity.illustrations + activity.journalPages
+      cells.push({
+        ...activity,
+        total,
+        level: day < startKey ? 0 : getIntensityLevel(total),
+        future: day > todayKey,
+      })
+      day = addDays(day, 1)
+      if (day.slice(0, 7) !== monthKey) break
+    }
+    rows.push({ monthKey, cells })
+    monthCursor = `${day.slice(0, 7)}-01`
+  }
+  return rows
+}
