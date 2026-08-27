@@ -5,6 +5,7 @@ export interface Oshi {
   color?: string
   description: string
   activity_links: string[] // parsed from JSON string
+  anniversaries: OshiAnniversary[] // parsed from JSON string
   created_at: string
 }
 
@@ -15,7 +16,53 @@ export interface OshiRow {
   color?: string
   description: string | null
   activity_links: string | null // JSON string from DB
+  anniversaries: string | null // JSON string from DB
   created_at: string
+}
+
+export type AnniversaryKind = 'birthday' | 'debut' | 'other'
+
+export interface OshiAnniversary {
+  id: string
+  label: string
+  month: number
+  day: number
+  kind: AnniversaryKind
+}
+
+export type ScheduleKind = 'weekly' | 'once'
+export type ScheduleStatus = 'active' | 'done' | 'cancelled'
+
+export interface OshiSchedule {
+  id: string
+  oshi_id: string
+  title: string
+  platform: string
+  kind: ScheduleKind
+  weekday: number | null // 0 = Sunday ... 6 = Saturday (weekly)
+  date: string | null // YYYY-MM-DD (once)
+  time: string | null // HH:MM, nullable for "sometime that day"
+  status: ScheduleStatus // used by 'once'; weekly rows stay 'active'
+  note_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OshiScheduleOverride {
+  id: string
+  schedule_id: string
+  date: string // YYYY-MM-DD occurrence being overridden
+  status: 'done' | 'cancelled'
+  note_id: string | null
+  created_at: string
+}
+
+/** Minimal note shape used by the calendar and heatmap aggregations. */
+export interface CalendarNote {
+  id: string
+  title: string
+  created_at: string
+  source_url: string
 }
 
 export interface Archive {
@@ -363,6 +410,7 @@ export interface UpdateOshiInput {
   color?: string
   description?: string
   activity_links?: string[]
+  anniversaries?: OshiAnniversary[]
 }
 
 export interface CreateNoteInput {

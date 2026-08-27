@@ -37,6 +37,7 @@ async function runMigrations(db: Database): Promise<void> {
     await db.execute(sql)
   }
   await ensureOshiProfileColumns(db)
+  await ensureOshiAnniversaries(db)
   await ensureNoteSourceUrl(db)
   await ensureOptionalNoteOwnership(db)
   await ensureJournalBooksSchema(db)
@@ -44,7 +45,44 @@ async function runMigrations(db: Database): Promise<void> {
   await ensureJournalPagesOrientationSchema(db)
   await ensureJournalItemsAssetSchema(db)
   await ensureJournalItemsMaterialSchema(db)
+  await ensureScheduleTables(db)
   await rebuildNoteSearchIndex(db)
+}
+
+async function ensureOshiAnniversaries(db: Database): Promise<void> {
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(oshis)')
+  if (!columns.some((column) => column.name === 'anniversaries')) {
+    await db.execute("ALTER TABLE oshis ADD COLUMN anniversaries TEXT NOT NULL DEFAULT '[]'")
+  }
+}
+
+async function ensureScheduleTables(db: Database): Promise<void> {
+  await db.execute(`CREATE TABLE IF NOT EXISTS oshi_schedules (
+    id         TEXT PRIMARY KEY,
+    oshi_id    TEXT NOT NULL,
+    title      TEXT NOT NULL DEFAULT '',
+    platform   TEXT NOT NULL DEFAULT '',
+    kind       TEXT NOT NULL DEFAULT 'once',
+    weekday    INTEGER,
+    date       TEXT,
+    time       TEXT,
+    status     TEXT NOT NULL DEFAULT 'active',
+    note_id    TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE CASCADE
+  )`)
+  await db.execute(`CREATE TABLE IF NOT EXISTS oshi_schedule_overrides (
+    id          TEXT PRIMARY KEY,
+    schedule_id TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'done',
+    note_id     TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (schedule_id) REFERENCES oshi_schedules(id) ON DELETE CASCADE
+  )`)
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_oshi_schedules_oshi ON oshi_schedules(oshi_id, kind)')
+  await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_overrides_unique ON oshi_schedule_overrides(schedule_id, date)')
 }
 
 async function ensureOshiProfileColumns(db: Database): Promise<void> {

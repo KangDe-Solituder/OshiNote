@@ -6,6 +6,7 @@ function deserializeOshi(row: OshiRow): Oshi {
     ...row,
     description: row.description || '',
     activity_links: JSON.parse(row.activity_links || '[]'),
+    anniversaries: JSON.parse(row.anniversaries || '[]'),
   }
 }
 
@@ -48,6 +49,7 @@ export async function updateOshi(id: string, input: UpdateOshiInput): Promise<vo
   if (input.color !== undefined) { sets.push('color = ?'); params.push(input.color) }
   if (input.description !== undefined) { sets.push('description = ?'); params.push(input.description) }
   if (input.activity_links !== undefined) { sets.push('activity_links = ?'); params.push(JSON.stringify(input.activity_links)) }
+  if (input.anniversaries !== undefined) { sets.push('anniversaries = ?'); params.push(JSON.stringify(input.anniversaries)) }
 
   if (sets.length > 0) {
     await db.execute(`UPDATE oshis SET ${sets.join(', ')} WHERE id = ?`, [...params, id])
