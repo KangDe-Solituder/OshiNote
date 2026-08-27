@@ -68,7 +68,7 @@
   border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
 }
 
-:root[data-glass="true"] input,
+:root[data-glass="true"] input:not([type='range']):not([type='color']):not([type='checkbox']),
 :root[data-glass="true"] select,
 :root[data-glass="true"] textarea {
   background-color: var(--glass-input-bg, var(--glass-bg));
