@@ -53,6 +53,21 @@
     inset 0 1px 0 var(--glass-highlight-strong, rgba(255, 255, 255, 0.38));
 }
 
+/* Glass only reads well on the outermost panel. Any bordered rounded surface nested
+   inside another one falls back to a flat divider look — no stacked blur, no contour lines. */
+:root[data-glass="true"] :is(.rounded-lg.border, .rounded-xl.border, .rounded-2xl.border) :is(.rounded-lg.border, .rounded-xl.border, .rounded-2xl.border),
+:root[data-glass="true"] :is(.rounded-lg.border, .rounded-xl.border, .rounded-2xl.border) :is(.rounded-lg.border, .rounded-xl.border, .rounded-2xl.border):hover {
+  background: color-mix(in srgb, var(--color-bg-secondary) 55%, transparent);
+  border-color: var(--color-border);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-glass="true"] :is(.rounded-lg.border, .rounded-xl.border, .rounded-2xl.border) :is(.rounded-lg.border-accent, .rounded-xl.border-accent, .rounded-2xl.border-accent) {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+}
+
 :root[data-glass="true"] input,
 :root[data-glass="true"] select,
 :root[data-glass="true"] textarea {
