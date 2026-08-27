@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
 import { Flame } from 'lucide-react'
 import type { CalendarNote, Oshi } from '../../../types'
@@ -17,7 +18,16 @@ import { fetchDailyActivity, fetchDayNotes } from '../../../features/schedule/sc
 import { toLocalDateKey } from '../../../features/schedule/scheduleModel'
 import { fetchAllOshis } from '../../../features/oshis/oshiService'
 import { SelectMenu } from '../../ui/SelectMenu'
+import { MOTION_EASING, useMotionTiming } from '../themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
+
+const CELL_LEVEL_CLASSES = [
+  'bg-bg-tertiary/45',
+  'bg-accent/25',
+  'bg-accent/45',
+  'bg-accent/70',
+  'bg-accent',
+] as const
 
 interface HoveredCell {
   cell: HeatmapCell
@@ -27,6 +37,7 @@ interface HoveredCell {
 export function RecordHeatmap() {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
+  const timing = useMotionTiming()
   const [range, setRange] = useState<HeatmapRange>('quarter')
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [activity, setActivity] = useState<Map<string, { date: string; notes: number; illustrations: number; journalPages: number }>>(new Map())
@@ -66,6 +77,7 @@ export function RecordHeatmap() {
 
   const localeTag = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US'
   const hoveredNotes = hovered ? dayNotesCache.get(hovered.cell.date) : undefined
+  const animated = timing.micro > 0
 
   return (
     <section className="rounded-2xl border border-border-color bg-bg-card p-5 shadow-e1">
@@ -93,40 +105,73 @@ export function RecordHeatmap() {
         </div>
       </div>
 
-      {range === 'year' ? (
-        <div className="overflow-x-auto pb-1">
-          <div className="inline-block">
+      <AnimatePresence mode="wait" initial={false}>
+        {range === 'year' ? (
+          <motion.div
+            key="year"
+            initial={animated ? { opacity: 0, y: 8 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: timing.micro + 0.12, ease: MOTION_EASING.enter }}
+          >
             <div className="mb-1.5 flex gap-[3px] text-[10px] leading-none text-text-muted">
               {monthLabels.map((label, index) => (
-                <span key={index} className="w-[15px] shrink-0 overflow-visible whitespace-nowrap">
+                <span key={index} className="min-w-0 flex-1 overflow-visible whitespace-nowrap">
                   {label ? new Intl.DateTimeFormat(localeTag, { month: 'short' }).format(new Date(2026, Number(label) - 1, 1)) : ''}
                 </span>
               ))}
             </div>
             <div className="flex gap-[3px]">
-              {weeks.map((week) => (
-                <div key={week[0].date} className="flex flex-col gap-[3px]">
+              {weeks.map((week, weekIndex) => (
+                <motion.div
+                  key={week[0].date}
+                  className="flex min-w-0 flex-1 flex-col gap-[3px]"
+                  initial={animated ? { opacity: 0, y: 5 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: timing.micro + 0.14, delay: Math.min(weekIndex * 0.007, 0.36), ease: MOTION_EASING.enter }}
+                >
                   {week.map((cell) => (
-                    <HeatmapDot key={cell.date} cell={cell} onEnter={handleEnter} onLeave={() => setHovered(null)} />
+                    <HeatmapDot key={cell.date} cell={cell} stretch onEnter={handleEnter} onLeave={() => setHovered(null)} />
                   ))}
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {monthRows.map((row) => (
-            <MonthStrip
-              key={row.monthKey}
-              row={row}
-              localeTag={localeTag}
-              onEnter={handleEnter}
-              onLeave={() => setHovered(null)}
-            />
-          ))}
-        </div>
-      )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key={range}
+            className="space-y-2"
+            initial={animated ? { opacity: 0, y: 8 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: timing.micro + 0.12, ease: MOTION_EASING.enter }}
+          >
+            {monthRows.map((row, rowIndex) => (
+              <motion.div
+                key={row.monthKey}
+                initial={animated ? { opacity: 0, x: -10 } : false}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: timing.micro + 0.14, delay: rowIndex * 0.055, ease: MOTION_EASING.enter }}
+              >
+                <MonthStrip
+                  row={row}
+                  localeTag={localeTag}
+                  onEnter={handleEnter}
+                  onLeave={() => setHovered(null)}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-text-muted">
+        <span>{t('heatmap.less')}</span>
+        {CELL_LEVEL_CLASSES.map((levelClass, index) => (
+          <span key={index} className={clsx('h-2.5 w-2.5 rounded-[3px]', levelClass)} />
+        ))}
+        <span>{t('heatmap.more')}</span>
+      </div>
 
       {hovered && hovered.cell.total > 0 && !hovered.cell.future && (
         <HeatmapTooltip
@@ -144,10 +189,12 @@ export function RecordHeatmap() {
 
 function HeatmapDot({
   cell,
+  stretch = false,
   onEnter,
   onLeave,
 }: {
   cell: HeatmapCell
+  stretch?: boolean
   onEnter: (cell: HeatmapCell, target: HTMLElement) => void
   onLeave: () => void
 }) {
@@ -158,10 +205,11 @@ function HeatmapDot({
       onMouseEnter={(event) => onEnter(cell, event.currentTarget)}
       onMouseLeave={onLeave}
       className={clsx(
-        'h-[15px] w-[15px] rounded-[4px] transition-transform',
-        cell.total > 0 ? 'bg-accent' : 'bg-bg-tertiary/70',
+        'rounded-[4px] transition-transform',
+        stretch ? 'h-[15px] w-full' : 'h-[15px] w-[15px]',
+        CELL_LEVEL_CLASSES[cell.level],
         cell.future && 'opacity-25',
-        cell.total > 0 && 'cursor-pointer hover:scale-125'
+        cell.total > 0 && 'cursor-pointer hover:scale-110'
       )}
     />
   )
@@ -194,7 +242,7 @@ function MonthStrip({
             onMouseLeave={onLeave}
             className={clsx(
               'h-[18px] min-w-[10px] flex-1 rounded-[4px] transition-transform',
-              cell.total > 0 ? 'bg-accent' : 'bg-bg-tertiary/70',
+              CELL_LEVEL_CLASSES[cell.level],
               cell.future && 'opacity-25',
               cell.total > 0 && 'cursor-pointer hover:scale-y-125'
             )}
