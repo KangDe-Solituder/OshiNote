@@ -142,38 +142,42 @@ function ScheduleTab({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
+      <div>
         {schedules.length === 0 && <p className="py-2 text-sm text-text-muted">{t('calendar.noSchedules')}</p>}
-        {schedules.map((schedule) => (
-          <div
-            key={schedule.id}
-            className={clsx(
-              'flex items-center gap-2.5 rounded-xl border px-3 py-2.5',
-              editingId === schedule.id ? 'border-accent bg-accent/5' : 'border-border-color bg-bg-secondary/40'
-            )}
-          >
-            <Video size={15} className="shrink-0 text-accent" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-text-primary">{schedule.title}</p>
-              <p className="text-xs text-text-muted">
-                {schedule.kind === 'weekly'
-                  ? t('calendar.everyWeek', { weekday: t(`calendar.weekday.${WEEKDAY_OPTION_KEYS[schedule.weekday ?? 0]}`) })
-                  : schedule.date}
-                {schedule.time ? ` · ${schedule.time}` : ''}
-                {schedule.platform ? ` · ${t(`calendar.platform.${schedule.platform}` as never)}` : ''}
-              </p>
-            </div>
-            <button type="button" onClick={() => onEdit(schedule)} className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-accent" title={t('common.edit')}>
-              <Pencil size={14} />
-            </button>
-            <button type="button" onClick={() => onDelete(schedule.id)} className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-red-500" title={t('common.delete')}>
-              <Trash2 size={14} />
-            </button>
+        {schedules.length > 0 && (
+          <div className="divide-y divide-border-color/50">
+            {schedules.map((schedule) => (
+              <div
+                key={schedule.id}
+                className={clsx(
+                  'group flex items-center gap-2.5 rounded-lg px-2 py-2.5 transition-colors',
+                  editingId === schedule.id ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-bg-secondary/50'
+                )}
+              >
+                <Video size={15} className="shrink-0 text-accent" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-text-primary">{schedule.title}</p>
+                  <p className="text-xs text-text-muted">
+                    {schedule.kind === 'weekly'
+                      ? t('calendar.everyWeek', { weekday: t(`calendar.weekday.${WEEKDAY_OPTION_KEYS[schedule.weekday ?? 0]}`) })
+                      : schedule.date}
+                    {schedule.time ? ` · ${schedule.time}` : ''}
+                    {schedule.platform ? ` · ${t(`calendar.platform.${schedule.platform}` as never)}` : ''}
+                  </p>
+                </div>
+                <button type="button" onClick={() => onEdit(schedule)} className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-accent" title={t('common.edit')}>
+                  <Pencil size={14} />
+                </button>
+                <button type="button" onClick={() => onDelete(schedule.id)} className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-red-500" title={t('common.delete')}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="rounded-xl border border-border-color bg-bg-secondary/25 p-3.5">
+      <div className="border-t border-border-color/60 pt-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-muted">
           {editingId ? t('calendar.editSchedule') : t('calendar.addSchedule')}
         </p>
@@ -182,7 +186,7 @@ function ScheduleTab({
             value={draft.title}
             onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
             placeholder={t('calendar.scheduleNamePlaceholder')}
-            className="rounded-lg border border-border-color bg-bg-card px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+            className="rounded-lg border border-border-color bg-transparent px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
           />
           <div className="flex flex-wrap gap-2.5">
             <SelectMenu
@@ -208,14 +212,14 @@ function ScheduleTab({
                 type="date"
                 value={draft.date || ''}
                 onChange={(event) => onDraftChange({ ...draft, date: event.target.value || null })}
-                className="h-8 rounded-lg border border-border-color bg-bg-card px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+                className="h-8 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
               />
             )}
             <input
               type="time"
               value={draft.time || ''}
               onChange={(event) => onDraftChange({ ...draft, time: event.target.value || null })}
-              className="h-8 rounded-lg border border-border-color bg-bg-card px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+              className="h-8 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
               title={t('calendar.timeOptional')}
             />
             <SelectMenu
@@ -265,37 +269,41 @@ function AnniversaryTab({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
+      <div>
         {anniversaries.length === 0 && <p className="py-2 text-sm text-text-muted">{t('calendar.noAnniversaries')}</p>}
-        {anniversaries.map((item) => (
-          <div key={item.id} className="flex items-center gap-2.5 rounded-xl border border-border-color bg-bg-secondary/40 px-3 py-2.5">
-            <Cake size={15} className={clsx('shrink-0', item.kind === 'birthday' ? 'text-amber-500' : 'text-accent')} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-text-primary">{item.label}</p>
-              <p className="text-xs text-text-muted">
-                {t('calendar.anniversaryDate', { month: item.month, day: item.day })} · {t(`calendar.anniversaryKind.${item.kind}`)}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onChange(anniversaries.filter((candidate) => candidate.id !== item.id))}
-              className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-red-500"
-              title={t('common.delete')}
-            >
-              <Trash2 size={14} />
-            </button>
+        {anniversaries.length > 0 && (
+          <div className="divide-y divide-border-color/50">
+            {anniversaries.map((item) => (
+              <div key={item.id} className="group flex items-center gap-2.5 rounded-lg px-2 py-2.5 transition-colors hover:bg-bg-secondary/50">
+                <Cake size={15} className={clsx('shrink-0', item.kind === 'birthday' ? 'text-amber-500' : 'text-accent')} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-text-primary">{item.label}</p>
+                  <p className="text-xs text-text-muted">
+                    {t('calendar.anniversaryDate', { month: item.month, day: item.day })} · {t(`calendar.anniversaryKind.${item.kind}`)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onChange(anniversaries.filter((candidate) => candidate.id !== item.id))}
+                  className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-red-500"
+                  title={t('common.delete')}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="rounded-xl border border-border-color bg-bg-secondary/25 p-3.5">
+      <div className="border-t border-border-color/60 pt-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-muted">{t('calendar.addAnniversary')}</p>
         <div className="grid gap-2.5">
           <input
             value={label}
             onChange={(event) => setLabel(event.target.value)}
             placeholder={t('calendar.anniversaryNamePlaceholder')}
-            className="rounded-lg border border-border-color bg-bg-card px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+            className="rounded-lg border border-border-color bg-transparent px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
           />
           <div className="flex flex-wrap items-center gap-2.5">
             <input
@@ -304,7 +312,7 @@ function AnniversaryTab({
               max={12}
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              className="h-8 w-20 rounded-lg border border-border-color bg-bg-card px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+              className="h-8 w-20 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
               title={t('calendar.month')}
             />
             <input
@@ -313,7 +321,7 @@ function AnniversaryTab({
               max={31}
               value={day}
               onChange={(event) => setDay(event.target.value)}
-              className="h-8 w-20 rounded-lg border border-border-color bg-bg-card px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
+              className="h-8 w-20 rounded-lg border border-border-color bg-transparent px-2.5 text-xs text-text-primary outline-none focus:ring-2 focus:ring-accent-soft"
               title={t('calendar.day')}
             />
             <SelectMenu

@@ -384,23 +384,23 @@ function DayDetail({
       transition={{ duration: timing.micro + 0.07, ease: 'easeOut' }}
       className="overflow-hidden"
     >
-      <div className="mt-3 rounded-xl border border-border-color bg-bg-secondary/35 p-3.5">
+      <div className="mt-3 rounded-xl bg-bg-secondary/35 px-3.5 py-3">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-sm font-semibold text-text-primary">{dateLabel}</p>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary" aria-label={t('common.cancel')}>
             <X size={15} />
           </button>
         </div>
-        <div className="space-y-1.5">
+        <div className="divide-y divide-border-color/40">
           {day.anniversaries.map((item) => (
-            <div key={item.id} className="flex items-center gap-2 rounded-lg bg-bg-card px-2.5 py-2 text-sm text-text-primary">
+            <div key={item.id} className="flex items-center gap-2 px-2 py-2 text-sm text-text-primary">
               <Cake size={14} className="shrink-0 text-amber-500" />
               <span className="font-medium">{item.label}</span>
               <span className="text-xs text-text-muted">{t(`calendar.anniversaryKind.${item.kind}`)}</span>
             </div>
           ))}
           {day.entries.map((entry) => (
-            <div key={`${entry.schedule.id}-${entry.date}`} className="flex items-center gap-2 rounded-lg bg-bg-card px-2.5 py-2">
+            <div key={`${entry.schedule.id}-${entry.date}`} className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-bg-secondary/50">
               <Video size={14} className="shrink-0 text-accent" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-text-primary">{entry.schedule.title || t('calendar.untitledSchedule')}</p>
@@ -445,7 +445,7 @@ function DayDetail({
               key={note.id}
               type="button"
               onClick={() => onOpenNote(note.id)}
-              className="flex w-full items-center gap-2 rounded-lg bg-bg-card px-2.5 py-2 text-left transition-colors hover:bg-bg-tertiary/60"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-bg-secondary/50"
             >
               <FileText size={14} className="shrink-0 text-accent" />
               <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{note.title || t('common.untitled')}</span>
