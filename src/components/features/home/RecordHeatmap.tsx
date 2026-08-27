@@ -38,7 +38,7 @@ export function RecordHeatmap() {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
   const timing = useMotionTiming()
-  const [range, setRange] = useState<HeatmapRange>('quarter')
+  const [range, setRange] = useState<HeatmapRange>('year')
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [activity, setActivity] = useState<Map<string, { date: string; notes: number; illustrations: number; journalPages: number }>>(new Map())
   const [dayNotesCache, setDayNotesCache] = useState<Map<string, (CalendarNote & { oshi_id: string | null })[]>>(new Map())

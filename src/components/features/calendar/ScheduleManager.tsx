@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
-import { Cake, Check, Pencil, Plus, Trash2, Video } from 'lucide-react'
-import type { Archive, Oshi, OshiAnniversary, OshiSchedule } from '../../../types'
+import { Cake, Check, Pencil, Plus, RotateCcw, Trash2, Video } from 'lucide-react'
+import type { Archive, CalendarNote, Oshi, OshiAnniversary, OshiSchedule, OshiScheduleOverride } from '../../../types'
 import { generateId } from '../../../database'
-import { createSchedule, deleteSchedule, updateSchedule, type ScheduleInput } from '../../../features/schedule/scheduleService'
+import {
+  clearOccurrenceOverride,
+  createSchedule,
+  deleteSchedule,
+  fetchCalendarNotes,
+  fetchOverrides,
+  updateSchedule,
+  type ScheduleInput,
+} from '../../../features/schedule/scheduleService'
+import { matchScheduleToNotes, toLocalDateKey } from '../../../features/schedule/scheduleModel'
 import { fetchArchivesByOshi } from '../../../features/oshis/archiveService'
 import { updateOshi } from '../../../features/oshis/oshiService'
 import { Modal } from '../../ui/Modal'
@@ -17,26 +26,26 @@ interface ScheduleManagerProps {
   open: boolean
   oshi: Oshi
   schedules: OshiSchedule[]
+  initialEditId?: string | null
   onClose: () => void
   onChanged: () => void
 }
 
 const WEEKDAY_OPTION_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
-export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: ScheduleManagerProps) {
+export function ScheduleManager({ open, oshi, schedules, initialEditId, onClose, onChanged }: ScheduleManagerProps) {
   const { t } = useI18n()
   const timing = useMotionTiming()
   const [tab, setTab] = useState<'schedules' | 'anniversaries'>('schedules')
   const [archives, setArchives] = useState<Archive[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<ScheduleInput>({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
+  const [calendarNotes, setCalendarNotes] = useState<CalendarNote[]>([])
+  const [weekOverrides, setWeekOverrides] = useState<OshiScheduleOverride[]>([])
 
-  useEffect(() => {
-    if (!open) return
-    setEditingId(null)
+  function resetDraft() {
     setDraft({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
-    fetchArchivesByOshi(oshi.id).then(setArchives).catch(() => setArchives([]))
-  }, [open, oshi.id])
+  }
 
   function startEdit(schedule: OshiSchedule) {
     setEditingId(schedule.id)
@@ -49,6 +58,42 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
       time: schedule.time,
     })
   }
+
+  useEffect(() => {
+    if (!open) return
+    resetDraft()
+    fetchArchivesByOshi(oshi.id).then(setArchives).catch(() => setArchives([]))
+    if (initialEditId) {
+      const target = schedules.find((schedule) => schedule.id === initialEditId)
+      setTab('schedules')
+      if (target) startEdit(target)
+    } else {
+      setEditingId(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, oshi.id, initialEditId])
+
+  useEffect(() => {
+    if (!open) return
+    const todayKey = toLocalDateKey(new Date())
+    const mondayOffset = (new Date().getDay() + 6) % 7
+    const monday = new Date()
+    monday.setDate(monday.getDate() - mondayOffset)
+    const weekStart = toLocalDateKey(monday)
+    const weekEnd = toLocalDateKey(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6))
+
+    const onceDates = schedules
+      .filter((schedule) => schedule.kind === 'once' && schedule.date && schedule.date <= todayKey)
+      .map((schedule) => schedule.date as string)
+    const earliest = onceDates.sort()[0]
+
+    fetchOverrides(oshi.id, weekStart, weekEnd).then(setWeekOverrides).catch(() => setWeekOverrides([]))
+    if (earliest) {
+      fetchCalendarNotes(oshi.id, earliest, todayKey).then(setCalendarNotes).catch(() => setCalendarNotes([]))
+    } else {
+      setCalendarNotes([])
+    }
+  }, [open, oshi.id, schedules])
 
   async function handleSaveSchedule() {
     const payload: ScheduleInput = {
@@ -74,6 +119,47 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
     await deleteSchedule(id)
     if (editingId === id) setEditingId(null)
     onChanged()
+  }
+
+  async function handleUndoSkip(schedule: OshiSchedule) {
+    const date = thisWeekOccurrenceDate(schedule)
+    if (!date) return
+    await clearOccurrenceOverride(schedule.id, date)
+    onChanged()
+  }
+
+  const todayKey = toLocalDateKey(new Date())
+  const notesByDay = new Map<string, CalendarNote[]>()
+  for (const note of calendarNotes) {
+    const key = note.created_at.slice(0, 10)
+    notesByDay.set(key, [...(notesByDay.get(key) || []), note])
+  }
+  // Matched or already-resolved once schedules have done their job — hide them from the list.
+  const onceList = schedules.filter((schedule) => {
+    if (schedule.kind !== 'once' || !schedule.date) return false
+    if (schedule.status !== 'active') return false
+    if (schedule.date > todayKey) return true
+    return !matchScheduleToNotes(schedule, notesByDay.get(schedule.date) || [])
+  })
+  const weeklyList = schedules.filter((schedule) => schedule.kind === 'weekly')
+  const skippedThisWeek = new Set(
+    weeklyList
+      .filter((schedule) => {
+        const date = thisWeekOccurrenceDate(schedule)
+        return date != null && weekOverrides.some((item) => item.schedule_id === schedule.id && item.date === date && item.status === 'cancelled')
+      })
+      .map((schedule) => schedule.id)
+  )
+
+  function thisWeekOccurrenceDate(schedule: OshiSchedule): string | null {
+    if (schedule.weekday == null) return null
+    const today = new Date()
+    const mondayOffset = (today.getDay() + 6) % 7
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - mondayOffset)
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + ((schedule.weekday + 6) % 7))
+    return toLocalDateKey(date)
   }
 
   async function handleAnniversariesChange(next: OshiAnniversary[]) {
@@ -109,7 +195,9 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
         >
           {tab === 'schedules' ? (
             <ScheduleTab
-              schedules={schedules}
+              weeklyList={weeklyList}
+              onceList={onceList}
+              skippedThisWeek={skippedThisWeek}
               archives={archives}
               draft={draft}
               editingId={editingId}
@@ -117,9 +205,10 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
               onSave={handleSaveSchedule}
               onEdit={startEdit}
               onDelete={handleDeleteSchedule}
+              onUndoSkip={handleUndoSkip}
               onCancelEdit={() => {
                 setEditingId(null)
-                setDraft({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
+                resetDraft()
               }}
               t={t}
             />
@@ -133,7 +222,9 @@ export function ScheduleManager({ open, oshi, schedules, onClose, onChanged }: S
 }
 
 function ScheduleTab({
-  schedules,
+  weeklyList,
+  onceList,
+  skippedThisWeek,
   archives,
   draft,
   editingId,
@@ -141,10 +232,13 @@ function ScheduleTab({
   onSave,
   onEdit,
   onDelete,
+  onUndoSkip,
   onCancelEdit,
   t,
 }: {
-  schedules: OshiSchedule[]
+  weeklyList: OshiSchedule[]
+  onceList: OshiSchedule[]
+  skippedThisWeek: Set<string>
   archives: Archive[]
   draft: ScheduleInput
   editingId: string | null
@@ -152,45 +246,76 @@ function ScheduleTab({
   onSave: () => void
   onEdit: (schedule: OshiSchedule) => void
   onDelete: (id: string) => void
+  onUndoSkip: (schedule: OshiSchedule) => void
   onCancelEdit: () => void
   t: ReturnType<typeof useI18n>['t']
 }) {
   const saveDisabled = !draft.title.trim() || (draft.kind === 'once' && !draft.date)
   const archiveName = (id: string) => archives.find((archive) => archive.id === id)?.name || ''
 
+  const renderRow = (schedule: OshiSchedule) => {
+    const skipped = skippedThisWeek.has(schedule.id)
+    return (
+      <motion.div
+        key={schedule.id}
+        layout
+        exit={{ opacity: 0, height: 0 }}
+        transition={{ duration: 0.16, ease: 'easeOut' }}
+        className={clsx(
+          'group flex items-center gap-2.5 rounded-lg px-2 py-2.5 transition-colors',
+          skipped && 'opacity-45',
+          editingId === schedule.id ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-bg-secondary/50'
+        )}
+      >
+        <Video size={15} className="shrink-0 text-accent" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-text-primary">{schedule.title}</p>
+          <p className="text-xs text-text-muted">
+            {schedule.kind === 'weekly'
+              ? t('calendar.everyWeek', { weekday: t(`calendar.weekdayFull.${WEEKDAY_OPTION_KEYS[schedule.weekday ?? 0]}`) })
+              : schedule.date}
+            {schedule.time ? ` · ${schedule.time}` : ''}
+            {schedule.archive_id ? ` · ${archiveName(schedule.archive_id)}` : ''}
+            {skipped && ` · ${t('calendar.weekSkipped')}`}
+          </p>
+        </div>
+        {skipped ? (
+          <button type="button" onClick={() => onUndoSkip(schedule)} className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-accent" title={t('calendar.undoSkip')}>
+            <RotateCcw size={14} />
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={() => onEdit(schedule)} className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-accent" title={t('common.edit')}>
+              <Pencil size={14} />
+            </button>
+            <button type="button" onClick={() => onDelete(schedule.id)} className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-red-500" title={t('common.delete')}>
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
+      </motion.div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div>
-        {schedules.length === 0 && <p className="py-2 text-sm text-text-muted">{t('calendar.noSchedules')}</p>}
-        {schedules.length > 0 && (
+        {weeklyList.length === 0 && onceList.length === 0 && <p className="py-2 text-sm text-text-muted">{t('calendar.noSchedules')}</p>}
+        {weeklyList.length > 0 && (
           <div className="divide-y divide-border-color/50">
-            {schedules.map((schedule) => (
-              <div
-                key={schedule.id}
-                className={clsx(
-                  'group flex items-center gap-2.5 rounded-lg px-2 py-2.5 transition-colors',
-                  editingId === schedule.id ? 'bg-accent/10 ring-1 ring-accent/40' : 'hover:bg-bg-secondary/50'
-                )}
-              >
-                <Video size={15} className="shrink-0 text-accent" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-text-primary">{schedule.title}</p>
-                  <p className="text-xs text-text-muted">
-                    {schedule.kind === 'weekly'
-                      ? t('calendar.everyWeek', { weekday: t(`calendar.weekdayFull.${WEEKDAY_OPTION_KEYS[schedule.weekday ?? 0]}`) })
-                      : schedule.date}
-                    {schedule.time ? ` · ${schedule.time}` : ''}
-                    {schedule.archive_id ? ` · ${archiveName(schedule.archive_id)}` : ''}
-                  </p>
-                </div>
-                <button type="button" onClick={() => onEdit(schedule)} className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-accent" title={t('common.edit')}>
-                  <Pencil size={14} />
-                </button>
-                <button type="button" onClick={() => onDelete(schedule.id)} className="rounded-lg p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-bg-tertiary hover:text-red-500" title={t('common.delete')}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+            <AnimatePresence initial={false}>
+              {weeklyList.map(renderRow)}
+            </AnimatePresence>
+          </div>
+        )}
+        {weeklyList.length > 0 && onceList.length > 0 && (
+          <div className="my-2 border-t border-border-color/60" />
+        )}
+        {onceList.length > 0 && (
+          <div className="divide-y divide-border-color/50">
+            <AnimatePresence initial={false}>
+              {onceList.map(renderRow)}
+            </AnimatePresence>
           </div>
         )}
       </div>

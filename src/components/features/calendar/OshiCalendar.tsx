@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
-import { Cake, CalendarCog, ChevronLeft, ChevronRight, Clock, FileText, Radio, RotateCcw, Video, X } from 'lucide-react'
+import { Cake, CalendarCog, ChevronLeft, ChevronRight, Clock, FileText, Pencil, Radio, Video, X } from 'lucide-react'
 import type { Archive, CalendarNote, Oshi, OshiAnniversary, OshiSchedule, OshiScheduleOverride } from '../../../types'
 import {
   addDays,
@@ -15,7 +15,7 @@ import {
   type DayScheduleEntry,
 } from '../../../features/schedule/scheduleModel'
 import {
-  clearOccurrenceOverride,
+  deleteSchedule,
   fetchCalendarNotes,
   fetchOverrides,
   fetchSchedules,
@@ -33,6 +33,7 @@ interface CalendarDayModel {
   inCurrentWeek: boolean
   notes: CalendarNote[]
   entries: DayScheduleEntry[]
+  hasSchedule: boolean
   anniversaries: OshiAnniversary[]
 }
 
@@ -50,6 +51,7 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
   const [notes, setNotes] = useState<CalendarNote[]>([])
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [managerOpen, setManagerOpen] = useState(false)
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const requestRef = useRef(0)
 
   const gridRange = useMemo(() => {
@@ -100,11 +102,14 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
         const dateKey = addDays(gridRange.startKey, week * 7 + dayIndex)
         const dayNotes = notesByDay.get(dateKey) || []
         const entries: DayScheduleEntry[] = []
+        let hasSchedule = false
         for (const schedule of schedules) {
           if (!expandOccurrences(schedule, dateKey, dateKey).length) continue
+          hasSchedule = true
           const override = overrides.find((item) => item.schedule_id === schedule.id && item.date === dateKey) || null
           const entry = resolveOccurrence(schedule, dateKey, dayNotes, override, todayKey)
-          if (entry.state !== 'cancelled') entries.push(entry)
+          // Matched occurrences yield the marker to the note itself — the note IS the record.
+          if (entry.state === 'scheduled' || entry.state === 'missed') entries.push(entry)
         }
         row.push({
           dateKey,
@@ -113,6 +118,7 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
           inCurrentWeek: getMondayKey(dateKey) === currentWeekMonday,
           notes: dayNotes,
           entries,
+          hasSchedule,
           anniversaries: getAnniversariesOnDate(oshi.anniversaries, dateKey),
         })
       }
@@ -142,9 +148,19 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
     }
   }
 
-  async function handleRestore(entry: DayScheduleEntry) {
-    await clearOccurrenceOverride(entry.schedule.id, entry.date)
-    setOverrides(await fetchOverrides(oshi.id, gridRange.startKey, gridRange.endKey))
+  async function handleSkipWeek(entry: DayScheduleEntry) {
+    if (entry.schedule.kind === 'once') {
+      await deleteSchedule(entry.schedule.id)
+      setSchedules(await fetchSchedules(oshi.id))
+    } else {
+      await persistOccurrence(entry.schedule, entry.date, 'cancelled')
+      setOverrides(await fetchOverrides(oshi.id, gridRange.startKey, gridRange.endKey))
+    }
+  }
+
+  function handleEditSchedule(entry: DayScheduleEntry) {
+    setEditingScheduleId(entry.schedule.id)
+    setManagerOpen(true)
   }
 
   const monthTitle = (() => {
@@ -193,7 +209,7 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
           <button
             type="button"
             onClick={() => setManagerOpen(true)}
-            className="ml-1 inline-flex items-center gap-1.5 rounded-lg border border-border-color bg-bg-secondary px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
+            className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-bg-secondary hover:text-accent"
           >
             <CalendarCog size={14} />
             {t('calendar.manage')}
@@ -250,7 +266,8 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
             archiveNameById={archiveNameById}
             onOpenNote={(noteId) => navigate(`/oshis/${oshi.id}/notes/${noteId}`)}
             onResolve={handleResolve}
-            onRestore={handleRestore}
+            onSkipWeek={handleSkipWeek}
+            onEditSchedule={handleEditSchedule}
             onClose={() => setSelectedDay(null)}
           />
         )}
@@ -260,7 +277,8 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
         open={managerOpen}
         oshi={oshi}
         schedules={schedules}
-        onClose={() => setManagerOpen(false)}
+        initialEditId={editingScheduleId}
+        onClose={() => { setManagerOpen(false); setEditingScheduleId(null) }}
         onChanged={async () => {
           setSchedules(await fetchSchedules(oshi.id))
           setOverrides(await fetchOverrides(oshi.id, gridRange.startKey, gridRange.endKey))
@@ -370,14 +388,16 @@ function DayDetail({
   archiveNameById,
   onOpenNote,
   onResolve,
-  onRestore,
+  onSkipWeek,
+  onEditSchedule,
   onClose,
 }: {
   day: CalendarDayModel
   archiveNameById: Map<string, string>
   onOpenNote: (noteId: string) => void
   onResolve: (entry: DayScheduleEntry, status: 'done' | 'cancelled', noteId?: string | null) => void
-  onRestore: (entry: DayScheduleEntry) => void
+  onSkipWeek: (entry: DayScheduleEntry) => void
+  onEditSchedule: (entry: DayScheduleEntry) => void
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
@@ -407,47 +427,64 @@ function DayDetail({
               <span className="text-xs text-text-muted">{t(`calendar.anniversaryKind.${item.kind}`)}</span>
             </div>
           ))}
-          {day.entries.map((entry) => (
-            <div key={`${entry.schedule.id}-${entry.date}`} className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-bg-secondary/50">
-              <Video size={14} className="shrink-0 text-accent" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-text-primary">{entry.schedule.title || t('calendar.untitledSchedule')}</p>
-                <p className="flex items-center gap-2 text-xs text-text-muted">
-                  {entry.schedule.time && <span className="inline-flex items-center gap-1"><Clock size={11} />{entry.schedule.time}</span>}
-                  {entry.schedule.archive_id && <span>{archiveNameById.get(entry.schedule.archive_id) || ''}</span>}
-                  <EntryStateLabel state={entry.state} t={t} />
-                </p>
-              </div>
-              {entry.state === 'missed' && (
+          <AnimatePresence initial={false}>
+            {day.entries.map((entry) => (
+              <motion.div
+                key={`${entry.schedule.id}-${entry.date}`}
+                layout
+                exit={timing.micro > 0 ? { opacity: 0, height: 0 } : undefined}
+                transition={{ duration: timing.micro + 0.08, ease: 'easeOut' }}
+                className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-bg-secondary/50"
+              >
+                <Video size={14} className="shrink-0 text-accent" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-text-primary">{entry.schedule.title || t('calendar.untitledSchedule')}</p>
+                  <p className="flex items-center gap-2 text-xs text-text-muted">
+                    {entry.schedule.time && <span className="inline-flex items-center gap-1"><Clock size={11} />{entry.schedule.time}</span>}
+                    {entry.schedule.archive_id && <span>{archiveNameById.get(entry.schedule.archive_id) || ''}</span>}
+                    <EntryStateLabel state={entry.state} t={t} />
+                  </p>
+                </div>
+                {entry.state === 'missed' && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onResolve(entry, 'done', entry.matchedNote?.id || day.notes[0]?.id || null)}
+                      className="rounded-md bg-accent/10 px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
+                    >
+                      {t('calendar.markDone')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onResolve(entry, 'cancelled')}
+                      className="rounded-md px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+                    >
+                      {t('calendar.markCancelled')}
+                    </button>
+                  </div>
+                )}
                 <div className="flex shrink-0 items-center gap-1">
+                  {entry.state === 'scheduled' && (
+                    <button
+                      type="button"
+                      onClick={() => onSkipWeek(entry)}
+                      className="rounded-md px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+                    >
+                      {entry.schedule.kind === 'weekly' ? t('calendar.skipWeek') : t('common.delete')}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => onResolve(entry, 'done', entry.matchedNote?.id || day.notes[0]?.id || null)}
-                    className="rounded-md bg-accent/10 px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
+                    onClick={() => onEditSchedule(entry)}
+                    className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-accent"
+                    title={t('common.edit')}
                   >
-                    {t('calendar.markDone')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onResolve(entry, 'cancelled')}
-                    className="rounded-md px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
-                  >
-                    {t('calendar.markCancelled')}
+                    <Pencil size={13} />
                   </button>
                 </div>
-              )}
-              {entry.override && (
-                <button
-                  type="button"
-                  onClick={() => onRestore(entry)}
-                  className="shrink-0 rounded-md p-1 text-text-muted transition-colors hover:bg-bg-tertiary hover:text-text-primary"
-                  title={t('calendar.restoreAuto')}
-                >
-                  <RotateCcw size={13} />
-                </button>
-              )}
-            </div>
-          ))}
+              </motion.div>
+            ))}
+          </AnimatePresence>
           {day.notes.map((note) => (
             <button
               key={note.id}
@@ -463,7 +500,7 @@ function DayDetail({
           {day.entries.length === 0 && day.notes.length === 0 && day.anniversaries.length === 0 && (
             <p className="py-1 text-sm text-text-muted">{t('calendar.emptyDay')}</p>
           )}
-          {day.entries.length === 0 && day.notes.length > 0 && (
+          {!day.hasSchedule && day.notes.length > 0 && (
             <p className="flex items-center gap-1.5 px-1 pt-1 text-xs text-text-muted">
               <Radio size={11} />
               {t('calendar.unscheduledNoteHint')}
