@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom'
 import { ImageIcon, StickyNote } from 'lucide-react'
-import type { Illustration, Note } from '../../../types'
+import type { Illustration, JournalImage, Note } from '../../../types'
 import { getAnchoredPopoverPosition } from '../../../features/journal/journalPopoverPosition'
 import { useI18n } from '../../../i18n/useI18n'
 import { MediaImage } from '../../ui/MediaImage'
@@ -8,6 +8,7 @@ import { MediaImage } from '../../ui/MediaImage'
 export type JournalResourcePreview =
   | { kind: 'note'; note: Note }
   | { kind: 'illustration'; illustration: Illustration }
+  | { kind: 'journal-image'; image: JournalImage }
 
 export interface JournalResourcePreviewAnchor {
   clientX: number
@@ -38,6 +39,8 @@ export function JournalResourceHoverPreview({ preview, anchor }: {
     >
       {preview.kind === 'illustration' ? (
         <IllustrationPreview illustration={preview.illustration} />
+      ) : preview.kind === 'journal-image' ? (
+        <JournalImagePreview image={preview.image} />
       ) : (
         <div className="flex h-full flex-col p-4">
           <div className="flex min-w-0 items-start gap-3 border-b border-border-color pb-3">
@@ -92,6 +95,25 @@ function IllustrationPreview({ illustration }: { illustration: Illustration }) {
           <p className="mt-2 line-clamp-2 text-xs leading-5 text-text-secondary">{illustration.description}</p>
         ) : null}
         <PreviewTags tags={illustration.tags} />
+      </div>
+    </div>
+  )
+}
+
+function JournalImagePreview({ image }: { image: JournalImage }) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-bg-tertiary">
+        <MediaImage
+          path={image.file_path}
+          alt={image.original_filename}
+          className="max-h-full w-full object-contain"
+          reserveHeight={false}
+          eager
+        />
+      </div>
+      <div className="shrink-0 px-4 py-3">
+        <p className="truncate text-xs text-text-muted">{image.original_filename}</p>
       </div>
     </div>
   )

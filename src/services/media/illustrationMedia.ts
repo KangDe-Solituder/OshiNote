@@ -266,7 +266,7 @@ function getImageMimeType(path: string): string {
   return 'application/octet-stream'
 }
 
-function discardCachedMediaPath(path: string): void {
+export function discardCachedMediaPath(path: string): void {
   const cached = cachedMediaByPath.get(path)
   cachedMediaByPath.delete(path)
   if (!cached || 'promise' in cached) return

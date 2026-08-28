@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { Check, ChevronLeft, ChevronRight, ImageIcon, Loader2, Search, Sparkles, StickyNote } from 'lucide-react'
 import { useMemo, useState, type PointerEvent, type ReactNode } from 'react'
-import type { Illustration, JournalMaterialKind, JournalPageOrientation, Note, StampInput } from '../../../types'
+import type { Illustration, JournalImage, JournalMaterialKind, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
 import { JOURNAL_MATERIAL_KINDS, JOURNAL_MATERIALS } from '../../../features/journal/journalMaterials'
@@ -20,6 +20,12 @@ import {
 const NOTE_PAGE_SIZE = 20
 const IMAGE_PAGE_SIZE = 20
 const MATERIAL_PAGE_SIZE = 12
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${bytes} B`
+}
 
 export function JournalNotesDrawer({ notes, loading, query, filter, page, placedIds, onQueryChange, onFilterChange, onPageChange, onPointerPlace }: {
   notes: Note[]
@@ -79,8 +85,10 @@ export function JournalNotesDrawer({ notes, loading, query, filter, page, placed
   )
 }
 
-export function JournalImagesDrawer({ illustrations, loading, query, filter, page, placedIds, onQueryChange, onFilterChange, onPageChange, onPointerPlace }: {
+export function JournalImagesDrawer({ illustrations, journalImages, placedJournalImageIds, loading, query, filter, page, placedIds, onQueryChange, onFilterChange, onPageChange, onPointerPlace }: {
   illustrations: Illustration[]
+  journalImages: JournalImage[]
+  placedJournalImageIds: Set<string>
   loading: boolean
   query: string
   filter: JournalImageFilter
@@ -121,6 +129,31 @@ export function JournalImagesDrawer({ illustrations, loading, query, filter, pag
       totalPages={totalPages}
       onPageChange={onPageChange}
     >
+      {journalImages.length > 0 && (
+        <div className="mb-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">{t('journal.localImages')}</p>
+          <div className="grid gap-2">
+            {journalImages.slice(0, 12).map((image) => (
+              <ResourceRow
+                key={image.id}
+                title={image.original_filename || t('common.untitled')}
+                meta={t('journal.localImageMeta', { size: formatFileSize(image.file_size) })}
+                tags={[]}
+                placed={placedJournalImageIds.has(image.id)}
+                payload={{ kind: 'journal-image', id: image.id }}
+                preview={{ kind: 'journal-image', image }}
+                leading={<ImageIcon size={18} />}
+                onPointerPlace={onPointerPlace}
+              />
+            ))}
+            {journalImages.length > 12 && (
+              <p className="px-1 text-[11px] text-text-muted">{t('journal.localImagesMore', { count: journalImages.length - 12 })}</p>
+            )}
+          </div>
+          <div className="my-3 border-t border-border-color/60" />
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">{t('journal.illustrationLibrary')}</p>
+        </div>
+      )}
       {loading ? <EmptyDrawerMessage>{t('common.loading')}</EmptyDrawerMessage> : pageItems.length === 0 ? <EmptyDrawerMessage>{t('journalCreate.emptyIllustrations')}</EmptyDrawerMessage> : pageItems.map((illustration) => (
         <ResourceRow
           key={illustration.id}

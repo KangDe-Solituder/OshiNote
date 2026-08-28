@@ -1,7 +1,7 @@
 import { Camera, Flower2, Heart, ImageIcon, Music2, Sparkles, Star } from 'lucide-react'
 import { useEffect, useState, type CSSProperties } from 'react'
 import clsx from 'clsx'
-import type { Illustration, JournalDraftItem, Note } from '../../../types'
+import type { Illustration, JournalDraftItem, JournalImage, Note } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
 import {
@@ -16,12 +16,14 @@ import {
 } from '../../../features/journal/journalItemStyles'
 import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
 import { asNumber, asString } from '../../../utils/safeJson'
+import { MediaImage } from '../../ui/MediaImage'
 
-export function JournalDraftItemRenderer({ item, note, illustration }: { item: JournalDraftItem; note?: Note; illustration?: Illustration }) {
+export function JournalDraftItemRenderer({ item, note, illustration, journalImage }: { item: JournalDraftItem; note?: Note; illustration?: Illustration; journalImage?: JournalImage }) {
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
   const stylePayload = getMaterialStylePayload(item.stylePayload, material?.id)
   if (item.itemType === 'note') return <DraftNoteBody item={item} note={note} />
   if (item.itemType === 'illustration') return <DraftIllustrationBody item={item} illustration={illustration} />
+  if (item.itemType === 'image') return <DraftJournalImageBody journalImage={journalImage} />
   if (material) return <DraftMaterialBody materialId={material.id} stylePayload={stylePayload} />
   return null
 }
@@ -103,6 +105,23 @@ function DraftIllustrationBody({ item, illustration }: { item: JournalDraftItem;
           <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={28} /></div>
         )}
       </div>
+    </div>
+  )
+}
+
+function DraftJournalImageBody({ journalImage }: { journalImage?: JournalImage }) {
+  if (!journalImage) {
+    return <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={28} /></div>
+  }
+  return (
+    <div className="h-full w-full overflow-hidden">
+      <MediaImage
+        path={journalImage.file_path}
+        alt={journalImage.original_filename}
+        className="h-full w-full"
+        reserveHeight={false}
+        eager
+      />
     </div>
   )
 }

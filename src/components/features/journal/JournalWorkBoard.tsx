@@ -1,8 +1,8 @@
 import { type PointerEvent, type RefObject } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
-import { FileText, Inbox, X } from 'lucide-react'
-import type { Illustration, JournalDraftItem, Note } from '../../../types'
+import { FileText, ImagePlus, Inbox, X } from 'lucide-react'
+import type { Illustration, JournalDraftItem, JournalImage, Note } from '../../../types'
 import { MediaImage } from '../../ui/MediaImage'
 import { JournalMaterialTile } from './JournalMaterialTile'
 import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
@@ -15,8 +15,11 @@ interface JournalWorkBoardProps {
   items: JournalDraftItem[]
   notesById: Map<string, Note>
   illustrationsById: Map<string, Illustration>
+  journalImagesById: Map<string, JournalImage>
   onDragStartItem: (item: JournalDraftItem, event: PointerEvent<HTMLElement>) => void
   onRemoveItem: (draftId: string) => void
+  onImportFiles: (files: FileList | File[]) => void
+  importing?: boolean
 }
 
 /**
@@ -24,7 +27,7 @@ interface JournalWorkBoardProps {
  * Collapsed to a slim edge strip by default; reveals when the pointer nears the
  * canvas top edge (handled by the canvas) and retracts when the pointer leaves.
  */
-export function JournalWorkBoard({ open, boardRef, items, notesById, illustrationsById, onDragStartItem, onRemoveItem }: JournalWorkBoardProps) {
+export function JournalWorkBoard({ open, boardRef, items, notesById, illustrationsById, journalImagesById, onDragStartItem, onRemoveItem, onImportFiles, importing }: JournalWorkBoardProps) {
   const { t } = useI18n()
   const timing = useMotionTiming()
   const animated = timing.micro > 0
@@ -44,6 +47,20 @@ export function JournalWorkBoard({ open, boardRef, items, notesById, illustratio
           {t('journal.workboard')}
           {items.length > 0 && <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{items.length}</span>}
         </div>
+        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border-color px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-accent hover:text-accent">
+          <ImagePlus size={13} />
+          {importing ? t('journal.importing') : t('journal.importImages')}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              if (event.target.files?.length) onImportFiles(event.target.files)
+              event.target.value = ''
+            }}
+          />
+        </label>
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-3">
           {items.length === 0 && (
             <p className="w-full text-center text-xs text-text-muted/70">{t('journal.workboardEmpty')}</p>
@@ -60,7 +77,7 @@ export function JournalWorkBoard({ open, boardRef, items, notesById, illustratio
                 className="group relative shrink-0 cursor-grab active:cursor-grabbing"
                 onPointerDown={(event) => onDragStartItem(item, event)}
               >
-                <BoardChip item={item} notesById={notesById} illustrationsById={illustrationsById} />
+                <BoardChip item={item} notesById={notesById} illustrationsById={illustrationsById} journalImagesById={journalImagesById} />
                 <button
                   type="button"
                   onPointerDown={(event) => event.stopPropagation()}
@@ -91,10 +108,12 @@ function BoardChip({
   item,
   notesById,
   illustrationsById,
+  journalImagesById,
 }: {
   item: JournalDraftItem
   notesById: Map<string, Note>
   illustrationsById: Map<string, Illustration>
+  journalImagesById: Map<string, JournalImage>
 }) {
   const { t } = useI18n()
   if (item.itemType === 'illustration' && item.sourceId) {
@@ -108,6 +127,22 @@ function BoardChip({
             alt={illustration.title}
             className="h-full w-full object-cover"
             reserveHeight={false}
+          />
+        )}
+      </div>
+    )
+  }
+  if (item.itemType === 'image' && item.sourceId) {
+    const image = journalImagesById.get(item.sourceId)
+    return (
+      <div className="overflow-hidden rounded-lg bg-bg-tertiary shadow-sm ring-1 ring-border-color" style={{ width: 52, height: 52 }}>
+        {image && (
+          <MediaImage
+            path={image.file_path}
+            alt={image.original_filename}
+            className="h-full w-full object-cover"
+            reserveHeight={false}
+            eager
           />
         )}
       </div>

@@ -46,6 +46,7 @@ async function runMigrations(db: Database): Promise<void> {
   await ensureJournalItemsAssetSchema(db)
   await ensureJournalItemsMaterialSchema(db)
   await ensureJournalItemsStaged(db)
+  await ensureJournalImages(db)
   await ensureScheduleTables(db)
   await rebuildNoteSearchIndex(db)
 }
@@ -403,6 +404,24 @@ async function ensureJournalItemsStaged(db: Database): Promise<void> {
   const columns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_items)')
   if (!columns.some((column) => column.name === 'staged')) {
     await db.execute('ALTER TABLE journal_items ADD COLUMN staged INTEGER NOT NULL DEFAULT 0')
+  }
+}
+
+async function ensureJournalImages(db: Database): Promise<void> {
+  await db.execute(`CREATE TABLE IF NOT EXISTS journal_images (
+    id                 TEXT PRIMARY KEY,
+    oshi_id            TEXT,
+    file_path          TEXT NOT NULL,
+    original_filename  TEXT NOT NULL DEFAULT '',
+    mime_type          TEXT NOT NULL DEFAULT 'image/png',
+    file_size          INTEGER NOT NULL DEFAULT 0,
+    width              INTEGER,
+    height             INTEGER,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  )`)
+  const itemColumns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_items)')
+  if (itemColumns.length > 0 && !itemColumns.some((column) => column.name === 'journal_image_id')) {
+    await db.execute('ALTER TABLE journal_items ADD COLUMN journal_image_id TEXT')
   }
 }
 

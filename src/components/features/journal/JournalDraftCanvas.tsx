@@ -1,6 +1,6 @@
 import { ArrowUp, ImageIcon, Inbox, Minus, Plus, RotateCcw, StickyNote, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import type { Illustration, JournalDraftItem, JournalPageOrientation, Note, StampInput } from '../../../types'
+import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { clampLayout, getJournalPageSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { getDraftItemConstraints } from '../../../features/journal/journalItemSizing'
 import { getMaterializedTemplateSlots } from '../../../features/journal/journalPageTemplates'
@@ -23,6 +23,7 @@ interface JournalDraftCanvasProps {
   items: JournalDraftItem[]
   notesById: Map<string, Note>
   illustrationsById: Map<string, Illustration>
+  journalImagesById: Map<string, JournalImage>
   selectedItemId: string | null
   zoom: number
   stamp: StampInput | null
@@ -36,6 +37,8 @@ interface JournalDraftCanvasProps {
   onDropResource: (payload: DragPayload, point: { x: number; y: number }) => void
   onStageItem: (itemId: string) => void
   onDragStartStaged: (item: JournalDraftItem, event: React.PointerEvent<HTMLElement>) => void
+  onImportFiles: (files: FileList | File[]) => void
+  importing?: boolean
   onStampPlace: (stamp: StampInput) => void
   onStampPlacementComplete: () => void
   onStampPlacementCancel: () => void
@@ -45,6 +48,7 @@ export type DragPayload =
   | { kind: 'note'; id: string }
   | { kind: 'illustration'; id: string }
   | { kind: 'material'; id: string }
+  | { kind: 'journal-image'; id: string }
   | { kind: 'staged'; id: string }
 
 export function JournalDraftCanvas({
@@ -54,6 +58,7 @@ export function JournalDraftCanvas({
   items,
   notesById,
   illustrationsById,
+  journalImagesById,
   selectedItemId,
   zoom,
   stamp,
@@ -67,6 +72,8 @@ export function JournalDraftCanvas({
   onDropResource,
   onStageItem,
   onDragStartStaged,
+  onImportFiles,
+  importing,
   onStampPlace,
   onStampPlacementComplete,
   onStampPlacementCancel,
@@ -172,8 +179,11 @@ export function JournalDraftCanvas({
         items={stagedItems}
         notesById={notesById}
         illustrationsById={illustrationsById}
+        journalImagesById={journalImagesById}
         onDragStartItem={onDragStartStaged}
         onRemoveItem={onRemoveItem}
+        onImportFiles={onImportFiles}
+        importing={importing}
       />
       <div ref={viewportRef} className="journal-canvas-viewport relative flex min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6">
       <div className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
@@ -220,6 +230,7 @@ export function JournalDraftCanvas({
               item={item}
               note={item.sourceId ? notesById.get(item.sourceId) : undefined}
               illustration={item.sourceId ? illustrationsById.get(item.sourceId) : undefined}
+              journalImage={item.sourceId ? journalImagesById.get(item.sourceId) : undefined}
               selected={item.draftId === selectedItemId}
               orientation={orientation}
               zoom={zoom}

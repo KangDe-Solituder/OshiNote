@@ -18,6 +18,7 @@ import {
 } from '../features/journal/journalDraftAdapters'
 import {
   createJournalItemForIllustration,
+  createJournalItemForImage,
   createJournalItemForMaterial,
   createJournalItemForNote,
   fetchJournalPageById,
@@ -224,6 +225,9 @@ export function JournalEditorPage() {
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'illustration' && item.sourceId) {
         const created = await createJournalItemForIllustration(activePage.id, item.sourceId, layout, staged)
+        if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
+      } else if (item.itemType === 'image' && item.sourceId) {
+        const created = await createJournalItemForImage(activePage.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'material' && item.materialId) {
         await createJournalItemForMaterial(activePage.id, item.materialId, layout, item.stylePayload, staged)

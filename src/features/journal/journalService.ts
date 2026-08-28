@@ -57,6 +57,14 @@ interface JoinedJournalItemRow extends JournalItemRow {
   illustration_archived: number | null
   illustration_created_at: string | null
   illustration_updated_at: string | null
+  journal_image_oshi_id: string | null
+  journal_image_file_path: string | null
+  journal_image_original_filename: string | null
+  journal_image_mime_type: string | null
+  journal_image_file_size: number | null
+  journal_image_width: number | null
+  journal_image_height: number | null
+  journal_image_created_at: string | null
 }
 
 export interface JournalLayoutUpdate {
@@ -281,6 +289,9 @@ export async function createJournalPageFromDraft(input: CreateJournalPageDraftIn
       } else if (item.itemType === 'illustration' && item.sourceId) {
         const created = await createJournalItemForIllustration(page.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
+      } else if (item.itemType === 'image' && item.sourceId) {
+        const created = await createJournalItemForImage(page.id, item.sourceId, layout, staged)
+        if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'material' && item.materialId) {
         await createJournalItemForMaterial(page.id, item.materialId, layout, item.stylePayload, staged)
       }
@@ -389,10 +400,19 @@ export async function fetchJournalItems(pageId: string, includeStaged = false): 
        i.favorite as illustration_favorite,
        i.archived as illustration_archived,
        i.created_at as illustration_created_at,
-       i.updated_at as illustration_updated_at
+       i.updated_at as illustration_updated_at,
+       jimg.oshi_id as journal_image_oshi_id,
+       jimg.file_path as journal_image_file_path,
+       jimg.original_filename as journal_image_original_filename,
+       jimg.mime_type as journal_image_mime_type,
+       jimg.file_size as journal_image_file_size,
+       jimg.width as journal_image_width,
+       jimg.height as journal_image_height,
+       jimg.created_at as journal_image_created_at
      FROM journal_items ji
      LEFT JOIN notes n ON n.id = ji.note_id
      LEFT JOIN illustrations i ON i.id = ji.illustration_id
+     LEFT JOIN journal_images jimg ON jimg.id = ji.journal_image_id
      WHERE ji.page_id = ?${includeStaged ? '' : ' AND ji.staged = 0'}
      ORDER BY ji.z_index ASC, ji.created_at ASC`,
     [pageId]
@@ -552,6 +572,41 @@ export async function createJournalItemForMaterial(pageId: string, materialId: s
 export async function setJournalItemStaged(id: string, staged: boolean): Promise<void> {
   const db = await getDb()
   await db.execute("UPDATE journal_items SET staged = ?, updated_at = datetime('now', 'localtime') WHERE id = ?", [staged ? 1 : 0, id])
+}
+
+export async function createJournalItemForImage(pageId: string, journalImageId: string, initialLayout?: JournalLayoutUpdate, staged = false): Promise<JournalItem> {
+  const db = await getDb()
+  const existing = await db.select<JournalItemRow[]>(
+    'SELECT * FROM journal_items WHERE page_id = ? AND journal_image_id = ?',
+    [pageId, journalImageId]
+  )
+  if (existing[0]) return deserializeItem(existing[0])
+
+  const rows = await db.select<{ count: number }[]>(
+    'SELECT COUNT(*) as count FROM journal_items WHERE page_id = ?',
+    [pageId]
+  )
+  const baseLayout = createInitialLayout(rows[0]?.count || 0)
+  const layout = initialLayout ? { ...baseLayout, ...initialLayout } : baseLayout
+  const id = generateId()
+  await db.execute(
+    `INSERT INTO journal_items
+     (id, page_id, journal_image_id, item_type, x, y, width, height, rotation, z_index, sticker_style, staged)
+     VALUES (?, ?, ?, 'image', ?, ?, ?, ?, ?, ?, 'memo', ?)`,
+    [
+      id,
+      pageId,
+      journalImageId,
+      layout.x,
+      layout.y,
+      layout.width,
+      layout.height,
+      layout.rotation,
+      layout.z_index,
+      staged ? 1 : 0,
+    ]
+  )
+  return (await fetchJournalItemById(id))!
 }
 
 export async function createJournalItemForTape(pageId: string): Promise<JournalItem> {
@@ -718,6 +773,17 @@ function deserializeJoinedItem(row: JoinedJournalItemRow): JournalItemWithNote {
       created_at: row.illustration_created_at || '',
       updated_at: row.illustration_updated_at || '',
     }) : null,
+    journal_image: row.journal_image_id && row.journal_image_file_path !== null ? {
+      id: row.journal_image_id,
+      oshi_id: row.journal_image_oshi_id,
+      file_path: row.journal_image_file_path,
+      original_filename: row.journal_image_original_filename || '',
+      mime_type: row.journal_image_mime_type || 'image/png',
+      file_size: row.journal_image_file_size || 0,
+      width: row.journal_image_width,
+      height: row.journal_image_height,
+      created_at: row.journal_image_created_at || '',
+    } : null,
   }
 }
 
@@ -774,7 +840,7 @@ function isTapeStyle(value: string): value is JournalTapeStyle {
 }
 
 function isJournalItemType(value: string): value is JournalItemType {
-  return value === 'note' || value === 'illustration' || value === 'tape' || value === 'material' || value === 'memo'
+  return value === 'note' || value === 'illustration' || value === 'tape' || value === 'material' || value === 'memo' || value === 'image'
 }
 
 function normalizeJournalItemStyle(itemType: JournalItemType, value: string): JournalItemStyle {

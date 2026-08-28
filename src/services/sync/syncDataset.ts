@@ -34,7 +34,8 @@ const TABLES: readonly TableDefinition[] = [
   { name: 'journal_books', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'description', 'cover_style', 'cover_color', 'cover_decoration', 'date_label', 'sort_order', 'created_at', 'updated_at'] },
   { name: 'journal_pages', primaryKey: 'id', columns: ['id', 'book_id', 'oshi_id', 'page_type', 'title', 'description', 'date_label', 'standalone', 'page_index', 'background', 'orientation', 'created_at', 'updated_at'] },
   { name: 'note_images', primaryKey: 'id', columns: ['id', 'note_id', 'data_url', 'sort_order', 'created_at'] },
-  { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'staged', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
+  { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'journal_image_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'staged', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
+  { name: 'journal_images', primaryKey: 'id', columns: ['id', 'oshi_id', 'file_path', 'original_filename', 'mime_type', 'file_size', 'width', 'height', 'created_at'] },
   { name: 'stamps', primaryKey: 'id', columns: ['id', 'target_type', 'target_id', 'template_id', 'template_snapshot', 'label', 'color', 'position', 'x', 'y', 'rotation', 'size', 'opacity', 'created_at', 'updated_at'] },
   { name: 'templates', primaryKey: 'id', columns: ['id', 'type', 'name', 'description', 'source', 'payload', 'hidden', 'deleted', 'created_at', 'updated_at'] },
   { name: 'oshi_schedules', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'archive_id', 'kind', 'weekday', 'date', 'time', 'status', 'note_id', 'created_at', 'updated_at'] },
@@ -116,6 +117,17 @@ export async function buildLocalSyncDataset(): Promise<LocalSyncDataset> {
         mediaHashes[localPath] = hash
         mediaJobs.set(localPath, { logicalPath: localPath, localPath, hash })
       }
+
+      if (table.name === 'journal_images' && typeof row.file_path === 'string' && row.file_path) {
+        const localPath = normalizeManagedMediaPath(row.file_path)
+        if (!(await exists(localPath, { baseDir: BaseDirectory.AppData }))) {
+          throw new Error(`Missing journal image media: ${localPath}`)
+        }
+        const bytes = new Uint8Array(await readFile(localPath, { baseDir: BaseDirectory.AppData }))
+        const hash = await sha256Bytes(bytes)
+        mediaHashes[localPath] = hash
+        mediaJobs.set(localPath, { logicalPath: localPath, localPath, hash })
+      }
     }
   }
 
@@ -147,21 +159,16 @@ export async function applySyncOperations(operations: SyncOperation[]): Promise<
 async function findSupersededIllustrationMedia(db: Database, operations: SyncOperation[]): Promise<string[]> {
   const paths = new Set<string>()
   for (const operation of operations) {
-    if (operation.table !== 'illustrations') continue
-    const rows = await db.select<{ original_path: string; thumbnail_path: string | null }[]>(
-      'SELECT original_path, thumbnail_path FROM illustrations WHERE id = ?',
-      [operation.id]
-    )
+    if (operation.table !== 'illustrations' && operation.table !== 'journal_images') continue
+    const pathColumn = operation.table === 'illustrations' ? 'original_path' : 'file_path'
+    const rows = await db.select<Record<string, string | null>[]>(`SELECT ${pathColumn} AS primary_path FROM ${operation.table} WHERE id = ?`, [operation.id])
     const existing = rows[0]
     if (!existing) continue
-    const nextOriginal = operation.operation === 'upsert' && typeof operation.value?.original_path === 'string'
-      ? operation.value.original_path
+    const nextPrimary = operation.operation === 'upsert' && typeof operation.value?.[pathColumn] === 'string'
+      ? operation.value[pathColumn] as string
       : null
-    const nextThumbnail = operation.operation === 'upsert' && typeof operation.value?.thumbnail_path === 'string'
-      ? operation.value.thumbnail_path
-      : null
-    if (existing.original_path && existing.original_path !== nextOriginal) paths.add(existing.original_path)
-    if (existing.thumbnail_path && existing.thumbnail_path !== nextThumbnail) paths.add(existing.thumbnail_path)
+    const previousPrimary = typeof existing.primary_path === 'string' ? existing.primary_path : null
+    if (previousPrimary && previousPrimary !== nextPrimary) paths.add(previousPrimary)
   }
   return Array.from(paths)
 }
@@ -271,8 +278,9 @@ function bytesToDataUrl(bytes: Uint8Array, mimeType: string): string {
 
 function normalizeManagedMediaPath(value: string): string {
   const normalized = value.replace(/\\/g, '/')
-  if (!normalized.startsWith('media/illustrations/') || normalized.includes('../') || normalized.includes(':')) {
-    throw new Error(`Invalid illustration media path: ${value}`)
+  const managed = normalized.startsWith('media/illustrations/') || normalized.startsWith('media/journal/')
+  if (!managed || normalized.includes('../') || normalized.includes(':')) {
+    throw new Error(`Invalid managed media path: ${value}`)
   }
   return normalized
 }

@@ -125,7 +125,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
       {isTape ? (
         <TapeBody item={item} />
       ) : sharedDraftItem ? (
-        <JournalDraftItemRenderer item={sharedDraftItem} note={item.note || undefined} illustration={item.illustration || undefined} />
+        <JournalDraftItemRenderer item={sharedDraftItem} note={item.note || undefined} illustration={item.illustration || undefined} journalImage={item.journal_image || undefined} />
       ) : null}
     </button>
   )

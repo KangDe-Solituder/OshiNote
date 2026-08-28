@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { useRef, type PointerEvent, type RefObject } from 'react'
-import type { Illustration, JournalDraftItem, JournalPageOrientation, Note } from '../../../types'
+import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note } from '../../../types'
 import type { JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
 import { getDraftItemConstraints } from '../../../features/journal/journalItemSizing'
@@ -21,6 +21,7 @@ export interface CanvasItemFrameProps {
   item: JournalDraftItem
   note?: Note
   illustration?: Illustration
+  journalImage?: JournalImage
   selected: boolean
   orientation: JournalPageOrientation
   zoom: number
@@ -31,7 +32,7 @@ export interface CanvasItemFrameProps {
   onStageItem?: (itemId: string) => void
 }
 
-export function CanvasItemFrame({ item, note, illustration, selected, orientation, zoom, pageRef, onSelect, onOpenDetail, onUpdateItem, onStageItem }: CanvasItemFrameProps) {
+export function CanvasItemFrame({ item, note, illustration, journalImage, selected, orientation, zoom, pageRef, onSelect, onOpenDetail, onUpdateItem, onStageItem }: CanvasItemFrameProps) {
   const dragRef = useRef<FrameDragState | null>(null)
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
   const constraints = getDraftItemConstraints(item)
@@ -99,7 +100,7 @@ export function CanvasItemFrame({ item, note, illustration, selected, orientatio
       className={clsx('absolute touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
       style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
     >
-      <JournalDraftItemRenderer item={item} note={note} illustration={illustration} />
+      <JournalDraftItemRenderer item={item} note={note} illustration={illustration} journalImage={journalImage} />
       {selected && (
         <>
           {RESIZE_HANDLES.map((handle) => (

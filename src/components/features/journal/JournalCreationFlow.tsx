@@ -5,14 +5,17 @@ import { createPortal } from 'react-dom'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../ui/Button'
 import { Modal } from '../../ui/Modal'
+import { MediaImage } from '../../ui/MediaImage'
 import { PAGE_HEADER_CLASS } from '../../layout/pageShell'
 import { useUiMotionSeconds } from '../../features/themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
-import type { Illustration, JournalDraftItem, JournalPageOrientation, Note, Oshi, Stamp, StampInput } from '../../../types'
+import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note, Oshi, Stamp, StampInput } from '../../../types'
 import { fetchAllOshis } from '../../../features/oshis/oshiService'
 import { fetchNotesByOshi } from '../../../features/notes/noteService'
 import { fetchIllustrationById, fetchIllustrations } from '../../../features/illustrations/illustrationService'
 import { createJournalPageFromDraft } from '../../../features/journal/journalService'
+import { storeJournalImage, validateJournalImageFile } from '../../../features/journal/journalImageService'
+import { fetchJournalImages } from '../../../features/journal/journalImageService'
 import { getJournalPageSize } from '../../../features/journal/journalLayout'
 import { getJournalMaterialDefinition, getMaterialSnapshot } from '../../../features/journal/journalMaterials'
 import { createImageStylePayload, createNoteCardStylePayload } from '../../../features/journal/journalItemStyles'
@@ -86,6 +89,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
+  const [journalImages, setJournalImages] = useState<JournalImage[]>([])
+  const [importingImages, setImportingImages] = useState(false)
   const [selectedOshiId, setSelectedOshiId] = useState(initialDraft?.oshiId || queryOshiId)
   const [title, setTitle] = useState(initialDraft?.title || '')
   const [dateLabel, setDateLabel] = useState(initialDraft?.dateLabel || String(new Date().getFullYear()))
@@ -149,8 +154,9 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       fetchNotesByOshi(selectedOshiId, { page: 1, pageSize: 200, archiveFilter: 'all' }),
       fetchIllustrations({ oshiId: selectedOshiId, includeArchived: false, sort: 'newest' }),
       Promise.all(initialIllustrationIdsRef.current.map((id) => fetchIllustrationById(id).catch(() => null))),
+      fetchJournalImages(selectedOshiId).catch(() => [] as JournalImage[]),
     ])
-      .then(([noteResult, illustrationRows, referencedIllustrations]) => {
+      .then(([noteResult, illustrationRows, referencedIllustrations, journalImageRows]) => {
         if (!alive) return
         const mergedIllustrations = new Map(illustrationRows.map((illustration) => [illustration.id, illustration]))
         for (const illustration of referencedIllustrations) {
@@ -158,6 +164,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         }
         setNotes(noteResult.notes)
         setIllustrations(Array.from(mergedIllustrations.values()))
+        setJournalImages(journalImageRows)
         if (editMode) return
         setItems((current) => current.filter((item) => {
           if (item.itemType === 'note') return noteResult.notes.some((note) => note.id === item.sourceId)
@@ -192,9 +199,11 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
 
   const notesById = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
   const illustrationsById = useMemo(() => new Map(illustrations.map((illustration) => [illustration.id, illustration])), [illustrations])
+  const journalImagesById = useMemo(() => new Map(journalImages.map((image) => [image.id, image])), [journalImages])
   const selectableIllustrations = useMemo(() => illustrations.filter((illustration) => !illustration.archived), [illustrations])
   const placedNoteIds = useMemo(() => new Set(items.filter((item) => item.itemType === 'note').map((item) => item.sourceId || '')), [items])
   const placedIllustrationIds = useMemo(() => new Set(items.filter((item) => item.itemType === 'illustration').map((item) => item.sourceId || '')), [items])
+  const placedJournalImageIds = useMemo(() => new Set(items.filter((item) => item.itemType === 'image').map((item) => item.sourceId || '')), [items])
   const canSubmit = Boolean(selectedOshiId) && !creating
   const drawerOpen = drawerPinned || drawerHovered
   const effectiveDrawerDock: JournalDrawerDock = narrowViewport ? 'bottom' : drawerDock
@@ -411,6 +420,18 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         rotation: 2,
       }
     }
+    if (payload.kind === 'journal-image') {
+      const image = journalImagesById.get(payload.id)
+      const scale = image?.width && image.width > 560 ? 560 / image.width : 1
+      return {
+        itemType: 'image',
+        sourceId: payload.id,
+        stylePayload: createImageStylePayload(),
+        width: Math.round((image?.width || 480) * scale),
+        height: Math.round((image?.height || 360) * scale),
+        rotation: 1,
+      }
+    }
     const material = getJournalMaterialDefinition(payload.id)
     if (!material) return null
     return {
@@ -421,6 +442,40 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       width: material.defaultWidth,
       height: material.defaultHeight,
       rotation: material.defaultRotation,
+    }
+  }
+
+  async function handleImportImages(files: FileList | File[]) {
+    const list = Array.from(files)
+    if (list.length === 0 || !selectedOshiId) return
+    setImportingImages(true)
+    try {
+      const created: JournalImage[] = []
+      for (const file of list) {
+        if (validateJournalImageFile(file)) continue
+        created.push(await storeJournalImage(file, selectedOshiId))
+      }
+      if (created.length === 0) return
+      setJournalImages((current) => [...created, ...current])
+      const newItems: JournalDraftItem[] = created.map((image, index) => {
+        const scale = image.width && image.width > 560 ? 560 / image.width : 1
+        return {
+          draftId: createDraftId(),
+          itemType: 'image',
+          sourceId: image.id,
+          stylePayload: createImageStylePayload(),
+          staged: true,
+          x: 0,
+          y: 0,
+          width: Math.round((image.width || 480) * scale),
+          height: Math.round((image.height || 360) * scale),
+          rotation: 1,
+          zIndex: Math.max(0, ...items.map((item) => item.zIndex)) + 1 + index,
+        }
+      })
+      setItems((current) => [...current, ...newItems])
+    } finally {
+      setImportingImages(false)
     }
   }
 
@@ -510,7 +565,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               <AnimatePresence mode="wait">
                 <motion.div key={step.id} initial={{ opacity: 0, x: effectiveDrawerDock === 'right' ? 10 : -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: effectiveDrawerDock === 'right' ? -10 : 10 }} transition={{ duration: motionSeconds, ease: 'easeOut' }}>
                   {step.id === 'notes' && <JournalNotesDrawer notes={notes} loading={loadingResources} query={noteQuery} filter={noteFilter} page={notePage} placedIds={placedNoteIds} onQueryChange={setNoteQuery} onFilterChange={setNoteFilter} onPageChange={setNotePage} onPointerPlace={startPointerResourceDrag} />}
-                  {step.id === 'images' && <JournalImagesDrawer illustrations={selectableIllustrations} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
+                  {step.id === 'images' && <JournalImagesDrawer illustrations={selectableIllustrations} journalImages={journalImages} placedJournalImageIds={placedJournalImageIds} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'materials' && <JournalMaterialsDrawer kind={materialKind} page={materialPage} onKindChange={setMaterialKind} onPageChange={setMaterialPage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'stamp' && <JournalStampDrawer value={stampDraft} placing={Boolean(stampPlacementDraft)} onClear={() => { setStampDraft(null); setStampPlacementDraft(null) }} onStartPlacement={setStampPlacementDraft} onCancelPlacement={() => setStampPlacementDraft(null)} />}
                   {step.id === 'review' && <JournalReviewDrawer title={title} dateLabel={dateLabel} description={description} background={background} orientation={orientation} templateId={selectedTemplateId} itemCount={items.length} stamp={stampDraft} creating={creating} canCreate={canSubmit} onCreate={handleSubmit} submitLabel={editMode ? t('journalEditor.setup.save') : t('journalCreate.create')} submittingLabel={editMode ? t('journalEditor.setup.saving') : t('journalCreate.creating')} />}
@@ -525,6 +580,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               items={items}
               notesById={notesById}
               illustrationsById={illustrationsById}
+              journalImagesById={journalImagesById}
               selectedItemId={selectedItemId}
               zoom={zoom}
               stamp={stampDraft}
@@ -538,6 +594,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               onDropResource={addDraftItem}
               onStageItem={stageExistingItem}
               onDragStartStaged={(item, event) => startPointerResourceDrag({ kind: 'staged', id: item.draftId }, event)}
+              onImportFiles={handleImportImages}
+              importing={importingImages}
               onStampPlace={setStampDraft}
               onStampPlacementComplete={() => setStampPlacementDraft(null)}
               onStampPlacementCancel={() => setStampPlacementDraft(null)}
@@ -570,12 +628,12 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
           </div>
         </div>
       </Modal>
-      <DragGhostPreview ghost={dragGhost} items={items} notesById={notesById} illustrationsById={illustrationsById} />
+      <DragGhostPreview ghost={dragGhost} items={items} notesById={notesById} illustrationsById={illustrationsById} journalImagesById={journalImagesById} />
     </div>
   )
 }
 
-function DragGhostPreview({ ghost, items, notesById, illustrationsById }: { ghost: DragGhost; items: JournalDraftItem[]; notesById: Map<string, Note>; illustrationsById: Map<string, Illustration> }) {
+function DragGhostPreview({ ghost, items, notesById, illustrationsById, journalImagesById }: { ghost: DragGhost; items: JournalDraftItem[]; notesById: Map<string, Note>; illustrationsById: Map<string, Illustration>; journalImagesById: Map<string, JournalImage> }) {
   const { t } = useI18n()
   if (!ghost) return null
   let payload = ghost.payload
@@ -584,13 +642,21 @@ function DragGhostPreview({ ghost, items, notesById, illustrationsById }: { ghos
     if (!stagedItem) return null
     payload = stagedItem.itemType === 'material'
       ? { kind: 'material', id: stagedItem.materialId || '' }
-      : { kind: stagedItem.itemType, id: stagedItem.sourceId || '' } as DragPayload
+      : stagedItem.itemType === 'image'
+        ? { kind: 'journal-image', id: stagedItem.sourceId || '' }
+        : { kind: stagedItem.itemType, id: stagedItem.sourceId || '' } as DragPayload
   }
   const style = { left: ghost.x, top: ghost.y }
   if (payload.kind === 'material') {
     const material = getJournalMaterialDefinition(payload.id)
     if (!material) return null
     return createPortal(<div className="pointer-events-none fixed z-[120] h-20 w-24 -translate-x-1/2 -translate-y-1/2 rotate-[-4deg] opacity-90 drop-shadow-xl" style={style}><JournalMaterialTile fill material={material} /></div>, document.body)
+  }
+  if (payload.kind === 'journal-image') {
+    const image = journalImagesById.get(payload.id)
+    return createPortal(<div className="pointer-events-none fixed z-[120] h-24 w-32 -translate-x-1/2 -translate-y-1/2 rotate-2 overflow-hidden rounded-xl border border-border-color bg-bg-card/95 shadow-xl" style={style}>
+      {image && <MediaImage path={image.file_path} alt={image.original_filename} className="h-full w-full object-cover" reserveHeight={false} eager />}
+    </div>, document.body)
   }
   if (payload.kind === 'illustration') {
     const illustration = illustrationsById.get(payload.id)

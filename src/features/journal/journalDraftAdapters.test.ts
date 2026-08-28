@@ -52,6 +52,8 @@ function item(overrides: Partial<JournalItemWithNote>): JournalItemWithNote {
     page_id: 'page-1',
     note_id: null,
     illustration_id: null,
+    journal_image_id: null,
+    journal_image: null,
     item_type: 'material',
     x: 10,
     y: 20,

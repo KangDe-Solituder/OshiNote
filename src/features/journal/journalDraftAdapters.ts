@@ -77,6 +77,18 @@ export function journalItemToDraftItem(item: JournalItemWithNote): JournalDraftI
     }]
   }
 
+  if (item.item_type === 'image') {
+    if (!item.journal_image_id) return []
+    return [{
+      ...base,
+      itemType: 'image',
+      sourceId: item.journal_image_id,
+      stylePayload: item.style_payload && item.style_payload !== '{}' ? item.style_payload : createImageStylePayload(),
+      width: item.width,
+      height: item.height,
+    }]
+  }
+
   return [{
     ...base,
     itemType: 'material',
@@ -105,7 +117,7 @@ export function draftItemToJournalLayout(item: JournalDraftItem): JournalLayoutU
 }
 
 export function isCompositionItem(item: JournalItemWithNote): boolean {
-  return item.item_type === 'note' || item.item_type === 'illustration' || item.item_type === 'material' || item.item_type === 'tape'
+  return item.item_type === 'note' || item.item_type === 'illustration' || item.item_type === 'material' || item.item_type === 'tape' || item.item_type === 'image'
 }
 
 function hasPayloadSection(stylePayload: string | null | undefined, key: string): boolean {

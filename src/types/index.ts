@@ -299,7 +299,7 @@ export type CardStyle = 'basic' | 'sticky' | 'bookshelf' | 'postcard'
 export type JournalStickerStyle = 'sticky' | 'memo' | 'ticket'
 export type JournalTapeStyle = 'washi' | 'grid' | 'dots' | 'stripe' | 'torn'
 export type JournalItemStyle = JournalStickerStyle | JournalTapeStyle
-export type JournalItemType = 'note' | 'illustration' | 'tape' | 'material' | 'memo'
+export type JournalItemType = 'note' | 'illustration' | 'tape' | 'material' | 'memo' | 'image'
 export type JournalMaterialKind = 'tape' | 'sticker' | 'paper' | 'label' | 'frame'
 export type JournalPageType = 'book_page' | 'postcard'
 export type JournalPageOrientation = 'portrait' | 'landscape'
@@ -342,6 +342,7 @@ export interface JournalItem {
   page_id: string
   note_id: string | null
   illustration_id: string | null
+  journal_image_id: string | null
   item_type: JournalItemType
   x: number
   y: number
@@ -360,7 +361,23 @@ export interface JournalItem {
   updated_at: string
 }
 
-export type JournalDraftItemType = 'note' | 'illustration' | 'material'
+export type JournalDraftItemType = 'note' | 'illustration' | 'material' | 'image'
+
+export interface JournalImage {
+  id: string
+  oshi_id: string | null
+  file_path: string
+  original_filename: string
+  mime_type: string
+  file_size: number
+  width: number | null
+  height: number | null
+  created_at: string
+}
+
+export interface JournalImageRow extends Omit<JournalImage, 'oshi_id'> {
+  oshi_id: string | null
+}
 
 export interface JournalDraftItem {
   draftId: string
@@ -391,6 +408,7 @@ export interface JournalItemRow extends Omit<JournalItem, 'item_type' | 'sticker
 export interface JournalItemWithNote extends JournalItem {
   note: Note | null
   illustration: Illustration | null
+  journal_image: JournalImage | null
 }
 
 export interface BackgroundFilters {

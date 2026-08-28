@@ -24,6 +24,8 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { exportAllData, type ExportFormat } from '../services/export'
 import { exportBackup, importBackup, type BackupMode } from '../services/backup'
+import { deleteJournalImage, fetchJournalImages } from '../features/journal/journalImageService'
+import type { JournalImage } from '../types'
 import {
   clearSyncCache,
   downloadAndRestoreWebDavBackup,
@@ -60,6 +62,7 @@ export function ExportPage() {
   const [done, setDone] = useState<ExportFormat | null>(null)
   const [backupAction, setBackupAction] = useState<BackupAction>(null)
   const [syncAction, setSyncAction] = useState<SyncAction>(null)
+  const [journalImageCleanupToken, setJournalImageCleanupToken] = useState(0)
   const [cacheAction, setCacheAction] = useState<'inspect' | 'clear' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [backupMessage, setBackupMessage] = useState<string | null>(null)
@@ -424,6 +427,7 @@ export function ExportPage() {
                 )}
               </div>
             </div>
+            <JournalImageCleanup changedToken={journalImageCleanupToken} onDeleted={() => setJournalImageCleanupToken((token) => token + 1)} />
           </Card>
         </section>
       )}
@@ -662,4 +666,54 @@ function conflictPreview(value: string | null): string {
   } catch {
     return value.slice(0, 180)
   }
+}
+
+/** Per-item cleanup list for images imported into the journal library. */
+function JournalImageCleanup({ changedToken, onDeleted }: { changedToken: number; onDeleted: () => void }) {
+  const { t } = useI18n()
+  const [images, setImages] = useState<JournalImage[] | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    fetchJournalImages().then((rows) => { if (alive) setImages(rows) }).catch(() => { if (alive) setImages([]) })
+    return () => { alive = false }
+  }, [changedToken])
+
+  async function handleDelete(image: JournalImage) {
+    if (!window.confirm(t('export.journalImages.deleteConfirm', { name: image.original_filename || t('common.untitled') }))) return
+    setBusyId(image.id)
+    try {
+      await deleteJournalImage(image.id)
+      setImages((current) => (current ? current.filter((row) => row.id !== image.id) : current))
+      onDeleted()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-border-color/60 pt-4">
+      <p className="text-sm font-semibold text-text-primary">{t('export.journalImages.title')}</p>
+      <p className="mt-1 text-xs text-text-muted">{t('export.journalImages.description')}</p>
+      {images === null ? (
+        <p className="mt-3 text-sm text-text-muted">{t('common.loading')}</p>
+      ) : images.length === 0 ? (
+        <p className="mt-3 text-sm text-text-muted">{t('export.journalImages.empty')}</p>
+      ) : (
+        <div className="mt-3 divide-y divide-border-color/50">
+          {images.map((image) => (
+            <div key={image.id} className="flex items-center gap-3 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{image.original_filename || t('common.untitled')}</span>
+              <span className="shrink-0 text-xs text-text-muted">{formatBytes(image.file_size)}</span>
+              <Button variant="ghost" size="sm" onClick={() => void handleDelete(image)} disabled={busyId === image.id}>
+                {busyId === image.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                {t('common.delete')}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
