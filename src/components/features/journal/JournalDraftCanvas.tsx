@@ -92,10 +92,18 @@ export function JournalDraftCanvas({
   const emptyTemplateSlots = getMaterializedTemplateSlots(templateId, orientation).filter((templateSlot) => !filledTemplateSlotIds.has(templateSlot.id))
 
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) { if (event.key === 'Escape') setDetailItemId(null) }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setDetailItemId(null)
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedItemId) {
+        const target = document.activeElement as HTMLElement | null
+        const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
+        if (!typing) removeSelectedItem(selectedItemId)
+      }
+    }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItemId])
 
   useEffect(() => {
     if (detailItemId && !canvasItems.some((item) => item.draftId === detailItemId)) setDetailItemId(null)

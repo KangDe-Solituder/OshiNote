@@ -13,7 +13,7 @@ import {
   type NoteCardStyle,
 } from '../../../features/journal/journalItemStyles'
 import { getDraftItemConstraints } from '../../../features/journal/journalItemSizing'
-import { asNumber, asString, isRecord } from '../../../utils/safeJson'
+import { asNumber, asString, isRecord, safeJsonParse } from '../../../utils/safeJson'
 import { Button } from '../../ui/Button'
 import { getItemLayout } from './journalDraftCanvasGeometry'
 
@@ -98,10 +98,16 @@ function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: Jou
   const isTape = material?.kind === 'tape'
   const isSticker = material?.kind === 'sticker'
   const isPaper = material?.kind === 'paper'
-  const paperText = isRecord(style.text) ? style.text : null
+  const noteCardRaw = (() => {
+    const parsed = safeJsonParse<Record<string, unknown>>(item.stylePayload || '{}', {}, isRecord)
+    return isRecord(parsed.noteCard) ? parsed.noteCard : null
+  })()
   function update(change: Record<string, unknown>) { updateStylePayload(item, { ...style, ...change }, onUpdateItem) }
   function updateText(key: 'title' | 'body', value: string) {
-    update({ text: { ...(paperText || {}), [key]: value } })
+    update({ noteCard: { ...(noteCardRaw || {}), [key === 'title' ? 'titleText' : 'bodyText']: value } })
+  }
+  function updateNoteCard(key: string, value: unknown) {
+    update({ noteCard: { ...(noteCardRaw || {}), [key]: value } })
   }
   return (
     <>
@@ -114,8 +120,13 @@ function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: Jou
       ]} onChange={(value) => update({ tapeStyle: value })} />}
       {isPaper && (
         <>
-          <TextField label={t('journalCreate.detail.paperTitle')} value={paperText ? asString(paperText.title) || '' : ''} onChange={(value) => updateText('title', value)} />
-          <TextAreaField label={t('journalCreate.detail.paperBody')} value={paperText ? asString(paperText.body) || '' : ''} rows={4} onChange={(value) => updateText('body', value)} />
+          <TextField label={t('journalCreate.detail.paperTitle')} value={noteCardRaw ? asString(noteCardRaw.titleText) || '' : ''} onChange={(value) => updateText('title', value)} />
+          <TextAreaField label={t('journalCreate.detail.paperBody')} value={noteCardRaw ? asString(noteCardRaw.bodyText) || '' : ''} rows={4} onChange={(value) => updateText('body', value)} />
+          <SelectField label={t('journalCreate.detail.fontFamily')} value={asString(noteCardRaw?.fontFamily) || 'sans'} options={FONT_OPTIONS} onChange={(value) => updateNoteCard('fontFamily', value)} />
+          <RangeField label={t('journalCreate.detail.fontSize')} value={asNumber(noteCardRaw?.fontSize, 13)} min={9} max={26} step={1} onChange={(value) => updateNoteCard('fontSize', value)} />
+          <RangeField label={t('journalCreate.detail.fontWeight')} value={asNumber(noteCardRaw?.fontWeight, 400)} min={300} max={800} step={100} onChange={(value) => updateNoteCard('fontWeight', value)} />
+          <RangeField label={t('journalCreate.detail.lineHeight')} value={asNumber(noteCardRaw?.lineHeight, 1.5)} min={1.1} max={1.9} step={0.05} onChange={(value) => updateNoteCard('lineHeight', value)} />
+          <ColorField label={t('journalCreate.detail.textColor')} value={asString(noteCardRaw?.textColor) || '#5a4a3f'} onChange={(value) => updateNoteCard('textColor', value)} />
         </>
       )}
       <SwatchField label={t('journalInspector.color')} value={asString(style.color) || '#d9c4ff'} colors={isTape ? TAPE_COLORS : isSticker ? STICKER_COLORS : PAPER_COLORS} onChange={(value) => update({ color: value })} />

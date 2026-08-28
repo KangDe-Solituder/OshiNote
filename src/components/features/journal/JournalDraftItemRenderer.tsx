@@ -23,7 +23,7 @@ export function JournalDraftItemRenderer({ item, note, illustration, journalImag
   const stylePayload = getMaterialStylePayload(item.stylePayload, material?.id)
   if (item.itemType === 'note') return <DraftNoteBody item={item} note={note} />
   if (item.itemType === 'illustration') return <DraftIllustrationBody item={item} illustration={illustration} />
-  if (item.itemType === 'image') return <DraftJournalImageBody journalImage={journalImage} />
+  if (item.itemType === 'image') return <DraftJournalImageBody item={item} journalImage={journalImage} />
   if (material) return <DraftMaterialBody materialId={material.id} stylePayload={stylePayload} />
   return null
 }
@@ -109,19 +109,25 @@ function DraftIllustrationBody({ item, illustration }: { item: JournalDraftItem;
   )
 }
 
-function DraftJournalImageBody({ journalImage }: { journalImage?: JournalImage }) {
+function DraftJournalImageBody({ item, journalImage }: { item: JournalDraftItem; journalImage?: JournalImage }) {
+  const imageStyle = getDraftImageItemStyle(item)
+  const imagePadding = getImagePadding(imageStyle)
+  const bottomPadding = getImageBottomPadding(imageStyle)
   if (!journalImage) {
     return <div className="flex h-full w-full items-center justify-center text-text-muted"><ImageIcon size={28} /></div>
   }
   return (
-    <div className="h-full w-full overflow-hidden">
-      <MediaImage
-        path={journalImage.file_path}
-        alt={journalImage.original_filename}
-        className="h-full w-full"
-        reserveHeight={false}
-        eager
-      />
+    <div className="h-full w-full overflow-hidden" style={getImageFrameStyle(imageStyle)}>
+      <div className="h-full w-full overflow-hidden" style={{ padding: `${imagePadding}px ${imagePadding}px ${bottomPadding}px`, borderRadius: imageStyle.radius }}>
+        <MediaImage
+          path={journalImage.file_path}
+          alt={journalImage.original_filename}
+          className="h-full w-full"
+          reserveHeight={false}
+          eager
+          imgStyle={{ objectFit: imageStyle.fit }}
+        />
+      </div>
     </div>
   )
 }
@@ -135,10 +141,16 @@ function DraftMaterialBody({ materialId, stylePayload }: { materialId: string; s
   if (material.kind === 'tape') return <TapeShape color={color} styleId={asString(stylePayload.tapeStyle) || 'washi'} extraStyle={glassStyle} />
   if (material.kind === 'paper') {
     const transparent = stylePayload.transparent === true
-    const text = isRecord(stylePayload.text) ? stylePayload.text : null
-    const title = text ? asString(text.title) || '' : ''
-    const body = text ? asString(text.body) || '' : ''
+    const noteCard = isRecord(stylePayload.noteCard) ? stylePayload.noteCard : null
+    const legacyText = isRecord(stylePayload.text) ? stylePayload.text : null
+    const title = (noteCard ? asString(noteCard.titleText) : '') || (legacyText ? asString(legacyText.title) : '') || ''
+    const body = (noteCard ? asString(noteCard.bodyText) : '') || (legacyText ? asString(legacyText.body) : '') || ''
     const hasText = Boolean(title || body)
+    const fontFamily = getFontFamily((noteCard && asString(noteCard.fontFamily)) || 'sans')
+    const fontSize = noteCard ? asNumber(noteCard.fontSize, 13) : 13
+    const fontWeight = noteCard ? asNumber(noteCard.fontWeight, 400) : 400
+    const lineHeight = noteCard ? asNumber(noteCard.lineHeight, 1.5) : 1.5
+    const textColor = (noteCard && asString(noteCard.textColor)) || (transparent ? 'var(--color-text-primary)' : '#5a4a3f')
     return (
       <span
         className={clsx('pointer-events-none relative block h-full w-full overflow-hidden', !transparent && 'border border-black/10 shadow-sm')}
@@ -146,8 +158,11 @@ function DraftMaterialBody({ materialId, stylePayload }: { materialId: string; s
       >
         {stylePayload.line === true && !transparent && !hasText && <span className="absolute inset-x-4 bottom-4 top-7 bg-[linear-gradient(transparent_21px,rgba(100,110,140,0.18)_22px)] bg-[length:100%_22px]" />}
         {hasText ? (
-          <span className="flex h-full w-full flex-col overflow-hidden px-3.5 py-2.5" style={{ color: transparent ? 'var(--color-text-primary)' : '#5a4a3f', fontSize: '0.78em', lineHeight: 1.55 }}>
-            {title && <strong className="mb-1 truncate font-semibold">{title}</strong>}
+          <span
+            className="flex h-full w-full flex-col overflow-hidden px-3.5 py-2.5"
+            style={{ color: textColor, fontFamily, fontSize, fontWeight, lineHeight }}
+          >
+            {title && <strong className="mb-1 truncate" style={{ fontWeight: Math.min(800, fontWeight + 200) }}>{title}</strong>}
             <span className="whitespace-pre-wrap break-words">{body}</span>
           </span>
         ) : transparent ? (

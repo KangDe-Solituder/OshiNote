@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import clsx from 'clsx'
 import { ImageIcon } from 'lucide-react'
 import {
@@ -16,6 +16,7 @@ interface MediaImageProps {
   reserveHeight?: boolean
   eager?: boolean
   draggable?: boolean
+  imgStyle?: CSSProperties
   onLoad?: () => void
 }
 
@@ -31,6 +32,7 @@ export function MediaImage({
   reserveHeight = true,
   eager = false,
   draggable = false,
+  imgStyle,
   onLoad,
 }: MediaImageProps) {
   const candidates = useMemo(
@@ -104,6 +106,7 @@ export function MediaImage({
       loading={eager ? 'eager' : 'lazy'}
       decoding="async"
       draggable={draggable}
+      style={imgStyle}
       ref={(el) => {
         if (el?.complete && el.naturalWidth > 0) setLoaded(true)
       }}
