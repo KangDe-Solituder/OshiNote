@@ -15,7 +15,7 @@ import {
   getMaterialStylePayload,
 } from '../../../features/journal/journalItemStyles'
 import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
-import { asNumber, asString } from '../../../utils/safeJson'
+import { asNumber, asString, isRecord } from '../../../utils/safeJson'
 import { MediaImage } from '../../ui/MediaImage'
 
 export function JournalDraftItemRenderer({ item, note, illustration, journalImage }: { item: JournalDraftItem; note?: Note; illustration?: Illustration; journalImage?: JournalImage }) {
@@ -134,9 +134,25 @@ function DraftMaterialBody({ materialId, stylePayload }: { materialId: string; s
   const glassStyle = getMaterialGlassStyle(glassStrength, color)
   if (material.kind === 'tape') return <TapeShape color={color} styleId={asString(stylePayload.tapeStyle) || 'washi'} extraStyle={glassStyle} />
   if (material.kind === 'paper') {
+    const transparent = stylePayload.transparent === true
+    const text = isRecord(stylePayload.text) ? stylePayload.text : null
+    const title = text ? asString(text.title) || '' : ''
+    const body = text ? asString(text.body) || '' : ''
+    const hasText = Boolean(title || body)
     return (
-      <span className="pointer-events-none relative block h-full w-full overflow-hidden border border-black/10 shadow-sm" style={{ backgroundColor: color, borderRadius: 10, ...glassStyle }}>
-        {stylePayload.line === true && <span className="absolute inset-x-4 bottom-4 top-7 bg-[linear-gradient(transparent_21px,rgba(100,110,140,0.18)_22px)] bg-[length:100%_22px]" />}
+      <span
+        className={clsx('pointer-events-none relative block h-full w-full overflow-hidden', !transparent && 'border border-black/10 shadow-sm')}
+        style={{ backgroundColor: transparent ? 'transparent' : color, borderRadius: 10, ...glassStyle }}
+      >
+        {stylePayload.line === true && !transparent && !hasText && <span className="absolute inset-x-4 bottom-4 top-7 bg-[linear-gradient(transparent_21px,rgba(100,110,140,0.18)_22px)] bg-[length:100%_22px]" />}
+        {hasText ? (
+          <span className="flex h-full w-full flex-col overflow-hidden px-3.5 py-2.5" style={{ color: transparent ? 'var(--color-text-primary)' : '#5a4a3f', fontSize: '0.78em', lineHeight: 1.55 }}>
+            {title && <strong className="mb-1 truncate font-semibold">{title}</strong>}
+            <span className="whitespace-pre-wrap break-words">{body}</span>
+          </span>
+        ) : transparent ? (
+          <span className="absolute inset-0 rounded-[10px] border border-dashed border-text-muted/40" />
+        ) : null}
       </span>
     )
   }

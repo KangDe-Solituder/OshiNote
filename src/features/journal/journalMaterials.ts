@@ -28,6 +28,7 @@ export const JOURNAL_MATERIALS: JournalMaterialDefinition[] = [
   material('memo-pink', 'paper', 'journalMaterials.memoPink', 170, 122, -2, { color: '#ffe3ec', line: true }),
   material('memo-blue', 'paper', 'journalMaterials.memoBlue', 170, 122, 2, { color: '#dff0ff', line: true }),
   material('memo-cream', 'paper', 'journalMaterials.memoCream', 170, 122, -3, { color: '#fff4cf', line: false }),
+  material('memo-clear', 'paper', 'journalMaterials.memoClear', 190, 132, -2, { color: 'transparent', line: false, transparent: true }),
   material('label-ticket', 'label', 'journalMaterials.labelTicket', 150, 64, -4, { color: '#f7e2b8', shape: 'ticket' }),
   material('label-date', 'label', 'journalMaterials.labelDate', 148, 58, 3, { color: '#e9f1f7', shape: 'date' }),
 ]

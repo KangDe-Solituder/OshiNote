@@ -13,7 +13,7 @@ import {
   type NoteCardStyle,
 } from '../../../features/journal/journalItemStyles'
 import { getDraftItemConstraints } from '../../../features/journal/journalItemSizing'
-import { asNumber, asString } from '../../../utils/safeJson'
+import { asNumber, asString, isRecord } from '../../../utils/safeJson'
 import { Button } from '../../ui/Button'
 import { getItemLayout } from './journalDraftCanvasGeometry'
 
@@ -40,7 +40,7 @@ export function JournalItemDetailPanel({ item, note, illustration, orientation, 
       </div>
       <div className="grid gap-4">
         {item.itemType === 'note' && <NoteDetailControls item={item} note={note} onUpdateItem={onUpdateItem} />}
-        {item.itemType === 'illustration' && <ImageDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
+        {(item.itemType === 'illustration' || item.itemType === 'image') && <ImageDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
         {item.itemType === 'material' && <MaterialDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
         <Button variant="ghost" size="sm" className="w-full text-red-500" onClick={() => onRemoveItem(item.draftId)}>
           <Trash2 size={15} />
@@ -97,7 +97,12 @@ function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: Jou
   const style = getMaterialStylePayload(item.stylePayload, item.materialId)
   const isTape = material?.kind === 'tape'
   const isSticker = material?.kind === 'sticker'
+  const isPaper = material?.kind === 'paper'
+  const paperText = isRecord(style.text) ? style.text : null
   function update(change: Record<string, unknown>) { updateStylePayload(item, { ...style, ...change }, onUpdateItem) }
+  function updateText(key: 'title' | 'body', value: string) {
+    update({ text: { ...(paperText || {}), [key]: value } })
+  }
   return (
     <>
       {isTape && <SelectField label={t('journalInspector.tapeStyle')} value={asString(style.tapeStyle) || 'washi'} options={[
@@ -107,6 +112,12 @@ function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: Jou
         { value: 'stripe', label: t('journalInspector.tape.stripe') },
         { value: 'torn', label: t('journalInspector.tape.torn') },
       ]} onChange={(value) => update({ tapeStyle: value })} />}
+      {isPaper && (
+        <>
+          <TextField label={t('journalCreate.detail.paperTitle')} value={paperText ? asString(paperText.title) || '' : ''} onChange={(value) => updateText('title', value)} />
+          <TextAreaField label={t('journalCreate.detail.paperBody')} value={paperText ? asString(paperText.body) || '' : ''} rows={4} onChange={(value) => updateText('body', value)} />
+        </>
+      )}
       <SwatchField label={t('journalInspector.color')} value={asString(style.color) || '#d9c4ff'} colors={isTape ? TAPE_COLORS : isSticker ? STICKER_COLORS : PAPER_COLORS} onChange={(value) => update({ color: value })} />
       {isSticker && (
         <>

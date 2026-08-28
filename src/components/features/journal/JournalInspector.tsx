@@ -98,7 +98,7 @@ export function JournalInspector({
       orientation))
   }
 
-  if (selectedItem.item_type === 'illustration') {
+  if (selectedItem.item_type === 'illustration' || selectedItem.item_type === 'image') {
     return (
       <aside className={variant === 'popover'
         ? 'max-h-[560px] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-4 shadow-xl'
@@ -109,7 +109,7 @@ export function JournalInspector({
             <div className="min-w-0 flex-1">
               <p className="text-xs uppercase tracking-wide text-text-muted">{t('journalInspector.selectedIllustration')}</p>
               <h3 className="mt-1 line-clamp-2 text-base font-semibold text-text-primary">
-                {selectedItem.illustration?.title || t('journalInspector.untitled')}
+                {selectedItem.illustration?.title || selectedItem.journal_image?.original_filename || t('journalInspector.untitled')}
               </h3>
             </div>
             {variant === 'popover' && onClose && (
@@ -124,7 +124,7 @@ export function JournalInspector({
             )}
           </div>
           <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-text-secondary">
-            {selectedItem.illustration?.artist ? t('common.byArtist', { artist: selectedItem.illustration.artist }) : t('journalInspector.unknownArtist')}
+            {selectedItem.item_type === 'image' ? t('journal.localImages') : selectedItem.illustration?.artist ? t('common.byArtist', { artist: selectedItem.illustration.artist }) : t('journalInspector.unknownArtist')}
           </p>
         </div>
 
