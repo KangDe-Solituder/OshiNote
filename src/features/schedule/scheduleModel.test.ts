@@ -4,6 +4,7 @@ import {
   expandOccurrences,
   getAnniversariesOnDate,
   getNextAnniversary,
+  isValidAnniversaryDate,
   matchScheduleToNotes,
   noteDateKey,
   resolveOccurrence,
@@ -119,6 +120,14 @@ describe('anniversaries', () => {
     expect(after?.daysUntil).toBe(364)
     const sameDay = getNextAnniversary(anniversaries, 'birthday', new Date(2026, 2, 5))
     expect(sameDay?.daysUntil).toBe(0)
+  })
+
+  it('rejects impossible recurring dates while allowing leap day', () => {
+    expect(isValidAnniversaryDate(2, 29)).toBe(true)
+    expect(isValidAnniversaryDate(2, 30)).toBe(false)
+    expect(isValidAnniversaryDate(4, 31)).toBe(false)
+    expect(isValidAnniversaryDate(12, 31)).toBe(true)
+    expect(isValidAnniversaryDate(0, 1)).toBe(false)
   })
 })
 

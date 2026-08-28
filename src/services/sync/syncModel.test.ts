@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { canonicalJson, diffSnapshot, emptySnapshot, mergeSnapshots, type SyncRecord } from './syncModel'
+import { canonicalJson, diffSnapshot, emptySnapshot, mergeSnapshots, SYNC_SCHEMA_VERSION, type SyncRecord } from './syncModel'
 
 describe('syncModel', () => {
+  it('advertises the schema used by schedules and journal images', () => {
+    expect(SYNC_SCHEMA_VERSION).toBe(2)
+  })
+
   it('serializes object keys deterministically', () => {
     expect(canonicalJson({ z: 1, a: { y: 2, b: 3 } })).toBe('{"a":{"b":3,"y":2},"z":1}')
   })

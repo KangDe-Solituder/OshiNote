@@ -34,8 +34,8 @@ const TABLES: readonly TableDefinition[] = [
   { name: 'journal_books', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'description', 'cover_style', 'cover_color', 'cover_decoration', 'date_label', 'sort_order', 'created_at', 'updated_at'] },
   { name: 'journal_pages', primaryKey: 'id', columns: ['id', 'book_id', 'oshi_id', 'page_type', 'title', 'description', 'date_label', 'standalone', 'page_index', 'background', 'orientation', 'created_at', 'updated_at'] },
   { name: 'note_images', primaryKey: 'id', columns: ['id', 'note_id', 'data_url', 'sort_order', 'created_at'] },
-  { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'journal_image_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'staged', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
   { name: 'journal_images', primaryKey: 'id', columns: ['id', 'oshi_id', 'file_path', 'original_filename', 'mime_type', 'file_size', 'width', 'height', 'created_at'] },
+  { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'journal_image_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'staged', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
   { name: 'stamps', primaryKey: 'id', columns: ['id', 'target_type', 'target_id', 'template_id', 'template_snapshot', 'label', 'color', 'position', 'x', 'y', 'rotation', 'size', 'opacity', 'created_at', 'updated_at'] },
   { name: 'templates', primaryKey: 'id', columns: ['id', 'type', 'name', 'description', 'source', 'payload', 'hidden', 'deleted', 'created_at', 'updated_at'] },
   { name: 'oshi_schedules', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'archive_id', 'kind', 'weekday', 'date', 'time', 'status', 'note_id', 'created_at', 'updated_at'] },
@@ -160,17 +160,47 @@ async function findSupersededIllustrationMedia(db: Database, operations: SyncOpe
   const paths = new Set<string>()
   for (const operation of operations) {
     if (operation.table !== 'illustrations' && operation.table !== 'journal_images') continue
-    const pathColumn = operation.table === 'illustrations' ? 'original_path' : 'file_path'
-    const rows = await db.select<Record<string, string | null>[]>(`SELECT ${pathColumn} AS primary_path FROM ${operation.table} WHERE id = ?`, [operation.id])
+    if (operation.table === 'illustrations') {
+      const rows = await db.select<{ original_path: string | null; thumbnail_path: string | null }[]>(
+        'SELECT original_path, thumbnail_path FROM illustrations WHERE id = ?',
+        [operation.id]
+      )
+      const existing = rows[0]
+      if (!existing) continue
+      const nextOriginal = operation.operation === 'upsert' && typeof operation.value?.original_path === 'string'
+        ? operation.value.original_path
+        : null
+      const nextThumbnail = operation.operation === 'upsert' && typeof operation.value?.thumbnail_path === 'string'
+        ? operation.value.thumbnail_path
+        : null
+      for (const path of collectSupersededIllustrationPaths(existing, { original_path: nextOriginal, thumbnail_path: nextThumbnail })) {
+        paths.add(path)
+      }
+      continue
+    }
+
+    const rows = await db.select<{ file_path: string | null }[]>(
+      'SELECT file_path FROM journal_images WHERE id = ?',
+      [operation.id]
+    )
     const existing = rows[0]
     if (!existing) continue
-    const nextPrimary = operation.operation === 'upsert' && typeof operation.value?.[pathColumn] === 'string'
-      ? operation.value[pathColumn] as string
+    const nextPath = operation.operation === 'upsert' && typeof operation.value?.file_path === 'string'
+      ? operation.value.file_path
       : null
-    const previousPrimary = typeof existing.primary_path === 'string' ? existing.primary_path : null
-    if (previousPrimary && previousPrimary !== nextPrimary) paths.add(previousPrimary)
+    if (existing.file_path && existing.file_path !== nextPath) paths.add(existing.file_path)
   }
   return Array.from(paths)
+}
+
+export function collectSupersededIllustrationPaths(
+  existing: { original_path: string | null; thumbnail_path: string | null },
+  next: { original_path: string | null; thumbnail_path: string | null }
+): string[] {
+  const paths: string[] = []
+  if (existing.original_path && existing.original_path !== next.original_path) paths.push(existing.original_path)
+  if (existing.thumbnail_path && existing.thumbnail_path !== next.thumbnail_path) paths.push(existing.thumbnail_path)
+  return paths
 }
 
 async function quarantineSupersededMedia(paths: string[]): Promise<void> {
@@ -211,7 +241,7 @@ export function incomingBlobCachePath(hash: string): string {
 async function buildUpsertStatement(operation: SyncOperation): Promise<SyncDatabaseStatement> {
   const table = TABLE_BY_NAME.get(operation.table)
   if (!table || !operation.value) throw new Error(`Unsupported sync table: ${operation.table}`)
-  const value = { ...operation.value }
+  const value = normalizeLegacySyncRecord(table.name, operation.value)
   if (table.name === 'note_images' && typeof value.data_url === 'string') {
     const blob = noteImageBlobFromOperation(operation)
     if (blob) {
@@ -234,6 +264,18 @@ async function buildUpsertStatement(operation: SyncOperation): Promise<SyncDatab
       ON CONFLICT(${table.primaryKey}) DO UPDATE SET ${updates}`,
     values: bindings,
   }
+}
+
+/** Fill columns introduced in schema 2 when applying operations written by schema 1 clients. */
+export function normalizeLegacySyncRecord(table: string, value: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...value }
+  if (table === 'oshis' && typeof normalized.anniversaries !== 'string') {
+    normalized.anniversaries = '[]'
+  }
+  if (table === 'journal_items' && typeof normalized.staged !== 'number') {
+    normalized.staged = 0
+  }
+  return normalized
 }
 
 function buildDeleteStatement(operation: SyncOperation): SyncDatabaseStatement {

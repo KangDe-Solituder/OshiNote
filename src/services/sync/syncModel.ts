@@ -1,5 +1,5 @@
 export const SYNC_PROTOCOL_VERSION = 1
-export const SYNC_SCHEMA_VERSION = 1
+export const SYNC_SCHEMA_VERSION = 2
 
 export interface SyncRecord {
   key: string

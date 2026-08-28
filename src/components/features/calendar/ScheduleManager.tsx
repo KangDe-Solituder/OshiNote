@@ -13,7 +13,7 @@ import {
   updateSchedule,
   type ScheduleInput,
 } from '../../../features/schedule/scheduleService'
-import { matchScheduleToNotes, toLocalDateKey } from '../../../features/schedule/scheduleModel'
+import { isValidAnniversaryDate, matchScheduleToNotes, toLocalDateKey } from '../../../features/schedule/scheduleModel'
 import { fetchArchivesByOshi } from '../../../features/oshis/archiveService'
 import { updateOshi } from '../../../features/oshis/oshiService'
 import { Modal } from '../../ui/Modal'
@@ -405,7 +405,7 @@ function AnniversaryTab({
   async function handleAdd() {
     const monthNum = Number(month)
     const dayNum = Number(day)
-    if (!label.trim() || monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) return
+    if (!label.trim() || !isValidAnniversaryDate(monthNum, dayNum)) return
     await onChange([...anniversaries, {
       id: generateId(),
       label: label.trim(),

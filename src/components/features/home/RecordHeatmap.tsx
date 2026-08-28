@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
 import { Flame } from 'lucide-react'
@@ -37,13 +37,18 @@ interface HoveredCell {
 export function RecordHeatmap() {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
+  const location = useLocation()
   const timing = useMotionTiming()
-  const [range, setRange] = useState<HeatmapRange>('year')
+  const initialRange = getHeatmapRangeFromSearch(location.search)
+  const [range, setRange] = useState<HeatmapRange>(initialRange)
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [activity, setActivity] = useState<Map<string, { date: string; notes: number; illustrations: number; journalPages: number }>>(new Map())
   const [dayNotesCache, setDayNotesCache] = useState<Map<string, (CalendarNote & { oshi_id: string | null })[]>>(new Map())
   const [hovered, setHovered] = useState<HoveredCell | null>(null)
+  const [selected, setSelected] = useState<HoveredCell | null>(null)
+  const sectionRef = useRef<HTMLElement>(null)
   const requestRef = useRef(0)
+  const closeTimerRef = useRef<number | null>(null)
   const todayKey = toLocalDateKey(new Date())
 
   useEffect(() => {
@@ -60,27 +65,114 @@ export function RecordHeatmap() {
       .catch(() => {})
   }, [range, todayKey])
 
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current)
+  }, [])
+
   const startKey = getRangeStartKey(range, new Date())
   const weeks = useMemo(() => buildHeatmapGrid(activity, startKey, todayKey), [activity, startKey, todayKey])
   const monthRows = useMemo(() => buildMonthRows(activity, startKey, todayKey), [activity, startKey, todayKey])
   const monthLabels = useMemo(() => getColumnMonthLabels(weeks), [weeks])
   const oshiNameById = useMemo(() => new Map(oshis.map((oshi) => [oshi.id, oshi.name])), [oshis])
 
-  function handleEnter(cell: HeatmapCell, target: HTMLElement) {
-    if (cell.total > 0 && !dayNotesCache.has(cell.date)) {
-      fetchDayNotes(cell.date)
-        .then((rows) => setDayNotesCache((current) => new Map(current).set(cell.date, rows)))
-        .catch(() => {})
+  useEffect(() => {
+    const selectedDate = new URLSearchParams(location.search).get('heatmapDate')
+    if (!selectedDate) {
+      setSelected(null)
+      return
     }
+    const cells = range === 'year' ? weeks.flat() : monthRows.flatMap((row) => row.cells)
+    const cell = cells.find((candidate) => candidate.date === selectedDate)
+    const target = sectionRef.current?.querySelector<HTMLElement>(`[data-heatmap-date="${selectedDate}"]`)
+    if (cell && target) setSelected({ cell, rect: target.getBoundingClientRect() })
+  }, [location.search, monthRows, range, weeks])
+
+  useEffect(() => {
+    if (!selected) return
+
+    function handleOutsidePointerDown(event: PointerEvent) {
+      if (!(event.target instanceof Element)) return
+      if (event.target.closest('[data-heatmap-date], [data-heatmap-tooltip]')) return
+
+      cancelClose()
+      setSelected(null)
+      setHovered(null)
+      updateSelectionUrl(null)
+    }
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown)
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
+  })
+
+  useEffect(() => {
+    if (location.hash !== '#record-heatmap') return
+    const frame = window.requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ block: 'center' }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [location.hash])
+
+  function handleEnter(cell: HeatmapCell, target: HTMLElement) {
+    if (selected) return
+    cancelClose()
+    ensureDayNotes(cell)
     setHovered({ cell, rect: target.getBoundingClientRect() })
   }
 
+  function handleSelect(cell: HeatmapCell, target: HTMLElement) {
+    if (cell.total <= 0 || cell.future) return
+    cancelClose()
+    if (selected?.cell.date === cell.date) {
+      setSelected(null)
+      setHovered(null)
+      updateSelectionUrl(null)
+      return
+    }
+    ensureDayNotes(cell)
+    setHovered(null)
+    setSelected({ cell, rect: target.getBoundingClientRect() })
+    updateSelectionUrl(cell.date)
+  }
+
+  function ensureDayNotes(cell: HeatmapCell) {
+    if (cell.total <= 0 || dayNotesCache.has(cell.date)) return
+    fetchDayNotes(cell.date)
+      .then((rows) => setDayNotesCache((current) => new Map(current).set(cell.date, rows)))
+      .catch(() => {})
+  }
+
+  function updateSelectionUrl(date: string | null) {
+    const search = new URLSearchParams(location.search)
+    if (date) {
+      search.set('heatmapDate', date)
+      search.set('heatmapRange', range)
+    } else {
+      search.delete('heatmapDate')
+      search.delete('heatmapRange')
+    }
+    navigate({ pathname: location.pathname, search: search.toString(), hash: date ? '#record-heatmap' : '' }, { replace: true })
+  }
+
+  function cancelClose() {
+    if (closeTimerRef.current === null) return
+    window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = null
+  }
+
+  function scheduleClose() {
+    if (selected) return
+    cancelClose()
+    closeTimerRef.current = window.setTimeout(() => {
+      setHovered(null)
+      closeTimerRef.current = null
+    }, 180)
+  }
+
   const localeTag = locale === 'zh' ? 'zh-CN' : locale === 'ja' ? 'ja-JP' : 'en-US'
-  const hoveredNotes = hovered ? dayNotesCache.get(hovered.cell.date) : undefined
+  const displayed = selected || hovered
+  const displayedNotes = displayed ? dayNotesCache.get(displayed.cell.date) : undefined
   const animated = timing.micro > 0
 
   return (
-    <section className="rounded-2xl border border-border-color bg-bg-card p-5 shadow-e1">
+    <section id="record-heatmap" ref={sectionRef} className="rounded-2xl border border-border-color bg-bg-card p-5 shadow-e1">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-soft/30 text-accent">
           <Flame size={16} />
@@ -92,7 +184,13 @@ export function RecordHeatmap() {
         <div className="ml-auto">
           <SelectMenu
             value={range}
-            onChange={(value) => { setRange(value as HeatmapRange); setHovered(null) }}
+            onChange={(value) => {
+              cancelClose()
+              setRange(value as HeatmapRange)
+              setHovered(null)
+              setSelected(null)
+              updateSelectionUrl(null)
+            }}
             options={[
               { value: 'month', label: t('heatmap.range.month') },
               { value: 'quarter', label: t('heatmap.range.quarter') },
@@ -131,7 +229,15 @@ export function RecordHeatmap() {
                   transition={{ duration: timing.micro + 0.14, delay: Math.min(weekIndex * 0.007, 0.36), ease: MOTION_EASING.enter }}
                 >
                   {week.map((cell) => (
-                    <HeatmapDot key={cell.date} cell={cell} stretch onEnter={handleEnter} onLeave={() => setHovered(null)} />
+                    <HeatmapDot
+                      key={cell.date}
+                      cell={cell}
+                      stretch
+                      selected={selected?.cell.date === cell.date}
+                      onEnter={handleEnter}
+                      onLeave={scheduleClose}
+                      onSelect={handleSelect}
+                    />
                   ))}
                 </motion.div>
               ))}
@@ -156,8 +262,10 @@ export function RecordHeatmap() {
                 <MonthStrip
                   row={row}
                   localeTag={localeTag}
+                  selectedDate={selected?.cell.date || null}
                   onEnter={handleEnter}
-                  onLeave={() => setHovered(null)}
+                  onLeave={scheduleClose}
+                  onSelect={handleSelect}
                 />
               </motion.div>
             ))}
@@ -173,13 +281,17 @@ export function RecordHeatmap() {
         <span>{t('heatmap.more')}</span>
       </div>
 
-      {hovered && hovered.cell.total > 0 && !hovered.cell.future && (
+      {displayed && displayed.cell.total > 0 && !displayed.cell.future && (
         <HeatmapTooltip
-          hovered={hovered}
-          notes={hoveredNotes}
+          hovered={displayed}
+          notes={displayedNotes}
           oshiNameById={oshiNameById}
           localeTag={localeTag}
-          onOpenNote={(noteId) => navigate(`/notes/${noteId}`)}
+          onOpenNote={(noteId) => navigate(`/notes/${noteId}`, {
+            state: { returnTo: `${location.pathname}${location.search}#record-heatmap` },
+          })}
+          onEnter={cancelClose}
+          onLeave={scheduleClose}
           t={t}
         />
       )}
@@ -190,26 +302,36 @@ export function RecordHeatmap() {
 function HeatmapDot({
   cell,
   stretch = false,
+  selected,
   onEnter,
   onLeave,
+  onSelect,
 }: {
   cell: HeatmapCell
   stretch?: boolean
+  selected: boolean
   onEnter: (cell: HeatmapCell, target: HTMLElement) => void
   onLeave: () => void
+  onSelect: (cell: HeatmapCell, target: HTMLElement) => void
 }) {
   return (
     <button
       type="button"
       aria-label={cell.date}
+      aria-pressed={selected}
+      data-heatmap-date={cell.date}
       onMouseEnter={(event) => onEnter(cell, event.currentTarget)}
       onMouseLeave={onLeave}
+      onFocus={(event) => onEnter(cell, event.currentTarget)}
+      onBlur={onLeave}
+      onClick={(event) => onSelect(cell, event.currentTarget)}
       className={clsx(
         'rounded-[4px] transition-transform',
         stretch ? 'h-[15px] w-full' : 'h-[15px] w-[15px]',
         CELL_LEVEL_CLASSES[cell.level],
         cell.future && 'opacity-25',
-        cell.total > 0 && 'cursor-pointer hover:scale-110'
+        cell.total > 0 && 'cursor-pointer hover:scale-110',
+        selected && 'z-10 scale-125 ring-2 ring-accent ring-offset-2 ring-offset-bg-card'
       )}
     />
   )
@@ -218,13 +340,17 @@ function HeatmapDot({
 function MonthStrip({
   row,
   localeTag,
+  selectedDate,
   onEnter,
   onLeave,
+  onSelect,
 }: {
   row: MonthRow
   localeTag: string
+  selectedDate: string | null
   onEnter: (cell: HeatmapCell, target: HTMLElement) => void
   onLeave: () => void
+  onSelect: (cell: HeatmapCell, target: HTMLElement) => void
 }) {
   const monthLabel = new Intl.DateTimeFormat(localeTag, { year: 'numeric', month: 'short' }).format(
     new Date(Number(row.monthKey.slice(0, 4)), Number(row.monthKey.slice(5, 7)) - 1, 1)
@@ -238,13 +364,19 @@ function MonthStrip({
             key={cell.date}
             type="button"
             aria-label={cell.date}
+            aria-pressed={selectedDate === cell.date}
+            data-heatmap-date={cell.date}
             onMouseEnter={(event) => onEnter(cell, event.currentTarget)}
             onMouseLeave={onLeave}
+            onFocus={(event) => onEnter(cell, event.currentTarget)}
+            onBlur={onLeave}
+            onClick={(event) => onSelect(cell, event.currentTarget)}
             className={clsx(
               'h-[24px] min-w-[10px] flex-1 rounded-[5px] transition-transform',
               CELL_LEVEL_CLASSES[cell.level],
               cell.future && 'opacity-25',
-              cell.total > 0 && 'cursor-pointer hover:scale-y-110'
+              cell.total > 0 && 'cursor-pointer hover:scale-y-110',
+              selectedDate === cell.date && 'z-10 scale-y-125 ring-2 ring-accent ring-offset-2 ring-offset-bg-card'
             )}
           />
         ))}
@@ -259,6 +391,8 @@ function HeatmapTooltip({
   oshiNameById,
   localeTag,
   onOpenNote,
+  onEnter,
+  onLeave,
   t,
 }: {
   hovered: HoveredCell
@@ -266,6 +400,8 @@ function HeatmapTooltip({
   oshiNameById: Map<string, string>
   localeTag: string
   onOpenNote: (noteId: string) => void
+  onEnter: () => void
+  onLeave: () => void
   t: ReturnType<typeof useI18n>['t']
 }) {
   const { cell, rect } = hovered
@@ -282,8 +418,15 @@ function HeatmapTooltip({
 
   const tooltip = (
     <div
+      data-heatmap-tooltip
       className="pointer-events-auto fixed z-[90] rounded-xl border border-border-color bg-bg-primary p-3 text-xs shadow-e2"
       style={{ left, transform: 'translateX(-50%)', width, ...position }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onFocusCapture={onEnter}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onLeave()
+      }}
     >
       <p className="mb-1 font-semibold text-text-primary">{dateLabel}</p>
       <p className="text-text-secondary">
@@ -310,4 +453,9 @@ function HeatmapTooltip({
   )
 
   return createPortal(tooltip, document.body)
+}
+
+function getHeatmapRangeFromSearch(search: string): HeatmapRange {
+  const value = new URLSearchParams(search).get('heatmapRange')
+  return value === 'month' || value === 'quarter' || value === 'year' ? value : 'year'
 }

@@ -1,27 +1,30 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './components/features/themes/ThemeProvider'
 import { MotionProvider } from './components/features/themes/MotionProvider'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { PageLoadingState } from './components/ui/PageLoadingState'
 import { MainLayout } from './components/layout/MainLayout'
-import { HomePage } from './pages/HomePage'
-import { OshiListPage } from './pages/OshiListPage'
-import { OshiDetailPage } from './pages/OshiDetailPage'
-import { OshiOverviewPage } from './pages/OshiOverviewPage'
-import { JournalHomePage } from './pages/JournalHomePage'
-import { JournalEditorPage } from './pages/JournalEditorPage'
-import { OshiTagsPage } from './pages/OshiTagsPage'
-import { NoteEditorPage } from './pages/NoteEditorPage'
-import { TagsPage } from './pages/TagsPage'
-import { TagDetailPage } from './pages/TagDetailPage'
-import { ExportPage } from './pages/ExportPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { NotesPage } from './pages/NotesPage'
-import { OshiIllustrationsPage } from './pages/OshiIllustrationsPage'
-import { IllustrationsPage } from './pages/IllustrationsPage'
-import { ResourcesPage } from './pages/ResourcesPage'
-import { ResourceTemplatesPage } from './pages/ResourceTemplatesPage'
-import { ResourceMaterialsPage } from './pages/ResourceMaterialsPage'
 import { UpdateNotifier } from './components/features/update/UpdateNotifier'
+
+const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })))
+const OshiListPage = lazy(() => import('./pages/OshiListPage').then((module) => ({ default: module.OshiListPage })))
+const OshiDetailPage = lazy(() => import('./pages/OshiDetailPage').then((module) => ({ default: module.OshiDetailPage })))
+const OshiOverviewPage = lazy(() => import('./pages/OshiOverviewPage').then((module) => ({ default: module.OshiOverviewPage })))
+const JournalHomePage = lazy(() => import('./pages/JournalHomePage').then((module) => ({ default: module.JournalHomePage })))
+const JournalEditorPage = lazy(() => import('./pages/JournalEditorPage').then((module) => ({ default: module.JournalEditorPage })))
+const OshiTagsPage = lazy(() => import('./pages/OshiTagsPage').then((module) => ({ default: module.OshiTagsPage })))
+const NoteEditorPage = lazy(() => import('./pages/NoteEditorPage').then((module) => ({ default: module.NoteEditorPage })))
+const TagsPage = lazy(() => import('./pages/TagsPage').then((module) => ({ default: module.TagsPage })))
+const TagDetailPage = lazy(() => import('./pages/TagDetailPage').then((module) => ({ default: module.TagDetailPage })))
+const ExportPage = lazy(() => import('./pages/ExportPage').then((module) => ({ default: module.ExportPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const NotesPage = lazy(() => import('./pages/NotesPage').then((module) => ({ default: module.NotesPage })))
+const OshiIllustrationsPage = lazy(() => import('./pages/OshiIllustrationsPage').then((module) => ({ default: module.OshiIllustrationsPage })))
+const IllustrationsPage = lazy(() => import('./pages/IllustrationsPage').then((module) => ({ default: module.IllustrationsPage })))
+const ResourcesPage = lazy(() => import('./pages/ResourcesPage').then((module) => ({ default: module.ResourcesPage })))
+const ResourceTemplatesPage = lazy(() => import('./pages/ResourceTemplatesPage').then((module) => ({ default: module.ResourceTemplatesPage })))
+const ResourceMaterialsPage = lazy(() => import('./pages/ResourceMaterialsPage').then((module) => ({ default: module.ResourceMaterialsPage })))
 
 export default function App() {
   return (
@@ -30,6 +33,7 @@ export default function App() {
         <BrowserRouter>
           <UpdateNotifier />
           <ErrorBoundary>
+            <Suspense fallback={<PageLoadingState label="Loading page" layout="detail" className="p-6" />}>
             <Routes>
               <Route element={<MainLayout />}>
               <Route index element={<HomePage />} />
@@ -58,6 +62,7 @@ export default function App() {
               <Route path="settings" element={<SettingsPage />} />
             </Route>
             </Routes>
+            </Suspense>
           </ErrorBoundary>
         </BrowserRouter>
       </MotionProvider>

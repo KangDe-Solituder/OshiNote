@@ -59,6 +59,7 @@ export async function updateOshi(id: string, input: UpdateOshiInput): Promise<vo
 export async function deleteOshi(id: string): Promise<void> {
   const db = await getDb()
   await db.execute("UPDATE notes SET oshi_id = NULL, archive_id = NULL, updated_at = datetime('now', 'localtime') WHERE oshi_id = ?", [id])
+  await db.execute('UPDATE journal_images SET oshi_id = NULL WHERE oshi_id = ?', [id])
   await db.execute('DELETE FROM archives WHERE oshi_id = ?', [id])
   await db.execute('DELETE FROM oshis WHERE id = ?', [id])
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
 import {
   ArrowLeft,
@@ -44,7 +44,10 @@ export function NoteEditorPage() {
   const { t } = useI18n()
   const { oshiId, noteId } = useParams<{ oshiId: string; noteId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const isNew = !noteId || noteId === 'new'
+  const defaultBackTo = oshiId ? `/oshis/${oshiId}/notes` : '/notes'
+  const backTo = getSafeReturnTo(location.state) || defaultBackTo
 
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState<string[]>([])
@@ -149,7 +152,10 @@ export function NoteEditorPage() {
         await replaceNoteImages(newNote.id, images)
         await persistStampForNote(newNote.id)
         markSaved()
-        navigate(selectedOshiId ? `/oshis/${selectedOshiId}/notes/${newNote.id}` : `/notes/${newNote.id}`, { replace: true })
+        navigate(selectedOshiId ? `/oshis/${selectedOshiId}/notes/${newNote.id}` : `/notes/${newNote.id}`, {
+          replace: true,
+          state: location.state,
+        })
       } else if (note) {
         await updateNote(note.id, {
           title: title || 'Untitled',
@@ -194,7 +200,7 @@ export function NoteEditorPage() {
     if (!note) return
     if (!confirm('Delete this note?')) return
     await deleteNote(note.id)
-    navigate(oshiId ? `/oshis/${oshiId}/notes` : '/notes')
+    navigate(backTo)
   }
 
   async function handleToggleFavorite() {
@@ -324,7 +330,7 @@ export function NoteEditorPage() {
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
       <header className={`${PAGE_HEADER_CLASS} gap-4`}>
         <Link
-          to={oshiId ? `/oshis/${oshiId}/notes` : '/notes'}
+          to={backTo}
           className="rounded-lg p-2 text-text-muted transition-colors hover:bg-bg-secondary hover:text-text-primary"
           title="Back"
         >
@@ -544,6 +550,12 @@ function MetaChip({ icon, label }: { icon: React.ReactNode; label: string }) {
       <span className="truncate">{label}</span>
     </span>
   )
+}
+
+function getSafeReturnTo(state: unknown): string | null {
+  if (!state || typeof state !== 'object') return null
+  const returnTo = (state as { returnTo?: unknown }).returnTo
+  return typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null
 }
 
 interface DetailsPanelProps {

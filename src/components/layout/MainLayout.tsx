@@ -99,22 +99,28 @@ function RouteView({
     <motion.div
       ref={scrollRef}
       className="absolute inset-0 z-10 overflow-y-auto overflow-x-hidden bg-bg-primary"
-      initial={animateRoute ? { opacity: 0, y: timing.routeOffset } : false}
+      initial={animateRoute ? { opacity: 0, y: timing.routeOffset, scale: 0.996 } : false}
       animate={{
         opacity: 1,
         y: 0,
+        scale: 1,
         transition: {
           opacity: { duration: timing.routeEnter, ease: MOTION_EASING.enter },
           y: { duration: timing.routeEnter, ease: MOTION_EASING.enter },
+          scale: { duration: timing.routeEnter, ease: MOTION_EASING.enter },
         },
       }}
       exit={animateRoute ? {
         opacity: 0,
+        y: -Math.max(2, timing.routeOffset * 0.4),
+        scale: 0.998,
         transition: {
           opacity: { duration: timing.routeExit, ease: MOTION_EASING.exit },
+          y: { duration: timing.routeExit, ease: MOTION_EASING.exit },
+          scale: { duration: timing.routeExit, ease: MOTION_EASING.exit },
         },
       } : undefined}
-      style={{ contain: 'layout paint', backfaceVisibility: 'hidden' }}
+      style={{ contain: 'layout paint', backfaceVisibility: 'hidden', willChange: animateRoute ? 'opacity, transform' : 'auto' }}
     >
       {children}
     </motion.div>

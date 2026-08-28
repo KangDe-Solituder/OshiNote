@@ -48,11 +48,20 @@ export async function storeJournalImage(file: File, oshiId: string | null): Prom
   await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData })
   const dimensions = await readImageDimensions(file)
 
-  await db.execute(
-    `INSERT INTO journal_images (id, oshi_id, file_path, original_filename, mime_type, file_size, width, height)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, oshiId, filePath, file.name, file.type || 'image/png', file.size, dimensions.width, dimensions.height]
-  )
+  try {
+    await db.execute(
+      `INSERT INTO journal_images (id, oshi_id, file_path, original_filename, mime_type, file_size, width, height)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, oshiId, filePath, file.name, file.type || 'image/png', file.size, dimensions.width, dimensions.height]
+    )
+  } catch (error) {
+    try {
+      await remove(filePath, { baseDir: BaseDirectory.AppData })
+    } catch {
+      // Preserve the database error; orphan cleanup can handle a failed compensating delete.
+    }
+    throw error
+  }
   return (await getJournalImageById(id))!
 }
 

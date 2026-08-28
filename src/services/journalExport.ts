@@ -1,7 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { writeFile } from '@tauri-apps/plugin-fs'
 import { save } from '@tauri-apps/plugin-dialog'
-import { domToPng } from 'modern-screenshot'
 import type { JournalItemWithNote, JournalPage, Stamp } from '../types'
 import { getJournalCanvasSize } from '../features/journal/journalLayout'
 
@@ -42,6 +41,7 @@ export async function exportJournalPageImage(page: JournalPage, items: JournalIt
   document.body.appendChild(host)
 
   try {
+    const { domToPng } = await import('modern-screenshot')
     const dataUrl = await domToPng(clone, {
       scale: 2,
       backgroundColor: undefined,

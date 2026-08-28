@@ -417,11 +417,120 @@ async function ensureJournalImages(db: Database): Promise<void> {
     file_size          INTEGER NOT NULL DEFAULT 0,
     width              INTEGER,
     height             INTEGER,
-    created_at         TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at         TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE SET NULL
   )`)
+  await ensureJournalImageOwnershipForeignKey(db)
+
   const itemColumns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_items)')
   if (itemColumns.length > 0 && !itemColumns.some((column) => column.name === 'journal_image_id')) {
-    await db.execute('ALTER TABLE journal_items ADD COLUMN journal_image_id TEXT')
+    await db.execute('ALTER TABLE journal_items ADD COLUMN journal_image_id TEXT REFERENCES journal_images(id) ON DELETE CASCADE')
+  }
+  await ensureJournalItemImageForeignKey(db)
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_images_oshi ON journal_images(oshi_id)')
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_items_journal_image ON journal_items(journal_image_id)')
+  await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_items_page_journal_image ON journal_items(page_id, journal_image_id)')
+}
+
+interface ForeignKeyInfo {
+  table: string
+  from: string
+  on_delete: string
+}
+
+async function ensureJournalImageOwnershipForeignKey(db: Database): Promise<void> {
+  const foreignKeys = await db.select<ForeignKeyInfo[]>('PRAGMA foreign_key_list(journal_images)')
+  const hasOwnershipForeignKey = foreignKeys.some((key) => (
+    key.table === 'oshis' && key.from === 'oshi_id' && key.on_delete.toUpperCase() === 'SET NULL'
+  ))
+  if (hasOwnershipForeignKey) return
+
+  await db.execute('PRAGMA foreign_keys = OFF')
+  try {
+    await db.execute('DROP TABLE IF EXISTS journal_images_v2')
+    await db.execute(`CREATE TABLE journal_images_v2 (
+      id                 TEXT PRIMARY KEY,
+      oshi_id            TEXT,
+      file_path          TEXT NOT NULL,
+      original_filename  TEXT NOT NULL DEFAULT '',
+      mime_type          TEXT NOT NULL DEFAULT 'image/png',
+      file_size          INTEGER NOT NULL DEFAULT 0,
+      width              INTEGER,
+      height             INTEGER,
+      created_at         TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (oshi_id) REFERENCES oshis(id) ON DELETE SET NULL
+    )`)
+    await db.execute(`INSERT INTO journal_images_v2
+      (id, oshi_id, file_path, original_filename, mime_type, file_size, width, height, created_at)
+      SELECT id,
+             CASE WHEN oshi_id IS NULL OR EXISTS (SELECT 1 FROM oshis WHERE oshis.id = journal_images.oshi_id) THEN oshi_id ELSE NULL END,
+             file_path, original_filename, mime_type, file_size, width, height, created_at
+      FROM journal_images`)
+    await db.execute('DROP TABLE journal_images')
+    await db.execute('ALTER TABLE journal_images_v2 RENAME TO journal_images')
+  } finally {
+    await db.execute('PRAGMA foreign_keys = ON')
+  }
+}
+
+async function ensureJournalItemImageForeignKey(db: Database): Promise<void> {
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(journal_items)')
+  if (!columns.some((column) => column.name === 'journal_image_id')) return
+  const foreignKeys = await db.select<ForeignKeyInfo[]>('PRAGMA foreign_key_list(journal_items)')
+  const hasImageForeignKey = foreignKeys.some((key) => (
+    key.table === 'journal_images' && key.from === 'journal_image_id' && key.on_delete.toUpperCase() === 'CASCADE'
+  ))
+  if (hasImageForeignKey) return
+
+  await db.execute('PRAGMA foreign_keys = OFF')
+  try {
+    await db.execute('DROP TABLE IF EXISTS journal_items_v3')
+    await db.execute(`CREATE TABLE journal_items_v3 (
+      id                TEXT PRIMARY KEY,
+      page_id           TEXT NOT NULL,
+      note_id           TEXT,
+      illustration_id   TEXT,
+      journal_image_id  TEXT,
+      item_type         TEXT NOT NULL DEFAULT 'note',
+      x                 REAL NOT NULL DEFAULT 0,
+      y                 REAL NOT NULL DEFAULT 0,
+      width             REAL NOT NULL DEFAULT 240,
+      height            REAL NOT NULL DEFAULT 180,
+      rotation          REAL NOT NULL DEFAULT 0,
+      z_index           INTEGER NOT NULL DEFAULT 0,
+      staged            INTEGER NOT NULL DEFAULT 0,
+      sticker_style     TEXT NOT NULL DEFAULT 'sticky',
+      color             TEXT,
+      border_style      TEXT,
+      material_id       TEXT,
+      material_snapshot TEXT NOT NULL DEFAULT '{}',
+      style_payload     TEXT NOT NULL DEFAULT '{}',
+      created_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (page_id) REFERENCES journal_pages(id) ON DELETE CASCADE,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+      FOREIGN KEY (illustration_id) REFERENCES illustrations(id) ON DELETE CASCADE,
+      FOREIGN KEY (journal_image_id) REFERENCES journal_images(id) ON DELETE CASCADE
+    )`)
+    await db.execute(`INSERT INTO journal_items_v3
+      (id, page_id, note_id, illustration_id, journal_image_id, item_type, x, y, width, height, rotation, z_index, staged, sticker_style, color, border_style, material_id, material_snapshot, style_payload, created_at, updated_at)
+      SELECT ji.id, ji.page_id, ji.note_id, ji.illustration_id, ji.journal_image_id, ji.item_type,
+             ji.x, ji.y, ji.width, ji.height, ji.rotation, ji.z_index, ji.staged, ji.sticker_style,
+             ji.color, ji.border_style, ji.material_id, ji.material_snapshot, ji.style_payload, ji.created_at, ji.updated_at
+      FROM journal_items ji
+      WHERE ji.journal_image_id IS NULL
+         OR EXISTS (SELECT 1 FROM journal_images WHERE journal_images.id = ji.journal_image_id)`)
+    await db.execute('DROP TABLE journal_items')
+    await db.execute('ALTER TABLE journal_items_v3 RENAME TO journal_items')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_items_page ON journal_items(page_id)')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_items_note ON journal_items(note_id)')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_items_illustration ON journal_items(illustration_id)')
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_journal_items_journal_image ON journal_items(journal_image_id)')
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_items_page_note ON journal_items(page_id, note_id)')
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_items_page_illustration ON journal_items(page_id, illustration_id)')
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_items_page_journal_image ON journal_items(page_id, journal_image_id)')
+  } finally {
+    await db.execute('PRAGMA foreign_keys = ON')
   }
 }
 

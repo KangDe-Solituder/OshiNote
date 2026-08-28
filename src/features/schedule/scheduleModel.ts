@@ -135,3 +135,10 @@ export function getAnniversariesOnDate(anniversaries: OshiAnniversary[], dateKey
   const day = Number(dateKey.slice(8, 10))
   return anniversaries.filter((item) => item.month === month && item.day === day)
 }
+
+/** Validate a recurring month/day pair. February 29 is valid for leap-day anniversaries. */
+export function isValidAnniversaryDate(month: number, day: number): boolean {
+  if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1) return false
+  const daysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  return day <= daysInMonth[month - 1]
+}
