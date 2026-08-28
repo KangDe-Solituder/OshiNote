@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, BookOpen, Check, FileImage, ImageIcon, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, FileImage, ImageIcon, ImageDown, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../../layout/pageShell'
 import { useJournalStore } from '../../../stores/journalStore'
@@ -29,6 +29,7 @@ import {
   getNoteCardStyleFromPayload,
 } from '../../../features/journal/journalItemStyles'
 import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
+import { exportJournalPageImage } from '../../../services/journalExport'
 
 interface JournalPageViewProps {
   oshiId: string
@@ -58,6 +59,8 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   const [showPageActions, setShowPageActions] = useState(false)
   const [pageDraft, setPageDraft] = useState({ title: '', description: '', date_label: '', background: 'paper' })
   const [availableBooks, setAvailableBooks] = useState<JournalBook[]>([])
+  const [exporting, setExporting] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
   const {
     pages,
     activePageId,
@@ -224,6 +227,23 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
     navigate(`/journal/create?bookId=${encodeURIComponent(bookId)}&oshiId=${encodeURIComponent(oshiId)}`)
   }
 
+  async function handleExportImage() {
+    if (!activePage || exporting) return
+    setExporting(true)
+    setExportMessage('')
+    try {
+      const savedTo = await exportJournalPageImage(activePage, items, stampsByPageId[activePage.id] || null, {
+        untitled: t('common.untitled'),
+        noContent: t('common.noContent'),
+      })
+      setExportMessage(savedTo ? t('journal.exportDone') : '')
+    } catch {
+      setExportMessage(t('journal.exportFailed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   function handleOpenPage(pageId: string) {
     setSelectedItemId(null)
     setViewingPageId(pageId)
@@ -258,6 +278,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
             </div>
             {loading && <Loader2 size={15} className="animate-spin text-accent" />}
             {error && <span className="truncate text-xs text-red-500">{error}</span>}
+            {exportMessage && <span className="truncate text-xs text-accent">{exportMessage}</span>}
           </div>
           {!standalonePostcard && (
             <Button variant="secondary" size="sm" onClick={() => setShowPageSidebar(!showPageSidebar)}>
@@ -300,6 +321,10 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
                     <button type="button" onClick={() => { handleAutoArrange(); setShowPageActions(false) }} disabled={items.length === 0} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:pointer-events-none disabled:opacity-50">
                       <LayoutGrid size={14} className="text-accent" />
                       {t('journalPage.autoArrange')}
+                    </button>
+                    <button type="button" onClick={() => { void handleExportImage(); setShowPageActions(false) }} disabled={exporting || items.length === 0} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:pointer-events-none disabled:opacity-50">
+                      {exporting ? <Loader2 size={14} className="animate-spin text-accent" /> : <ImageDown size={14} className="text-accent" />}
+                      {t('journal.exportImage')}
                     </button>
                     <button type="button" onClick={() => { if (activePage) detachPage(activePage.id, oshiId); setShowPageActions(false) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary">
                       <FileImage size={14} className="text-accent" />
