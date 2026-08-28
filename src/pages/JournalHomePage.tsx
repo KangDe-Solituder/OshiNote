@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BookOpen, Camera, FileImage, Flower, Grid3X3, Heart, List, Moon, MoreHorizontal, Pencil, Plus, Search, Ticket, Trash2 } from 'lucide-react'
@@ -66,9 +66,11 @@ export function JournalHomePage() {
     coverDecoration: 'ticket' as JournalCoverDecoration,
   })
   const initialLoading = loading && items.length === 0
+  const shelfEntrancePlayedRef = useRef(false)
 
   useEffect(() => {
     loadShelf()
+    shelfEntrancePlayedRef.current = true
   }, [])
 
   async function loadShelf() {
@@ -276,6 +278,7 @@ export function JournalHomePage() {
                     item={item}
                     index={index}
                     motionSeconds={motionSeconds}
+                    entrancePlayed={shelfEntrancePlayedRef.current}
                     onOpen={() => handleOpenItem(item)}
                     onDelete={() => handleDeleteItem(item)}
                     onEditBook={item.kind === 'book' ? () => openBookEditor(item) : undefined}
@@ -444,6 +447,7 @@ function ShelfGridCard({
   item,
   index,
   motionSeconds,
+  entrancePlayed,
   onOpen,
   onDelete,
   onEditBook,
@@ -454,6 +458,7 @@ function ShelfGridCard({
   item: JournalShelfItem
   index: number
   motionSeconds: number
+  entrancePlayed: boolean
   onOpen: () => void
   onDelete: () => void
   onEditBook?: () => void
@@ -470,9 +475,9 @@ function ShelfGridCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={entrancePlayed ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: motionSeconds, delay: Math.min(index * 0.012, 0.06), ease: 'easeOut' }}
+      transition={{ duration: motionSeconds, delay: entrancePlayed ? 0 : Math.min(index * 0.012, 0.06), ease: 'easeOut' }}
       className="group relative w-full max-w-[220px]"
     >
       <motion.button type="button" onClick={onOpen} whileHover={{ y: -2 }} whileTap={{ scale: 0.99 }} className="block w-full text-left">

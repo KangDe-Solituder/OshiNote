@@ -135,7 +135,7 @@ export function SelectMenu({
       >
         <motion.div
           ref={menuRef}
-          initial={{ opacity: 0, y: timing.viewEnter === 0 ? 0 : -4, scale: timing.viewEnter === 0 ? 1 : 0.99 }}
+          initial={{ opacity: 0, y: timing.viewEnter === 0 ? 0 : menuRect.openUp ? 4 : -4, scale: timing.viewEnter === 0 ? 1 : 0.99 }}
           animate={{
             opacity: 1,
             y: 0,
@@ -144,7 +144,7 @@ export function SelectMenu({
           }}
           exit={{
             opacity: 0,
-            y: timing.viewExit === 0 ? 0 : -2,
+            y: timing.viewExit === 0 ? 0 : menuRect.openUp ? 2 : -2,
             scale: timing.viewExit === 0 ? 1 : 0.995,
             transition: { duration: timing.viewExit, ease: MOTION_EASING.exit },
           }}

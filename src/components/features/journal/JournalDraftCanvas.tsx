@@ -123,29 +123,46 @@ export function JournalDraftCanvas({
 
   // The work board reveals when the pointer nears the canvas top edge (like the side rail)
   // and retracts shortly after the pointer leaves it. Held-pointer drags keep it open so
-  // items can be dropped onto the tray.
+  // items can be dropped onto the tray. The canvas rect is cached and the board rect is
+  // only measured when relevant, so pointermove stays layout-free on the hot path.
   const boardRef = useRef<HTMLDivElement>(null)
   const boardCloseTimer = useRef<number | null>(null)
+  const rootRectRef = useRef<DOMRect | null>(null)
   const [boardOpen, setBoardOpen] = useState(false)
 
   useEffect(() => {
+    function updateRootRect() {
+      rootRectRef.current = rootRef.current?.getBoundingClientRect() || null
+    }
+    updateRootRect()
+    window.addEventListener('resize', updateRootRect)
+    return () => window.removeEventListener('resize', updateRootRect)
+  }, [])
+
+  useEffect(() => {
     function handlePointerMove(event: globalThis.PointerEvent) {
-      const rootRect = rootRef.current?.getBoundingClientRect()
+      const rootRect = rootRectRef.current
       if (!rootRect) return
-      const withinCanvas = event.clientX >= rootRect.left && event.clientX <= rootRect.right
-        && event.clientY >= rootRect.top && event.clientY <= rootRect.bottom
+
+      // Cheap gate first: only measure the board when near the top or while it is open.
+      const dy = event.clientY - rootRect.top
+      const withinCanvasX = event.clientX >= rootRect.left && event.clientX <= rootRect.right
+      if (dy > 120 && boardCloseTimer.current === null && !boardOpen) return
+      if (!withinCanvasX && !boardOpen) return
+
       const boardRect = boardRef.current?.getBoundingClientRect()
       const insideBoard = boardRect
         ? event.clientX >= boardRect.left && event.clientX <= boardRect.right
           && event.clientY >= boardRect.top - 8 && event.clientY <= boardRect.bottom + 8
         : false
-      const nearTop = withinCanvas && event.clientY <= rootRect.top + 32
+      const nearTop = withinCanvasX && dy >= 0 && dy <= 32
 
       if (nearTop || insideBoard) {
         if (boardCloseTimer.current !== null) {
           window.clearTimeout(boardCloseTimer.current)
           boardCloseTimer.current = null
         }
+        rootRectRef.current = rootRef.current?.getBoundingClientRect() || rootRect
         setBoardOpen(true)
         return
       }
@@ -162,7 +179,8 @@ export function JournalDraftCanvas({
       window.removeEventListener('pointermove', handlePointerMove)
       if (boardCloseTimer.current !== null) window.clearTimeout(boardCloseTimer.current)
     }
-  }, [])
+     
+  }, [boardOpen])
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()

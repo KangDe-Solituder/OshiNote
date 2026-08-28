@@ -95,8 +95,13 @@ export function OshiCalendar({ oshi, onOshiUpdated }: { oshi: Oshi; onOshiUpdate
 
   const weeks = useMemo(() => {
     const currentWeekMonday = getMondayKey(todayKey)
+    // Render only the rows this month actually needs (4–6) — no trailing gray week.
+    const [year, month] = monthCursor.split('-').map(Number)
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const startOffset = (new Date(year, month - 1, 1).getDay() + 6) % 7
+    const weekCount = Math.ceil((startOffset + daysInMonth) / 7)
     const rows: CalendarDayModel[][] = []
-    for (let week = 0; week < 6; week += 1) {
+    for (let week = 0; week < weekCount; week += 1) {
       const row: CalendarDayModel[] = []
       for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
         const dateKey = addDays(gridRange.startKey, week * 7 + dayIndex)

@@ -7,15 +7,16 @@ import { useThemeStore } from '../../stores/themeStore'
 import { MOTION_EASING, MOTION_TIMING } from '../features/themes/uiMotion'
 
 const MAX_REMEMBERED_SCROLL_POSITIONS = 60
+/** Stored as a ratio (scrollTop / scrollHeight) so restore still lands correctly when content loads later. */
 const scrollPositions = new Map<string, number>()
 
 function scrollPositionKey(location: Location): string {
   return `${location.pathname}${location.search}`
 }
 
-function rememberScrollPosition(key: string, top: number) {
+function rememberScrollPosition(key: string, ratio: number) {
   if (scrollPositions.has(key)) scrollPositions.delete(key)
-  scrollPositions.set(key, top)
+  scrollPositions.set(key, ratio)
   if (scrollPositions.size > MAX_REMEMBERED_SCROLL_POSITIONS) {
     const oldest = scrollPositions.keys().next().value
     if (oldest !== undefined) scrollPositions.delete(oldest)
@@ -74,11 +75,11 @@ function RouteView({
     if (!el) return
     const saved = navigationType === 'POP' ? scrollPositions.get(positionKey) : undefined
     if (saved != null && saved > 0) {
-      el.scrollTop = saved
+      el.scrollTop = saved * el.scrollHeight
       // Content may settle after fonts/data arrive; re-apply once on the next frame.
       const frame = requestAnimationFrame(() => {
         if (scrollRef.current && scrollPositions.get(positionKey) === saved) {
-          scrollRef.current.scrollTop = saved
+          scrollRef.current.scrollTop = saved * scrollRef.current.scrollHeight
         }
       })
       return () => cancelAnimationFrame(frame)
@@ -90,7 +91,7 @@ function RouteView({
   useEffect(() => {
     const el = scrollRef.current
     return () => {
-      if (el) rememberScrollPosition(positionKey, el.scrollTop)
+      if (el) rememberScrollPosition(positionKey, el.scrollHeight > 0 ? el.scrollTop / el.scrollHeight : 0)
     }
 
   }, [positionKey])
@@ -114,6 +115,9 @@ function RouteView({
         opacity: 0,
         y: -Math.max(2, timing.routeOffset * 0.4),
         scale: 0.998,
+        // Non-animatable: applied immediately when the exit starts so the leaving page
+        // can never swallow clicks or scrolls during the crossfade.
+        pointerEvents: 'none',
         transition: {
           opacity: { duration: timing.routeExit, ease: MOTION_EASING.exit },
           y: { duration: timing.routeExit, ease: MOTION_EASING.exit },
