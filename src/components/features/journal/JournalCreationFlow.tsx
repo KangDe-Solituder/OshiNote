@@ -14,6 +14,10 @@ import { fetchAllOshis } from '../../../features/oshis/oshiService'
 import { fetchNotesByOshi } from '../../../features/notes/noteService'
 import { fetchIllustrationById, fetchIllustrations } from '../../../features/illustrations/illustrationService'
 import { createJournalPageFromDraft } from '../../../features/journal/journalService'
+import {
+  consumeWeeklyHandoff,
+  type WeeklyRecapHandoff,
+} from '../../../features/journal/weeklyRecap'
 import { storeJournalImage, validateJournalImageFile } from '../../../features/journal/journalImageService'
 import { fetchJournalImages } from '../../../features/journal/journalImageService'
 import { getJournalPageSize } from '../../../features/journal/journalLayout'
@@ -86,20 +90,25 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   )
   const [stepIndex, setStepIndex] = useState(editMode && initialStep !== 'setup' ? 1 : 0)
   const step = STEPS[stepIndex]
+  const weeklyHandoffRef = useRef<WeeklyRecapHandoff | null | undefined>(undefined)
+  if (weeklyHandoffRef.current === undefined) {
+    weeklyHandoffRef.current = editMode ? null : consumeWeeklyHandoff()
+  }
+  const weeklyHandoff = weeklyHandoffRef.current
   const [oshis, setOshis] = useState<Oshi[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
   const [journalImages, setJournalImages] = useState<JournalImage[]>([])
   const [importingImages, setImportingImages] = useState(false)
-  const [selectedOshiId, setSelectedOshiId] = useState(initialDraft?.oshiId || queryOshiId)
-  const [title, setTitle] = useState(initialDraft?.title || '')
-  const [dateLabel, setDateLabel] = useState(initialDraft?.dateLabel || String(new Date().getFullYear()))
+  const [selectedOshiId, setSelectedOshiId] = useState(initialDraft?.oshiId || queryOshiId || weeklyHandoff?.oshiId || '')
+  const [title, setTitle] = useState(initialDraft?.title || weeklyHandoff?.title || '')
+  const [dateLabel, setDateLabel] = useState(initialDraft?.dateLabel || weeklyHandoff?.dateLabel || String(new Date().getFullYear()))
   const [description, setDescription] = useState(initialDraft?.description || '')
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(queryTemplate?.id || null)
-  const [background, setBackground] = useState(initialDraft?.background || queryTemplate?.background || 'sakura')
-  const [orientation, setOrientation] = useState<JournalPageOrientation>(initialDraft?.orientation || queryTemplate?.preferredOrientation || 'portrait')
+  const [background, setBackground] = useState(initialDraft?.background || weeklyHandoff?.background || queryTemplate?.background || 'sakura')
+  const [orientation, setOrientation] = useState<JournalPageOrientation>(initialDraft?.orientation || weeklyHandoff?.orientation || queryTemplate?.preferredOrientation || 'portrait')
   const [items, setItems] = useState<JournalDraftItem[]>(() => {
-    const initialItems = initialDraft?.items || []
+    const initialItems = initialDraft?.items || weeklyHandoff?.items || []
     return queryTemplate ? applyJournalPageTemplate(queryTemplate.id, initialItems).items : initialItems
   })
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)

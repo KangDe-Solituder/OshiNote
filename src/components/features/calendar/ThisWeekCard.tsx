@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
-import { CalendarDays, Clock, FileText, Video } from 'lucide-react'
+import { BookOpen, CalendarDays, Clock, FileText, Loader2, Video } from 'lucide-react'
 import type { CalendarNote, Oshi, OshiSchedule, OshiScheduleOverride } from '../../../types'
 import {
   addDays,
@@ -12,6 +12,7 @@ import {
 } from '../../../features/schedule/scheduleModel'
 import { fetchCalendarNotes, fetchOverrides, fetchSchedules } from '../../../features/schedule/scheduleService'
 import { fetchArchivesByOshi } from '../../../features/oshis/archiveService'
+import { buildWeeklyRecap, stashWeeklyHandoff } from '../../../features/journal/weeklyRecap'
 import type { Archive } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 
@@ -28,6 +29,18 @@ export function ThisWeekCard({ oshi, refreshToken }: { oshi: Oshi; refreshToken?
   const [archives, setArchives] = useState<Archive[]>([])
   const [overrides, setOverrides] = useState<OshiScheduleOverride[]>([])
   const [notes, setNotes] = useState<CalendarNote[]>([])
+  const [buildingRecap, setBuildingRecap] = useState(false)
+
+  async function handleBuildRecap() {
+    setBuildingRecap(true)
+    try {
+      await buildWeeklyRecap(oshi.id, weekRange.startKey, weekRange.endKey)
+        .then((result) => stashWeeklyHandoff(result.handoff))
+      navigate(`/journal/create?oshiId=${encodeURIComponent(oshi.id)}`)
+    } finally {
+      setBuildingRecap(false)
+    }
+  }
 
   const weekRange = useMemo(() => {
     const today = new Date()
@@ -79,6 +92,15 @@ export function ThisWeekCard({ oshi, refreshToken }: { oshi: Oshi; refreshToken?
           <CalendarDays size={16} />
         </span>
         <h2 className="font-semibold text-text-primary">{t('calendar.thisWeek')}</h2>
+        <button
+          type="button"
+          onClick={() => void handleBuildRecap()}
+          disabled={buildingRecap}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-bg-secondary hover:text-accent disabled:opacity-50"
+        >
+          {buildingRecap ? <Loader2 size={13} className="animate-spin" /> : <BookOpen size={13} />}
+          {t('journal.buildRecap')}
+        </button>
       </div>
       {entries.length === 0 ? (
         <p className="py-4 text-center text-sm text-text-muted">{t('calendar.noWeekSchedules')}</p>
