@@ -7,7 +7,7 @@ import { useThemeStore } from '../../stores/themeStore'
 import { MOTION_EASING, MOTION_TIMING } from '../features/themes/uiMotion'
 
 const MAX_REMEMBERED_SCROLL_POSITIONS = 60
-/** Stored as a ratio (scrollTop / scrollHeight) so restore still lands correctly when content loads later. */
+/** Stored against the scrollable distance so 1 always means the bottom edge. */
 const scrollPositions = new Map<string, number>()
 
 function scrollPositionKey(location: Location): string {
@@ -21,6 +21,19 @@ function rememberScrollPosition(key: string, ratio: number) {
     const oldest = scrollPositions.keys().next().value
     if (oldest !== undefined) scrollPositions.delete(oldest)
   }
+}
+
+function scrollableDistance(element: HTMLElement): number {
+  return Math.max(0, element.scrollHeight - element.clientHeight)
+}
+
+function readScrollRatio(element: HTMLElement): number {
+  const distance = scrollableDistance(element)
+  return distance > 0 ? element.scrollTop / distance : 0
+}
+
+function applyScrollRatio(element: HTMLElement, ratio: number) {
+  element.scrollTop = Math.min(1, Math.max(0, ratio)) * scrollableDistance(element)
 }
 
 export function MainLayout() {
@@ -75,14 +88,46 @@ function RouteView({
     if (!el) return
     const saved = navigationType === 'POP' ? scrollPositions.get(positionKey) : undefined
     if (saved != null && saved > 0) {
-      el.scrollTop = saved * el.scrollHeight
-      // Content may settle after fonts/data arrive; re-apply once on the next frame.
-      const frame = requestAnimationFrame(() => {
-        if (scrollRef.current && scrollPositions.get(positionKey) === saved) {
-          scrollRef.current.scrollTop = saved * scrollRef.current.scrollHeight
-        }
-      })
-      return () => cancelAnimationFrame(frame)
+      let stopped = false
+      let frame = 0
+      let stopTimer = 0
+
+      const restore = () => {
+        if (!stopped && scrollPositions.get(positionKey) === saved) applyScrollRatio(el, saved)
+      }
+      const scheduleRestore = () => {
+        if (stopped) return
+        cancelAnimationFrame(frame)
+        frame = requestAnimationFrame(restore)
+      }
+      const resizeObserver = new ResizeObserver(scheduleRestore)
+      resizeObserver.observe(el)
+      const content = el.firstElementChild
+      if (content instanceof HTMLElement) resizeObserver.observe(content)
+      const mutationObserver = new MutationObserver(scheduleRestore)
+      mutationObserver.observe(el, { childList: true, characterData: true, subtree: true })
+
+      const stopRestoring = () => {
+        if (stopped) return
+        stopped = true
+        cancelAnimationFrame(frame)
+        window.clearTimeout(stopTimer)
+        resizeObserver.disconnect()
+        mutationObserver.disconnect()
+        el.removeEventListener('wheel', stopRestoring)
+        el.removeEventListener('touchstart', stopRestoring)
+        el.removeEventListener('pointerdown', stopRestoring)
+        window.removeEventListener('keydown', stopRestoring)
+      }
+
+      el.addEventListener('wheel', stopRestoring, { passive: true })
+      el.addEventListener('touchstart', stopRestoring, { passive: true })
+      el.addEventListener('pointerdown', stopRestoring)
+      window.addEventListener('keydown', stopRestoring)
+      stopTimer = window.setTimeout(stopRestoring, 2_000)
+      restore()
+      scheduleRestore()
+      return stopRestoring
     }
     el.scrollTop = 0
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,8 +135,18 @@ function RouteView({
 
   useEffect(() => {
     const el = scrollRef.current
+    if (!el) return
+    let frame = 0
+    const remember = () => rememberScrollPosition(positionKey, readScrollRatio(el))
+    const scheduleRemember = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(remember)
+    }
+    el.addEventListener('scroll', scheduleRemember, { passive: true })
     return () => {
-      if (el) rememberScrollPosition(positionKey, el.scrollHeight > 0 ? el.scrollTop / el.scrollHeight : 0)
+      cancelAnimationFrame(frame)
+      el.removeEventListener('scroll', scheduleRemember)
+      remember()
     }
 
   }, [positionKey])

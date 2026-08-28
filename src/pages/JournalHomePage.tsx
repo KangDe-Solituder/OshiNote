@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BookOpen, Camera, FileImage, Flower, Grid3X3, Heart, List, Moon, MoreHorizontal, Pencil, Plus, Search, Ticket, Trash2 } from 'lucide-react'
@@ -33,6 +33,7 @@ type ShelfViewMode = 'grid' | 'list'
 
 const BOOK_COVER_COLORS = ['#c9c5f3', '#f2c4ce', '#d7e4f5', '#efe2cc', '#29314b', '#e8e5dd', '#bfd9c4', '#f4c7a1']
 const BOOK_COVER_STYLES: JournalCoverStyle[] = ['cloth', 'paper', 'minimal', 'classic', 'night', 'postcard']
+let journalShelfEntrancePlayed = false
 const BOOK_COVER_DECORATIONS: JournalCoverDecoration[] = ['none', 'flower', 'moon', 'heart', 'camera', 'ticket']
 
 export function JournalHomePage() {
@@ -66,12 +67,17 @@ export function JournalHomePage() {
     coverDecoration: 'ticket' as JournalCoverDecoration,
   })
   const initialLoading = loading && items.length === 0
-  const shelfEntrancePlayedRef = useRef(false)
+  const shelfEntrancePlayed = journalShelfEntrancePlayed
 
   useEffect(() => {
     loadShelf()
-    shelfEntrancePlayedRef.current = true
   }, [])
+
+  useEffect(() => {
+    // Mark the entrance as played only after a non-empty shelf has rendered once.
+    // Keeping this at module scope avoids replaying every time the route remounts.
+    if (!initialLoading && items.length > 0) journalShelfEntrancePlayed = true
+  }, [initialLoading, items.length])
 
   async function loadShelf() {
     setLoading(true)
@@ -278,7 +284,7 @@ export function JournalHomePage() {
                     item={item}
                     index={index}
                     motionSeconds={motionSeconds}
-                    entrancePlayed={shelfEntrancePlayedRef.current}
+                    entrancePlayed={shelfEntrancePlayed}
                     onOpen={() => handleOpenItem(item)}
                     onDelete={() => handleDeleteItem(item)}
                     onEditBook={item.kind === 'book' ? () => openBookEditor(item) : undefined}

@@ -134,9 +134,20 @@ export function JournalDraftCanvas({
     function updateRootRect() {
       rootRectRef.current = rootRef.current?.getBoundingClientRect() || null
     }
+
+    const root = rootRef.current
     updateRootRect()
+    const resizeObserver = root ? new ResizeObserver(updateRootRect) : null
+    if (root) resizeObserver?.observe(root)
     window.addEventListener('resize', updateRootRect)
-    return () => window.removeEventListener('resize', updateRootRect)
+    // Capture scroll events from nested route containers because scrolling can
+    // move the canvas without changing its dimensions.
+    window.addEventListener('scroll', updateRootRect, true)
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', updateRootRect)
+      window.removeEventListener('scroll', updateRootRect, true)
+    }
   }, [])
 
   useEffect(() => {
@@ -179,7 +190,6 @@ export function JournalDraftCanvas({
       window.removeEventListener('pointermove', handlePointerMove)
       if (boardCloseTimer.current !== null) window.clearTimeout(boardCloseTimer.current)
     }
-     
   }, [boardOpen])
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
