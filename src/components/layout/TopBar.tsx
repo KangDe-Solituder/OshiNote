@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Copy, Layers3, Minus, Square, X } from
 import clsx from 'clsx'
 import { useI18n } from '../../i18n/useI18n'
 import { useOshiStore } from '../../stores/oshiStore'
-import appIconUrl from '../../assets/app-icon.svg'
+import appIconUrl from '../../assets/app-icon.png'
 
 export function TopBar() {
   const { t } = useI18n()
