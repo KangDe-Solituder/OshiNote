@@ -21,7 +21,7 @@ import {
 import { storeJournalImage, validateJournalImageFile } from '../../../features/journal/journalImageService'
 import { fetchJournalImages } from '../../../features/journal/journalImageService'
 import { getJournalPageSize } from '../../../features/journal/journalLayout'
-import { getJournalMaterialDefinition, getMaterialSnapshot } from '../../../features/journal/journalMaterials'
+import { getJournalMaterialDefinition, getMaterialSnapshot, type JournalStickerGroup } from '../../../features/journal/journalMaterials'
 import { createImageStylePayload, createNoteCardStylePayload } from '../../../features/journal/journalItemStyles'
 import { getDefaultIllustrationItemSize } from '../../../features/journal/journalItemSizing'
 import {
@@ -126,6 +126,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const [imageFilter, setImageFilter] = useState<JournalImageFilter>('all')
   const [imagePage, setImagePage] = useState(1)
   const [materialKind, setMaterialKind] = useState<JournalMaterialFilter>('all')
+  const [materialGroup, setMaterialGroup] = useState<'all' | JournalStickerGroup>('all')
   const [materialPage, setMaterialPage] = useState(1)
   const [loadingResources, setLoadingResources] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -193,7 +194,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
 
   useEffect(() => { setNotePage(1) }, [noteQuery, noteFilter])
   useEffect(() => { setImagePage(1) }, [imageQuery, imageFilter])
-  useEffect(() => { setMaterialPage(1) }, [materialKind])
+  useEffect(() => { setMaterialPage(1) }, [materialKind, materialGroup])
+  useEffect(() => { setMaterialGroup('all') }, [materialKind])
   useEffect(() => { setDraftBackSaved(false) }, [items, stampDraft])
   useEffect(() => { writeLocalStorage(DRAWER_DOCK_STORAGE_KEY, drawerDock) }, [drawerDock])
   useEffect(() => {
@@ -575,7 +577,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
                 <motion.div key={step.id} initial={{ opacity: 0, x: effectiveDrawerDock === 'right' ? 10 : -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: effectiveDrawerDock === 'right' ? -10 : 10 }} transition={{ duration: motionSeconds, ease: 'easeOut' }}>
                   {step.id === 'notes' && <JournalNotesDrawer notes={notes} loading={loadingResources} query={noteQuery} filter={noteFilter} page={notePage} placedIds={placedNoteIds} onQueryChange={setNoteQuery} onFilterChange={setNoteFilter} onPageChange={setNotePage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'images' && <JournalImagesDrawer illustrations={selectableIllustrations} journalImages={journalImages} placedJournalImageIds={placedJournalImageIds} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
-                  {step.id === 'materials' && <JournalMaterialsDrawer kind={materialKind} page={materialPage} onKindChange={setMaterialKind} onPageChange={setMaterialPage} onPointerPlace={startPointerResourceDrag} />}
+                  {step.id === 'materials' && <JournalMaterialsDrawer kind={materialKind} group={materialGroup} page={materialPage} onKindChange={setMaterialKind} onGroupChange={setMaterialGroup} onPageChange={setMaterialPage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'stamp' && <JournalStampDrawer value={stampDraft} placing={Boolean(stampPlacementDraft)} onClear={() => { setStampDraft(null); setStampPlacementDraft(null) }} onStartPlacement={setStampPlacementDraft} onCancelPlacement={() => setStampPlacementDraft(null)} />}
                   {step.id === 'review' && <JournalReviewDrawer title={title} dateLabel={dateLabel} description={description} background={background} orientation={orientation} templateId={selectedTemplateId} itemCount={items.length} stamp={stampDraft} creating={creating} canCreate={canSubmit} onCreate={handleSubmit} submitLabel={editMode ? t('journalEditor.setup.save') : t('journalCreate.create')} submittingLabel={editMode ? t('journalEditor.setup.saving') : t('journalCreate.creating')} />}
                 </motion.div>

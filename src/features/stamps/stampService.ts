@@ -124,7 +124,32 @@ export function parseStampSnapshot(snapshot: string | null | undefined, template
     shape: material.shape,
     texture: material.texture,
     border_style: material.borderStyle,
+    bg_color: asString(parsed?.bg_color) || undefined,
+    text_outline: asString(parsed?.text_outline) || undefined,
+    border_color: asString(parsed?.border_color) || undefined,
   }
+}
+
+/** Merges style overrides (底色/字体描边/印章描边) into a snapshot string; undefined values remove the key. */
+export function patchStampSnapshot(
+  snapshot: string | null | undefined,
+  templateId: StampTemplateId | string,
+  change: Partial<Pick<StampSnapshotV2, 'bg_color' | 'text_outline' | 'border_color'>>
+): string {
+  const parsed = parseStampSnapshot(snapshot, templateId)
+  return JSON.stringify({ ...parsed, ...change })
+}
+
+/** Carries user style overrides across a template/material switch, which regenerates the base snapshot. */
+export function preserveStampStyleOverrides(previousSnapshot: string | null | undefined, templateId: StampTemplateId | string, nextSnapshot: string): string {
+  const previous = parseStampSnapshot(previousSnapshot, templateId)
+  if (!previous.bg_color && !previous.text_outline && !previous.border_color) return nextSnapshot
+  return JSON.stringify({
+    ...parseStampSnapshot(nextSnapshot, templateId),
+    bg_color: previous.bg_color,
+    text_outline: previous.text_outline,
+    border_color: previous.border_color,
+  })
 }
 
 export function getStampMaterialId(stamp: Pick<StampInput, 'template_snapshot' | 'template_id'> | Pick<Stamp, 'template_snapshot' | 'template_id'> | null): StampMaterialId {

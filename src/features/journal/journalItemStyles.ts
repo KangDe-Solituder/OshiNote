@@ -38,6 +38,7 @@ export interface MaterialItemStyle extends Record<string, unknown> {
   glassStrength?: number
   backing?: boolean
   backingShape?: string
+  outline?: boolean
 }
 
 export function parseStylePayload(value: string | null | undefined): Record<string, unknown> {

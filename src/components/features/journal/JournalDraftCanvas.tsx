@@ -1,4 +1,5 @@
 import { ArrowUp, ImageIcon, Inbox, Minus, Plus, RotateCcw, StickyNote, Trash2 } from 'lucide-react'
+import clsx from 'clsx'
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { clampLayout, getJournalPageSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
@@ -15,6 +16,7 @@ import { getItemLayout } from './journalDraftCanvasGeometry'
 import { StampOverlay } from '../stamps/StampOverlay'
 import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
 import { useJournalWheelZoom } from './journalCanvasZoom'
+import { useJournalDragPan } from './journalCanvasPan'
 
 interface JournalDraftCanvasProps {
   background: string
@@ -192,6 +194,8 @@ export function JournalDraftCanvas({
     }
   }, [boardOpen])
 
+  const { panning, panHandlers } = useJournalDragPan(viewportRef, Boolean(stampPlacementDraft))
+
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
@@ -221,8 +225,12 @@ export function JournalDraftCanvas({
         onImportFiles={onImportFiles}
         importing={importing}
       />
-      <div ref={viewportRef} className="journal-canvas-viewport relative flex min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6">
-      <div className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
+      <div
+        ref={viewportRef}
+        className={clsx('journal-canvas-viewport relative flex min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6', panning && 'cursor-grabbing')}
+        {...panHandlers}
+      >
+      <div data-journal-canvas-ui="true" className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
         <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
         <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={() => onZoomChange(Math.min(1.25, zoom + 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomIn')}><Plus size={15} /></button>
@@ -232,7 +240,7 @@ export function JournalDraftCanvas({
         <div
           ref={pageRef}
           data-journal-draft-page="true"
-          className="journal-paper-page relative overflow-hidden"
+          className="journal-paper-page relative cursor-grab overflow-hidden"
           style={{ width: pageSize.width, height: pageSize.height, transform: `scale(${zoom})`, transformOrigin: 'top left', ...getPageBackground(background) }}
           onClick={(event) => {
             if (event.currentTarget === event.target) {
@@ -286,7 +294,7 @@ export function JournalDraftCanvas({
       </div>
 
       {selectedItem && (
-        <div className="fixed bottom-5 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-border-color bg-bg-card/95 p-1.5 shadow-xl backdrop-blur">
+        <div data-journal-canvas-ui="true" className="fixed bottom-5 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-border-color bg-bg-card/95 p-1.5 shadow-xl backdrop-blur">
           <button className={toolButtonClass} type="button" onClick={() => resizeSelected(selectedItem, -18, -18, orientation, onUpdateItem)}><Minus size={15} /></button>
           <button className={toolButtonClass} type="button" onClick={() => resizeSelected(selectedItem, 18, 18, orientation, onUpdateItem)}><Plus size={15} /></button>
           <button className={toolButtonClass} type="button" onClick={() => rotateSelected(selectedItem, -5, orientation, onUpdateItem)}>-5</button>

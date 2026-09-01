@@ -207,6 +207,9 @@ export interface StampSnapshotV2 {
   shape: 'round' | 'oval' | 'date' | 'ticket' | 'wax' | 'paper-label' | 'seal-script' | 'running-script' | 'flourish' | 'calligraphy'
   texture: 'ink' | 'paper' | 'wax' | 'ticket' | 'seal'
   border_style: 'double' | 'solid' | 'dashed' | 'perforated'
+  bg_color?: string
+  text_outline?: string
+  border_color?: string
 }
 
 export type ResourceTemplateType = 'note' | 'journal_page' | 'stamp' | 'material'

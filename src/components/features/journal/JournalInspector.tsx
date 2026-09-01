@@ -42,6 +42,7 @@ const STYLES: { id: JournalStickerStyle; label: string }[] = [
   { id: 'ticket', label: 'Ticket' },
 ]
 const TAPE_COLORS = ['#d9c4ff', '#f6b8d2', '#b8ddff', '#f8dfa0', '#b8ead8', '#f0c9ad']
+const STICKER_COLORS = ['#ef6f9f', '#f0b84a', '#7ab7e8', '#e58fbd', '#8a83d6', '#688ea8', '#7d86d9', '#6f9fc0', '#9a7fd4', '#f2a2c0', '#dfb75c', '#df7f4a', '#8fbfdc', '#e08bb0', '#8d97cf', '#64a8cc', '#ad8cd8', '#d3a6b8', '#a89a86']
 const TAPE_STYLES: { id: JournalTapeStyle; labelKey: TranslationKey }[] = [
   { id: 'washi', labelKey: 'journalInspector.tape.washi' },
   { id: 'grid', labelKey: 'journalInspector.tape.grid' },
@@ -198,6 +199,7 @@ export function JournalInspector({
     }
     const materialColor = asString(stylePayload.color) || materialItem.color || '#d9c4ff'
     const isTapeMaterial = material?.kind === 'tape'
+    const isStickerMaterial = material?.kind === 'sticker'
 
     function updateMaterialStyle(change: Record<string, unknown>) {
       const nextPayload = { ...stylePayload, ...change }
@@ -255,10 +257,24 @@ export function JournalInspector({
           </section>
         )}
 
+        {isStickerMaterial && (
+          <section className="mb-5">
+            <label className="flex items-center justify-between gap-3 text-xs font-semibold text-text-muted">
+              {t('journalCreate.detail.outline')}
+              <input
+                type="checkbox"
+                checked={stylePayload.outline === true}
+                onChange={(event) => updateMaterialStyle({ outline: event.target.checked })}
+                className="h-4 w-4 accent-[var(--color-accent)]"
+              />
+            </label>
+          </section>
+        )}
+
         <section className="mb-5">
           <h4 className="mb-2 text-xs font-semibold text-text-muted">{t('journalInspector.color')}</h4>
           <div className="flex flex-wrap gap-2">
-            {(isTapeMaterial ? TAPE_COLORS : COLORS).map((color) => (
+            {(isTapeMaterial ? TAPE_COLORS : isStickerMaterial ? STICKER_COLORS : COLORS).map((color) => (
               <button
                 key={color}
                 type="button"

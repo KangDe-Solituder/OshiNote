@@ -96,7 +96,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
       onPointerUp={handlePointerUp}
       onPointerCancel={() => { dragRef.current = null }}
       className={clsx(
-        'absolute text-left touch-none',
+        'absolute cursor-default text-left touch-none',
         'focus:outline-none focus:ring-2 focus:ring-accent-soft',
         isTape
           ? 'overflow-visible rounded-md border-0 shadow-none transition-[filter]'

@@ -4,7 +4,7 @@ import { useMemo, useState, type PointerEvent, type ReactNode } from 'react'
 import type { Illustration, JournalImage, JournalMaterialKind, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
-import { JOURNAL_MATERIAL_KINDS, JOURNAL_MATERIALS } from '../../../features/journal/journalMaterials'
+import { JOURNAL_MATERIAL_KINDS, JOURNAL_MATERIALS, JOURNAL_STICKER_GROUPS, type JournalStickerGroup } from '../../../features/journal/journalMaterials'
 import { getJournalPageTemplateDefinition } from '../../../features/journal/journalPageTemplates'
 import { Button } from '../../ui/Button'
 import { StampControl } from '../stamps/StampControl'
@@ -19,7 +19,7 @@ import {
 
 const NOTE_PAGE_SIZE = 20
 const IMAGE_PAGE_SIZE = 20
-const MATERIAL_PAGE_SIZE = 12
+const MATERIAL_PAGE_SIZE = 15
 
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -171,20 +171,26 @@ export function JournalImagesDrawer({ illustrations, journalImages, placedJourna
   )
 }
 
-export function JournalMaterialsDrawer({ kind, page, onKindChange, onPageChange, onPointerPlace }: {
+export function JournalMaterialsDrawer({ kind, group, page, onKindChange, onGroupChange, onPageChange, onPointerPlace }: {
   kind: 'all' | JournalMaterialKind
+  group: 'all' | JournalStickerGroup
   page: number
   onKindChange: (kind: 'all' | JournalMaterialKind) => void
+  onGroupChange: (group: 'all' | JournalStickerGroup) => void
   onPageChange: (page: number) => void
   onPointerPlace: (payload: DragPayload, event: PointerEvent<HTMLElement>) => void
 }) {
   const { t } = useI18n()
-  const filtered = kind === 'all' ? JOURNAL_MATERIALS : JOURNAL_MATERIALS.filter((material) => material.kind === kind)
+  const filtered = JOURNAL_MATERIALS.filter((material) => {
+    if (kind !== 'all' && material.kind !== kind) return false
+    if (kind === 'sticker' && group !== 'all' && material.group !== group) return false
+    return true
+  })
   const totalPages = Math.max(1, Math.ceil(filtered.length / MATERIAL_PAGE_SIZE))
   const pageItems = filtered.slice((page - 1) * MATERIAL_PAGE_SIZE, page * MATERIAL_PAGE_SIZE)
   return (
     <div className="min-w-0 overflow-x-hidden">
-      <div className="mb-3 flex flex-wrap gap-1.5">
+      <div className="mb-2 flex flex-wrap gap-1.5">
         {JOURNAL_MATERIAL_KINDS.map((item) => (
           <button
             key={item.id}
@@ -196,7 +202,21 @@ export function JournalMaterialsDrawer({ kind, page, onKindChange, onPageChange,
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      {kind === 'sticker' && (
+        <div className="mb-3 flex flex-wrap gap-1">
+          {JOURNAL_STICKER_GROUPS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onGroupChange(item.id)}
+              className={clsx('rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors', group === item.id ? 'border-accent/70 bg-accent-soft/70 text-accent' : 'border-border-color/70 bg-bg-primary text-text-muted hover:border-border-hover hover:text-text-secondary')}
+            >
+              {t(item.labelKey)}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-1.5">
         {pageItems.map((material) => (
           <div
             key={material.id}
@@ -205,10 +225,10 @@ export function JournalMaterialsDrawer({ kind, page, onKindChange, onPageChange,
             draggable
             onDragStart={(event) => setDragPayload(event.dataTransfer, { kind: 'material', id: material.id })}
             onPointerDown={(event) => onPointerPlace({ kind: 'material', id: material.id }, event)}
-            className="cursor-grab rounded-xl border border-border-color bg-bg-secondary p-2 text-left transition-colors hover:border-border-hover active:cursor-grabbing"
+            className="cursor-grab rounded-xl border border-border-color bg-bg-secondary p-1.5 text-left transition-colors hover:border-border-hover active:cursor-grabbing"
           >
             <JournalMaterialTile material={material} compact />
-            <span className="mt-2 block truncate text-xs font-semibold text-text-primary">{t(material.nameKey)}</span>
+            <span className="mt-1 block truncate text-[11px] font-semibold text-text-primary">{t(material.nameKey)}</span>
           </div>
         ))}
       </div>

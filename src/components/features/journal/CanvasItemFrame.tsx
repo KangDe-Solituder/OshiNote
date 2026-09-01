@@ -91,13 +91,14 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
 
   return (
     <div
+      data-journal-item-frame="true"
       onClick={(event) => { event.stopPropagation(); onSelect(item.draftId) }}
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onOpenDetail(item.draftId) }}
       onPointerDown={(event) => startDrag(event, 'move')}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={() => { dragRef.current = null }}
-      className={clsx('absolute touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
+      className={clsx('absolute cursor-default touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
       style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
     >
       <JournalDraftItemRenderer item={item} note={note} illustration={illustration} journalImage={journalImage} />

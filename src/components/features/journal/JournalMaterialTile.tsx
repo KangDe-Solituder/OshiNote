@@ -1,7 +1,7 @@
-import { Camera, Flower2, Heart, Music2, Sparkles, Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { CSSProperties } from 'react'
 import type { JournalMaterialDefinition } from '../../../features/journal/journalMaterials'
+import { JournalStickerArt } from './JournalStickerArt'
 
 interface JournalMaterialTileProps {
   material: JournalMaterialDefinition
@@ -21,13 +21,13 @@ export function JournalMaterialTile({ material, compact = false, fill = false, s
       className={clsx(
         'relative flex items-center justify-center overflow-hidden rounded-lg',
         fill ? 'border border-transparent bg-transparent' : 'border border-border-color bg-bg-primary',
-        fill ? 'h-full w-full' : compact ? 'h-24' : 'h-32',
+        fill ? 'h-full w-full' : compact ? 'h-16' : 'h-32',
         selected && 'border-accent ring-2 ring-accent-soft'
       )}
     >
       {material.kind === 'tape' ? (
         <span
-          className={clsx('block rounded-md border border-white/25 shadow-sm', fill ? 'h-full w-full' : 'h-9 w-32 rotate-[-6deg]')}
+          className={clsx('block rounded-md border border-white/25 shadow-sm', fill ? 'h-full w-full' : 'h-6 w-20 rotate-[-6deg]')}
           style={{
             backgroundColor: color,
             backgroundImage: getTapePreviewPattern(typeof style.tapeStyle === 'string' ? style.tapeStyle : 'washi', color),
@@ -35,33 +35,29 @@ export function JournalMaterialTile({ material, compact = false, fill = false, s
           }}
         />
       ) : material.kind === 'paper' ? (
-        <span className={clsx('block rounded-lg border border-white/60 shadow-sm', fill ? 'h-full w-full' : 'h-20 w-24 rotate-[-3deg]')} style={{ backgroundColor: color, ...glassStyle }}>
-          {style.line === true && <span className={clsx('block bg-[linear-gradient(transparent_13px,rgba(100,110,140,0.18)_14px)] bg-[length:100%_14px]', fill ? 'mt-[20%] h-[52%]' : 'mt-5 h-10')} />}
+        <span className={clsx('block rounded-lg border border-white/60 shadow-sm', fill ? 'h-full w-full' : 'h-14 w-16 rotate-[-3deg]')} style={{ backgroundColor: color, ...glassStyle }}>
+          {style.line === true && <span className={clsx('block bg-[linear-gradient(transparent_10px,rgba(100,110,140,0.18)_11px)] bg-[length:100%_11px]', fill ? 'mt-[20%] h-[52%]' : 'mt-3 h-7')} />}
         </span>
       ) : material.kind === 'label' ? (
         <span
-          className={clsx('block border border-black/10 shadow-sm', fill ? 'h-full w-full' : 'h-11 w-28 rotate-[-4deg]', style.shape === 'ticket' ? 'rounded-md border-dashed' : 'rounded-full')}
+          className={clsx('block border border-black/10 shadow-sm', fill ? 'h-full w-full' : 'h-7 w-20 rotate-[-4deg]', style.shape === 'ticket' ? 'rounded-md border-dashed' : 'rounded-full')}
           style={{ backgroundColor: color, ...glassStyle }}
         />
       ) : (
         <span
-          className={clsx('flex items-center justify-center rounded-full', fill ? 'h-full w-full bg-transparent shadow-none' : 'h-16 w-16 bg-white/60 shadow-sm')}
+          className={clsx('flex items-center justify-center rounded-full', fill ? 'h-full w-full bg-transparent shadow-none' : 'h-12 w-12 bg-white/60 shadow-sm')}
           style={{ color, ...glassStyle }}
         >
-          <MaterialIcon icon={typeof style.icon === 'string' ? style.icon : ''} size={compact ? 30 : 36} />
+          <JournalStickerArt
+            icon={typeof style.icon === 'string' ? style.icon : ''}
+            size={fill ? '72%' : compact ? 40 : 52}
+            color={color}
+            outline={style.outline === true}
+          />
         </span>
       )}
     </span>
   )
-}
-
-function MaterialIcon({ icon, size }: { icon: string; size: number }) {
-  if (icon === 'heart') return <Heart size={size} fill="currentColor" />
-  if (icon === 'star') return <Star size={size} fill="currentColor" />
-  if (icon === 'flower') return <Flower2 size={size} />
-  if (icon === 'music') return <Music2 size={size} />
-  if (icon === 'camera') return <Camera size={size} />
-  return <Sparkles size={size} />
 }
 
 function getTapePreviewPattern(style: string, color: string): string {

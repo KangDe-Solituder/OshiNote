@@ -15,6 +15,9 @@ import {
   getStampMaterialId,
   getStampTemplate,
   normalizeStampInput,
+  parseStampSnapshot,
+  patchStampSnapshot,
+  preserveStampStyleOverrides,
   STAMP_OPACITY_MAX,
   STAMP_OPACITY_MIN,
   STAMP_ROTATION_MAX,
@@ -24,12 +27,15 @@ import {
   STAMP_TEMPLATES,
   VISIBLE_STAMP_MATERIALS,
 } from '../../../features/stamps/stampService'
-import type { Stamp, StampInput, StampMaterialId, StampTemplateId } from '../../../types'
+import type { Stamp, StampInput, StampMaterialId, StampSnapshotV2, StampTemplateId } from '../../../types'
 import { StampOverlay } from './StampOverlay'
 import { isStampMaterialFontReady, type StampFontId } from '../../../features/stamps/stampFonts'
 import { useStampFontStore } from '../../../stores/stampFontStore'
 
-const INK_COLORS = ['#8B5CF6', '#EC4899', '#2563EB', '#F59E0B', '#10B981', '#EF4444', '#111827', '#8B5E34']
+const INK_SWATCHES = ['#8B5CF6', '#EC4899', '#2563EB', '#F59E0B', '#10B981']
+const BG_SWATCHES = ['#fffdf6', '#ffffff', '#2f2a3a', '#f6e7ee']
+const TEXT_OUTLINE_SWATCHES = ['#ffffff', '#1f2937', '#f8e8b0', '#ffd1dc']
+const BORDER_SWATCHES = ['#8B5CF6', '#EC4899', '#111827', '#8B5E34']
 
 export function StampControl({
   value,
@@ -198,6 +204,7 @@ function StampSettingsForm({
   const materialCompatible = isStampMaterialCompatible(currentMaterialId, preview.label)
   const materialReady = isStampMaterialFontReady(currentMaterialId, fontAvailability)
   const visibleMaterials = VISIBLE_STAMP_MATERIALS.filter((material) => isStampMaterialFontReady(material.id, fontAvailability))
+  const snapshotStyle = parseStampSnapshot(preview.template_snapshot, preview.template_id)
 
   function updateFromTemplate(templateId: StampTemplateId) {
     const template = getStampTemplate(templateId)
@@ -205,7 +212,7 @@ function StampSettingsForm({
     onChange({
       ...preview,
       template_id: template.id,
-      template_snapshot: createStampSnapshot(template.id, material.id),
+      template_snapshot: preserveStampStyleOverrides(preview.template_snapshot, preview.template_id, createStampSnapshot(template.id, material.id)),
       label: t(template.labelKey as never),
       color: template.color,
       rotation: clampStampRotation(template.rotation + material.rotationOffset),
@@ -217,10 +224,17 @@ function StampSettingsForm({
     const material = getStampMaterial(materialId)
     onChange({
       ...preview,
-      template_snapshot: createStampSnapshot(template.id, material.id),
+      template_snapshot: preserveStampStyleOverrides(preview.template_snapshot, preview.template_id, createStampSnapshot(template.id, material.id)),
       rotation: clampStampRotation(template.rotation + material.rotationOffset),
       size: material.defaultSize,
       opacity: material.defaultOpacity,
+    })
+  }
+
+  function updateSnapshotStyle(key: 'bg_color' | 'text_outline' | 'border_color', value: string | undefined) {
+    onChange({
+      ...preview,
+      template_snapshot: patchStampSnapshot(preview.template_snapshot, preview.template_id, { [key]: value } as Partial<Pick<StampSnapshotV2, 'bg_color' | 'text_outline' | 'border_color'>>),
     })
   }
 
@@ -262,34 +276,34 @@ function StampSettingsForm({
           />
         </div>
 
-        <div>
-          <p className="mb-2 text-xs font-medium text-text-muted">{t('stamps.color')}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            {INK_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => onChange({ ...preview, color })}
-                className={clsx(
-                  'h-8 w-8 rounded-full border transition-transform hover:scale-105',
-                  preview.color.toLowerCase() === color.toLowerCase() ? 'border-accent ring-2 ring-accent-soft' : 'border-border-color'
-                )}
-                style={{ backgroundColor: color }}
-                title={t('stamps.color')}
-              />
-            ))}
-            <label className="flex h-8 items-center gap-2 rounded-full border border-border-color bg-bg-secondary px-2 text-xs text-text-secondary">
-              <Palette size={13} />
-              {t('stamps.customColor')}
-              <input
-                type="color"
-                value={preview.color}
-                onChange={(event) => onChange({ ...preview, color: event.target.value })}
-                className="color-input h-5 w-6 cursor-pointer rounded-[6px] [--swatch-radius:6px]"
-                aria-label={t('stamps.customColor')}
-              />
-            </label>
-          </div>
+        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+          <StampSwatchRow
+            label={t('stamps.color')}
+            value={preview.color}
+            swatches={INK_SWATCHES}
+            onChange={(value) => value && onChange({ ...preview, color: value })}
+          />
+          <StampSwatchRow
+            label={t('stamps.bgColor')}
+            value={snapshotStyle.bg_color}
+            swatches={BG_SWATCHES}
+            autoLabel={t('stamps.auto.bg')}
+            onChange={(value) => updateSnapshotStyle('bg_color', value)}
+          />
+          <StampSwatchRow
+            label={t('stamps.textOutline')}
+            value={snapshotStyle.text_outline}
+            swatches={TEXT_OUTLINE_SWATCHES}
+            autoLabel={t('stamps.auto.textOutline')}
+            onChange={(value) => updateSnapshotStyle('text_outline', value)}
+          />
+          <StampSwatchRow
+            label={t('stamps.borderColor')}
+            value={snapshotStyle.border_color}
+            swatches={BORDER_SWATCHES}
+            autoLabel={t('stamps.auto.border')}
+            onChange={(value) => updateSnapshotStyle('border_color', value)}
+          />
         </div>
 
         <div>
@@ -437,6 +451,68 @@ function StampRange({
         className="h-2 w-full accent-[var(--color-accent)]"
       />
     </label>
+  )
+}
+
+function StampSwatchRow({
+  label,
+  value,
+  swatches,
+  autoLabel,
+  onChange,
+}: {
+  label: string
+  value?: string
+  swatches: string[]
+  /** When provided, a checkerboard "auto/unset" swatch is rendered first and selected when value is undefined. */
+  autoLabel?: string
+  onChange: (value: string | undefined) => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="min-w-0">
+      <p className="mb-1.5 text-xs font-medium text-text-muted">{label}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {autoLabel !== undefined && (
+          <button
+            type="button"
+            onClick={() => onChange(undefined)}
+            className={clsx(
+              'h-7 w-7 rounded-full border-2 border-current text-text-muted/70 transition-transform hover:scale-105 bg-[linear-gradient(45deg,transparent_44%,currentColor_46%,currentColor_54%,transparent_56%)]',
+              !value && 'ring-2 ring-accent-soft'
+            )}
+            title={autoLabel}
+            aria-label={autoLabel}
+          />
+        )}
+        {swatches.map((color) => (
+          <button
+            key={color}
+            type="button"
+            onClick={() => onChange(color)}
+            className={clsx(
+              'h-7 w-7 rounded-full border transition-transform hover:scale-105',
+              value?.toLowerCase() === color.toLowerCase() ? 'border-accent ring-2 ring-accent-soft' : 'border-border-color'
+            )}
+            style={{ backgroundColor: color }}
+            title={color}
+          />
+        ))}
+        <label
+          className="flex h-7 items-center gap-1 rounded-full border border-border-color bg-bg-secondary px-1.5 text-text-muted transition-colors hover:border-border-hover"
+          title={t('stamps.customColor')}
+        >
+          <Palette size={12} />
+          <input
+            type="color"
+            value={value || swatches[0]}
+            onChange={(event) => onChange(event.target.value)}
+            className="color-input h-4 w-5 cursor-pointer rounded-[5px] [--swatch-radius:5px]"
+            aria-label={t('stamps.customColor')}
+          />
+        </label>
+      </div>
+    </div>
   )
 }
 

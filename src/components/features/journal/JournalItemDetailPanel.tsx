@@ -132,6 +132,7 @@ function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: Jou
       <SwatchField label={t('journalInspector.color')} value={asString(style.color) || '#d9c4ff'} colors={isTape ? TAPE_COLORS : isSticker ? STICKER_COLORS : PAPER_COLORS} onChange={(value) => update({ color: value })} />
       {isSticker && (
         <>
+          <ToggleField label={t('journalCreate.detail.outline')} checked={style.outline === true} onChange={(value) => update({ outline: value })} />
           <ToggleField label={t('journalCreate.detail.backing')} checked={style.backing === true} onChange={(value) => update({ backing: value })} />
           <SelectField label={t('journalCreate.detail.backingShape')} value={asString(style.backingShape) || 'circle'} options={[{ value: 'circle', label: 'Circle' }, { value: 'square', label: 'Square' }]} onChange={(value) => update({ backingShape: value })} />
         </>
@@ -227,6 +228,6 @@ const FONT_OPTIONS = [
   { value: 'casual', label: 'Casual' },
 ]
 const TAPE_COLORS = ['#d9c4ff', '#f6b8d2', '#b8ddff', '#f8dfa0', '#b8ead8', '#f0c9ad']
-const STICKER_COLORS = ['#ef6f9f', '#f0b84a', '#7ab7e8', '#e58fbd', '#8a83d6', '#688ea8']
+const STICKER_COLORS = ['#ef6f9f', '#f0b84a', '#7ab7e8', '#e58fbd', '#8a83d6', '#688ea8', '#7d86d9', '#6f9fc0', '#9a7fd4', '#f2a2c0', '#dfb75c', '#df7f4a', '#8fbfdc', '#e08bb0', '#8d97cf', '#64a8cc', '#ad8cd8', '#d3a6b8', '#a89a86']
 const PAPER_COLORS = ['#fff1f5', '#eef6ff', '#fff7d6', '#f3f0ff', '#edf7ed', '#fffdf8']
 const detailInputClass = 'min-w-0 rounded-xl border border-border-color bg-transparent px-3 py-2 text-sm text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-soft'

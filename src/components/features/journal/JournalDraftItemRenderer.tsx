@@ -1,4 +1,4 @@
-import { Camera, Flower2, Heart, ImageIcon, Music2, Sparkles, Star } from 'lucide-react'
+import { ImageIcon } from 'lucide-react'
 import { useEffect, useState, type CSSProperties } from 'react'
 import clsx from 'clsx'
 import type { Illustration, JournalDraftItem, JournalImage, Note } from '../../../types'
@@ -17,6 +17,7 @@ import {
 import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
 import { asNumber, asString, isRecord } from '../../../utils/safeJson'
 import { MediaImage } from '../../ui/MediaImage'
+import { JournalStickerArt } from './JournalStickerArt'
 
 export function JournalDraftItemRenderer({ item, note, illustration, journalImage }: { item: JournalDraftItem; note?: Note; illustration?: Illustration; journalImage?: JournalImage }) {
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
@@ -179,19 +180,10 @@ function DraftMaterialBody({ materialId, stylePayload }: { materialId: string; s
   return (
     <span className="pointer-events-none flex h-full w-full items-center justify-center" style={{ color }}>
       <span className={clsx('flex h-full w-full items-center justify-center', backing && (backingShape === 'square' ? 'rounded-xl border border-black/10 bg-white/75 shadow-sm' : 'rounded-full border border-black/10 bg-white/75 shadow-sm'))} style={backing ? glassStyle : undefined}>
-        <MaterialIcon icon={asString(stylePayload.icon)} size={58} />
+        <JournalStickerArt icon={asString(stylePayload.icon)} size="88%" color={color} outline={stylePayload.outline === true} />
       </span>
     </span>
   )
-}
-
-function MaterialIcon({ icon, size = 42 }: { icon: string; size?: number }) {
-  if (icon === 'heart') return <Heart size={size} fill="currentColor" />
-  if (icon === 'star') return <Star size={size} fill="currentColor" />
-  if (icon === 'flower') return <Flower2 size={size} />
-  if (icon === 'music') return <Music2 size={size} />
-  if (icon === 'camera') return <Camera size={size} />
-  return <Sparkles size={size} />
 }
 
 function TapeShape({ color, styleId, extraStyle }: { color: string; styleId: string; extraStyle?: CSSProperties }) {

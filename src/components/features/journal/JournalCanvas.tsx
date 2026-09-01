@@ -1,4 +1,5 @@
 import { Minus, Plus, StickyNote } from 'lucide-react'
+import clsx from 'clsx'
 import type { JournalItemWithNote, JournalPage } from '../../../types'
 import { getJournalCanvasSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { JournalSticker } from './JournalSticker'
@@ -8,6 +9,7 @@ import { StampOverlay } from '../stamps/StampOverlay'
 import { StampPlacementLayer } from '../stamps/StampPlacementLayer'
 import type { Stamp, StampInput } from '../../../types'
 import { useJournalWheelZoom } from './journalCanvasZoom'
+import { useJournalDragPan } from './journalCanvasPan'
 
 export interface JournalPopoverAnchor {
   clientX: number
@@ -55,10 +57,12 @@ export function JournalCanvas({
   const orientation = page?.orientation || 'portrait'
   const canvasSize = getJournalCanvasSize(items, orientation)
   const viewportRef = useJournalWheelZoom(zoom, onZoomChange)
+  const { panning, panHandlers } = useJournalDragPan(viewportRef, Boolean(stampPlacementDraft))
 
   return (
-    <div ref={viewportRef} className="journal-canvas-viewport relative h-full min-h-0 min-w-0 flex-1 overflow-auto">
+    <div ref={viewportRef} className={clsx('journal-canvas-viewport relative h-full min-h-0 min-w-0 flex-1 overflow-auto', panning && 'cursor-grabbing')} {...panHandlers}>
       <div
+        data-journal-canvas-ui="true"
         className="sticky top-4 z-[60] flex h-10 w-max items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur"
         style={{ left: `max(16px, calc(100% - 178px - ${zoomControlsRightOffset}px))` }}
       >
@@ -73,7 +77,7 @@ export function JournalCanvas({
       <div className="flex min-h-[calc(100%-56px)] min-w-full justify-center p-6 pt-2">
       <div style={{ width: canvasSize.width * zoom, height: Math.max(canvasSize.height * zoom, 1) }}>
         <div
-          className="journal-paper-page relative overflow-visible bg-[var(--journal-canvas-bg)]"
+          className="journal-paper-page relative cursor-grab overflow-visible bg-[var(--journal-canvas-bg)]"
           style={{
             width: canvasSize.width,
             height: canvasSize.height,
