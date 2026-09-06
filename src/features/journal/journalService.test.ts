@@ -22,7 +22,16 @@ let sqlite: DatabaseSync
 beforeEach(() => {
   sqlite = new DatabaseSync(':memory:')
   sqlite.exec('PRAGMA foreign_keys = OFF')
-  for (const migration of MIGRATIONS) sqlite.exec(migration)
+  for (const migration of MIGRATIONS) {
+    // Some SQLite builds (e.g. node:sqlite) lack the FTS5 module; the journal
+    // tests do not exercise full-text search, so skip that statement there.
+    try {
+      sqlite.exec(migration)
+    } catch (error) {
+      if (migration.toLowerCase().includes('fts5')) continue
+      throw error
+    }
+  }
   sqlite.exec(`
     ALTER TABLE journal_items ADD COLUMN staged INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE journal_items ADD COLUMN journal_image_id TEXT;
