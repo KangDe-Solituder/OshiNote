@@ -376,6 +376,69 @@ function CatArt() {
   )
 }
 
+function TennisBallArt() {
+  return (
+    <>
+      <circle cx={32} cy={32} r={22} fill="currentColor" />
+      <path d="M54 32 A22 22 0 0 1 32 54 C42 51 49 42 51 32 Z" fill={SHADE} opacity={0.35} />
+      <path d="M15 17 C24 24 24 40 15 47" stroke={WHITE} strokeWidth={3.5} strokeLinecap="round" fill="none" />
+      <path d="M49 17 C40 24 40 40 49 47" stroke={WHITE} strokeWidth={3.5} strokeLinecap="round" fill="none" />
+      <ellipse cx={22} cy={18} rx={5} ry={3.2} transform="rotate(-28 22 18)" fill={WHITE} opacity={0.55} />
+    </>
+  )
+}
+
+function TennisRacketArt() {
+  const clipId = `osn-racket-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
+  return (
+    <>
+      <clipPath id={clipId}>
+        <ellipse cx={32} cy={23} rx={13.5} ry={15.5} />
+      </clipPath>
+      <ellipse cx={32} cy={23} rx={13.5} ry={15.5} fill={PALE} opacity={0.35} />
+      <g clipPath={`url(#${clipId})`} stroke={PALE} strokeWidth={1.6}>
+        {[24.5, 28.5, 32.5, 36.5, 40.5].map((x) => (
+          <line key={x} x1={x} y1={8} x2={x} y2={39} />
+        ))}
+        {[13, 18, 23, 28, 33].map((y) => (
+          <line key={y} x1={18} y1={y} x2={46} y2={y} />
+        ))}
+      </g>
+      <ellipse cx={32} cy={23} rx={16.5} ry={18.5} fill="none" stroke="currentColor" strokeWidth={4.5} />
+      <path d="M21 11 C24 7.5 29 5.8 33 6.2" stroke={SOFT} strokeWidth={2.2} strokeLinecap="round" fill="none" opacity={0.9} />
+      <path d="M25.5 40 L29 49 M38.5 40 L35 49" stroke="currentColor" strokeWidth={4.5} strokeLinecap="round" />
+      <rect x={28.5} y={48} width={7} height={13} rx={3} fill={SHADE} />
+      <path d="M29.5 52.5 L34.5 52.5 M29.5 56.5 L34.5 56.5" stroke={PALE} strokeWidth={1.4} strokeLinecap="round" />
+    </>
+  )
+}
+
+function GnomeHatArt() {
+  return (
+    <>
+      <path d="M13 47 C13 28 22 12 33 8 C40 6 46 8 48 14 C49 18 47 22 44 24 C47 30 51 38 51 47 Z" fill="currentColor" />
+      <path d="M44 24 C47 30 51 38 51 47 L38 47 C41 39 43 31 44 24 Z" fill={SHADE} opacity={0.4} />
+      <path d="M21 38 C20 28 24 18 31 13" stroke={PALE} strokeWidth={3.5} strokeLinecap="round" opacity={0.8} />
+      <rect x={9} y={44} width={46} height={10} rx={5} fill={SHADE} />
+      <rect x={9} y={44} width={46} height={4} rx={2} fill={DEEP} opacity={0.35} />
+    </>
+  )
+}
+
+function AnchorArt() {
+  return (
+    <>
+      <path d="M12 35 C12 45 20 52 32 53 C44 52 52 45 52 35" stroke="currentColor" strokeWidth={5} strokeLinecap="round" fill="none" />
+      <path d="M12 36 L3 30 L11 24 Z" fill="currentColor" />
+      <path d="M52 36 L61 30 L53 24 Z" fill="currentColor" />
+      <rect x={29.5} y={14} width={5} height={36} rx={2.5} fill="currentColor" />
+      <rect x={17} y={22} width={30} height={5.5} rx={2.75} fill={SHADE} />
+      <circle cx={32} cy={13} r={6.5} stroke="currentColor" strokeWidth={5} />
+      <circle cx={31} cy={12} r={6.5} stroke={PALE} strokeWidth={1.6} opacity={0.6} />
+    </>
+  )
+}
+
 const STICKER_ART: Record<string, () => ReactElement> = {
   heart: HeartArt,
   star: StarArt,
@@ -396,4 +459,8 @@ const STICKER_ART: Record<string, () => ReactElement> = {
   orbit: OrbitArt,
   rabbit: RabbitArt,
   cat: CatArt,
+  'gnome-hat': GnomeHatArt,
+  anchor: AnchorArt,
+  'tennis-ball': TennisBallArt,
+  'tennis-racket': TennisRacketArt,
 }
