@@ -89,7 +89,7 @@ export function clampLayout(
     y,
     width,
     height,
-    rotation: Math.min(Math.max(input.rotation, -18), 18),
+    rotation: Number.isFinite(input.rotation) ? input.rotation : 0,
   }
 }
 

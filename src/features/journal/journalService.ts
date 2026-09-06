@@ -211,10 +211,10 @@ export async function deleteJournalBook(id: string): Promise<void> {
 export async function fetchJournalPages(bookId: string): Promise<JournalPage[]> {
   const db = await getDb()
   const rows = await db.select<JournalPageRow[]>(
-    'SELECT * FROM journal_pages WHERE book_id = ? AND standalone = 0 ORDER BY page_index ASC',
+    'SELECT * FROM journal_pages WHERE book_id = ? AND standalone = 0 ORDER BY page_index ASC, created_at ASC, id ASC',
     [bookId]
   )
-  return rows.map(deserializePage)
+  return rows.map((row, index) => ({ ...deserializePage(row), page_index: index }))
 }
 
 export async function fetchStandalonePostcards(oshiId: string): Promise<JournalPage[]> {
@@ -456,7 +456,7 @@ export async function createJournalItemForNote(pageId: string, noteId: string, i
     'SELECT * FROM journal_items WHERE page_id = ? AND note_id = ?',
     [pageId, noteId]
   )
-  if (existing[0]) return deserializeItem(existing[0])
+  if (existing[0]) return reuseJournalItem(existing[0], initialLayout, staged)
 
   const rows = await db.select<{ count: number }[]>(
     'SELECT COUNT(*) as count FROM journal_items WHERE page_id = ?',
@@ -493,7 +493,7 @@ export async function createJournalItemForIllustration(pageId: string, illustrat
     'SELECT * FROM journal_items WHERE page_id = ? AND illustration_id = ?',
     [pageId, illustrationId]
   )
-  if (existing[0]) return deserializeItem(existing[0])
+  if (existing[0]) return reuseJournalItem(existing[0], initialLayout, staged)
 
   const rows = await db.select<{ count: number }[]>(
     'SELECT COUNT(*) as count FROM journal_items WHERE page_id = ?',
@@ -580,7 +580,7 @@ export async function createJournalItemForImage(pageId: string, journalImageId: 
     'SELECT * FROM journal_items WHERE page_id = ? AND journal_image_id = ?',
     [pageId, journalImageId]
   )
-  if (existing[0]) return deserializeItem(existing[0])
+  if (existing[0]) return reuseJournalItem(existing[0], initialLayout, staged)
 
   const rows = await db.select<{ count: number }[]>(
     'SELECT COUNT(*) as count FROM journal_items WHERE page_id = ?',
@@ -607,6 +607,14 @@ export async function createJournalItemForImage(pageId: string, journalImageId: 
     ]
   )
   return (await fetchJournalItemById(id))!
+}
+
+// A resource may already exist in the work board. Reusing it must also persist
+// its placement; otherwise a visible draft remains staged after saving.
+async function reuseJournalItem(item: JournalItemRow, layout: JournalLayoutUpdate | undefined, staged: boolean): Promise<JournalItem> {
+  if (layout) await updateJournalItemLayout(item.id, layout)
+  await setJournalItemStaged(item.id, staged)
+  return (await fetchJournalItemById(item.id))!
 }
 
 export async function createJournalItemForTape(pageId: string): Promise<JournalItem> {
@@ -692,7 +700,12 @@ export async function removeJournalItem(id: string): Promise<void> {
 export async function fetchJournalPageById(id: string): Promise<JournalPage | null> {
   const db = await getDb()
   const rows = await db.select<JournalPageRow[]>('SELECT * FROM journal_pages WHERE id = ?', [id])
-  return rows[0] ? deserializePage(rows[0]) : null
+  if (!rows[0]) return null
+  const page = deserializePage(rows[0])
+  if (page.book_id && !page.standalone) {
+    return (await fetchJournalPages(page.book_id)).find((entry) => entry.id === id) || page
+  }
+  return page
 }
 
 export async function fetchJournalBookById(id: string): Promise<JournalBook | null> {

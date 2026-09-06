@@ -26,13 +26,17 @@ export interface CanvasItemFrameProps {
   orientation: JournalPageOrientation
   zoom: number
   pageRef: RefObject<HTMLDivElement | null>
-  onSelect: (itemId: string) => void
+  showHandles?: boolean
+  onGroupMoveStart?: (id: string) => boolean
+  onGroupMove?: (dx: number, dy: number, commit: boolean, cancel?: boolean) => void
+  onSelect: (itemId: string, additive?: boolean) => void
   onOpenDetail: (itemId: string) => void
   onUpdateItem: (itemId: string, layout: JournalLayoutInput & { zIndex?: number; stylePayload?: string }) => void
   onStageItem?: (itemId: string) => void
 }
 
-export function CanvasItemFrame({ item, note, illustration, journalImage, selected, orientation, zoom, pageRef, onSelect, onOpenDetail, onUpdateItem, onStageItem }: CanvasItemFrameProps) {
+export function CanvasItemFrame({ item, note, illustration, journalImage, selected, showHandles = true, onGroupMoveStart, onGroupMove, orientation, zoom, pageRef, onSelect, onOpenDetail, onUpdateItem, onStageItem }: CanvasItemFrameProps) {
+  const movingGroup = useRef(false)
   const dragRef = useRef<FrameDragState | null>(null)
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
   const constraints = getDraftItemConstraints(item)
@@ -41,7 +45,12 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
     if (event.button !== 0) return
     event.preventDefault()
     event.stopPropagation()
+    if (mode === 'move' && (event.ctrlKey || event.metaKey)) {
+      onSelect(item.draftId, true)
+      return
+    }
     onSelect(item.draftId)
+    movingGroup.current = mode === 'move' && Boolean(onGroupMoveStart?.(item.draftId))
     const center = getItemCenter(item)
     let startAngle = 0
     if (mode === 'rotate') {
@@ -65,6 +74,11 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
+    if (movingGroup.current) {
+      drag.moved = drag.moved || Math.abs(event.clientX - drag.startClientX) + Math.abs(event.clientY - drag.startClientY) > 2
+      onGroupMove?.((event.clientX - drag.startClientX) / zoom, (event.clientY - drag.startClientY) / zoom, false)
+      return
+    }
     const rect = pageRef.current?.getBoundingClientRect() || null
     const layout = getDraggedLayout(drag, event, zoom, orientation, constraints, rect)
     if (Math.abs(event.clientX - drag.startClientX) + Math.abs(event.clientY - drag.startClientY) > 2) drag.moved = true
@@ -80,6 +94,11 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
     if (!drag || drag.pointerId !== event.pointerId) return
     dragRef.current = null
     event.currentTarget.releasePointerCapture(event.pointerId)
+    if (movingGroup.current) {
+      movingGroup.current = false
+      onGroupMove?.((event.clientX - drag.startClientX) / zoom, (event.clientY - drag.startClientY) / zoom, drag.moved, !drag.moved)
+      return
+    }
     if (!drag.moved) return
     if (onStageItem && document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-journal-workboard="true"]')) {
       onStageItem(item.draftId)
@@ -92,17 +111,26 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
   return (
     <div
       data-journal-item-frame="true"
-      onClick={(event) => { event.stopPropagation(); onSelect(item.draftId) }}
+      data-draft-id={item.draftId}
+      onClick={(event) => event.stopPropagation()}
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onOpenDetail(item.draftId) }}
       onPointerDown={(event) => startDrag(event, 'move')}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={() => { dragRef.current = null }}
+      onPointerCancel={(event) => {
+        if (movingGroup.current) onGroupMove?.(0, 0, false, true)
+        else if (dragRef.current) {
+          const layout = dragRef.current.startLayout
+          Object.assign(event.currentTarget.style, { left: `${layout.x}px`, top: `${layout.y}px`, width: `${layout.width}px`, height: `${layout.height}px`, transform: `rotate(${layout.rotation}deg) translateZ(0)` })
+        }
+        movingGroup.current = false
+        dragRef.current = null
+      }}
       className={clsx('absolute cursor-default touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
       style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
     >
       <JournalDraftItemRenderer item={item} note={note} illustration={illustration} journalImage={journalImage} />
-      {selected && (
+      {selected && showHandles && (
         <>
           {RESIZE_HANDLES.map((handle) => (
             <button

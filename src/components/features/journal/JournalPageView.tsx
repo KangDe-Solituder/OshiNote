@@ -32,6 +32,7 @@ import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/
 import { exportJournalPageImage } from '../../../services/journalExport'
 
 interface JournalPageViewProps {
+  initialPageId?: string
   oshiId: string
   bookId: string | null
   bookTitle: string
@@ -41,7 +42,7 @@ interface JournalPageViewProps {
 
 type Translate = ReturnType<typeof useI18n>['t']
 
-export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard = null, onBack }: JournalPageViewProps) {
+export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, standalonePostcard = null, onBack }: JournalPageViewProps) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const pageTransition = usePageTransition()
@@ -50,7 +51,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [popoverItemId, setPopoverItemId] = useState<string | null>(null)
   const [popoverAnchor, setPopoverAnchor] = useState<JournalPopoverAnchor | null>(null)
-  const [viewingPageId, setViewingPageId] = useState<string | null>(standalonePostcard?.id || null)
+  const [viewingPageId, setViewingPageId] = useState<string | null>(standalonePostcard?.id || initialPageId || null)
   const [previewItemsByPageId, setPreviewItemsByPageId] = useState<Record<string, JournalItemWithNote[]>>({})
   const [stampsByPageId, setStampsByPageId] = useState<Record<string, Stamp | null>>({})
   const [zoom, setZoom] = useState(1)
@@ -83,8 +84,12 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   const updateNote = useNoteStore((state) => state.updateNote)
 
   useEffect(() => {
-    if (bookId) openBook(bookId, oshiId)
-  }, [bookId, openBook, oshiId])
+    let alive = true
+    if (bookId) void openBook(bookId, oshiId).then(() => {
+      if (alive && initialPageId) void setActivePage(initialPageId, oshiId)
+    })
+    return () => { alive = false }
+  }, [bookId, openBook, oshiId, initialPageId, setActivePage])
 
   useEffect(() => {
     let alive = true
@@ -99,12 +104,12 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   }, [oshiId])
 
   useEffect(() => {
-    setViewingPageId(standalonePostcard?.id || null)
+    setViewingPageId(standalonePostcard?.id || initialPageId || null)
     setSelectedItemId(null)
     setPopoverItemId(null)
     setPopoverAnchor(null)
     setShowPageSidebar(false)
-  }, [bookId, standalonePostcard?.id])
+  }, [bookId, standalonePostcard?.id, initialPageId])
 
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) || pages[0] || null,
@@ -153,6 +158,14 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
     })
   }, [activePage, t])
 
+  useEffect(() => {
+    if (!exportMessage) return
+    const timer = window.setTimeout(() => setExportMessage(''), 4000)
+    return () => window.clearTimeout(timer)
+  }, [exportMessage])
+
+  useEffect(() => { setExportMessage('') }, [activePageId, viewingPageId])
+
   async function handleCommitLayout(itemId: string, layout: JournalLayoutInput) {
     const item = items.find((candidate) => candidate.id === itemId)
     await updateItemLayout(itemId, {
@@ -166,6 +179,7 @@ export function JournalPageView({ oshiId, bookId, bookTitle, standalonePostcard 
   }
 
   async function handleAutoArrange() {
+    if (!confirm(t('journalPage.autoArrangeConfirm'))) return
     const noteItems = items.filter((item) => item.note)
     const layouts = autoArrangeNotes(noteItems.map((item) => item.note!))
     await Promise.all(items.map((item) => {

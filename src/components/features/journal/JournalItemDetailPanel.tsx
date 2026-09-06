@@ -1,3 +1,5 @@
+import { JournalLayerControls } from './JournalLayerControls'
+import type { LayerAction } from '../../../features/journal/journalEditing'
 import clsx from 'clsx'
 import { Trash2, X } from 'lucide-react'
 import type { Illustration, JournalDraftItem, JournalPageOrientation, Note } from '../../../types'
@@ -18,6 +20,8 @@ import { Button } from '../../ui/Button'
 import { getItemLayout } from './journalDraftCanvasGeometry'
 
 export interface JournalItemDetailPanelProps {
+  layer: number
+  onChangeLayer: (action: LayerAction) => void
   item: JournalDraftItem
   note?: Note
   illustration?: Illustration
@@ -27,7 +31,7 @@ export interface JournalItemDetailPanelProps {
   onClose: () => void
 }
 
-export function JournalItemDetailPanel({ item, note, illustration, orientation, onUpdateItem, onRemoveItem, onClose }: JournalItemDetailPanelProps) {
+export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illustration, orientation, onUpdateItem, onRemoveItem, onClose }: JournalItemDetailPanelProps) {
   const { t } = useI18n()
   return (
     <aside data-journal-detail-panel="true" className="fixed bottom-5 right-5 top-20 z-[85] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-card/95 p-4 shadow-2xl backdrop-blur">
@@ -39,6 +43,8 @@ export function JournalItemDetailPanel({ item, note, illustration, orientation, 
         <button type="button" className="rounded-lg p-2 text-text-muted hover:bg-bg-secondary hover:text-text-primary" onClick={onClose} title={t('common.cancel')}><X size={16} /></button>
       </div>
       <div className="grid gap-4">
+        <JournalLayerControls layer={layer} onChange={onChangeLayer} />
+        {item.itemType === 'note' && <LayoutNumberControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
         {item.itemType === 'note' && <NoteDetailControls item={item} note={note} onUpdateItem={onUpdateItem} />}
         {(item.itemType === 'illustration' || item.itemType === 'image') && <ImageDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
         {item.itemType === 'material' && <MaterialDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}

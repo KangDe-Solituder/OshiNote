@@ -1,3 +1,4 @@
+import { reorderDraftLayer, type LayerAction } from '../../../features/journal/journalEditing'
 import { ArrowLeft, ImageIcon, Loader2, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -331,11 +332,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     setSelectedItemId((current) => current === itemId ? null : current)
   }
 
-  function bringForward(itemId: string) {
-    setItems((current) => {
-      const nextZ = Math.max(0, ...current.map((item) => item.zIndex)) + 1
-      return current.map((item) => item.draftId === itemId ? { ...item, zIndex: nextZ } : item)
-    })
+  function changeLayer(itemId: string, action: LayerAction) {
+    setItems((current) => reorderDraftLayer(current, itemId, action))
   }
 
   function addDraftItem(payload: DragPayload, point?: { x: number; y: number }) {
@@ -510,7 +508,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         return
       }
       const page = await createJournalPageFromDraft({ ...draft, bookId: targetBookId, stamp: stampDraft })
-      navigate(`/journal/pages/${page.id}/edit`, { replace: true })
+      navigate(`/journal/pages/${page.id}/edit?view=1`, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -601,7 +599,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               onSelectItem={setSelectedItemId}
               onUpdateItem={updateItem}
               onRemoveItem={removeItem}
-              onBringForward={bringForward}
+              onChangeLayer={changeLayer}
               onDropResource={addDraftItem}
               onStageItem={stageExistingItem}
               onDragStartStaged={(item, event) => startPointerResourceDrag({ kind: 'staged', id: item.draftId }, event)}

@@ -126,7 +126,7 @@ export function JournalCanvas({
             />
           ))}
 
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ zIndex: Math.max(0, ...items.map((item) => item.z_index)) + 1 }}>
             <StampOverlay stamp={stamp} />
             <StampPlacementLayer
               active={Boolean(stampPlacementDraft)}

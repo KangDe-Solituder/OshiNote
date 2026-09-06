@@ -1,4 +1,6 @@
-import { ArrowUp, ImageIcon, Inbox, Minus, Plus, RotateCcw, StickyNote, Trash2 } from 'lucide-react'
+import { moveDraftGroup, type LayerAction } from '../../../features/journal/journalEditing'
+import { JournalLayerControls } from './JournalLayerControls'
+import { ImageIcon, Inbox, Minus, Plus, RotateCcw, StickyNote, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note, StampInput } from '../../../types'
@@ -35,7 +37,7 @@ interface JournalDraftCanvasProps {
   onSelectItem: (itemId: string | null) => void
   onUpdateItem: (itemId: string, layout: JournalLayoutInput & { zIndex?: number; stylePayload?: string }) => void
   onRemoveItem: (itemId: string) => void
-  onBringForward: (itemId: string) => void
+  onChangeLayer: (itemId: string, action: LayerAction) => void
   onDropResource: (payload: DragPayload, point: { x: number; y: number }) => void
   onStageItem: (itemId: string) => void
   onDragStartStaged: (item: JournalDraftItem, event: React.PointerEvent<HTMLElement>) => void
@@ -70,7 +72,7 @@ export function JournalDraftCanvas({
   onSelectItem,
   onUpdateItem,
   onRemoveItem,
-  onBringForward,
+  onChangeLayer,
   onDropResource,
   onStageItem,
   onDragStartStaged,
@@ -88,6 +90,31 @@ export function JournalDraftCanvas({
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
   const canvasItems = useMemo(() => items.filter((item) => !item.staged), [items])
   const stagedItems = useMemo(() => items.filter((item) => item.staged), [items])
+  const [selection, setSelection] = useState<string[]>([])
+  const selectedIds = selectedItemId ? (selection.includes(selectedItemId) ? selection : [selectedItemId]) : []
+  const groupDrag = useRef<JournalDraftItem[]>([])
+  function selectItem(id: string, additive = false) {
+    const next = additive
+      ? selectedIds.includes(id) ? selectedIds.filter((selected) => selected !== id) : [...selectedIds, id]
+      : selectedIds.includes(id) ? selectedIds : [id]
+    setSelection(next)
+    onSelectItem(next.includes(id) ? id : next.at(-1) || null)
+  }
+  function startGroupMove(id: string) {
+    groupDrag.current = selectedIds.includes(id) ? canvasItems.filter((item) => selectedIds.includes(item.draftId)) : []
+    return groupDrag.current.length > 1
+  }
+  function moveGroup(dx: number, dy: number, commit: boolean, cancel = false) {
+    const moved = cancel ? groupDrag.current : moveDraftGroup(groupDrag.current, dx, dy, orientation)
+    for (const item of moved) {
+      const frame = Array.from(pageRef.current?.querySelectorAll<HTMLElement>('[data-draft-id]') || []).find((node) => node.dataset.draftId === item.draftId)
+      if (frame) { frame.style.left = `${item.x}px`; frame.style.top = `${item.y}px` }
+      if (commit) onUpdateItem(item.draftId, getItemLayout(item))
+    }
+    if (commit || cancel) groupDrag.current = []
+  }
+  const layerItems = [...canvasItems].sort((a, b) => a.zIndex - b.zIndex)
+  const layerOf = (id: string) => layerItems.findIndex((item) => item.draftId === id) + 1
   const selectedItem = canvasItems.find((item) => item.draftId === selectedItemId) || null
   const detailItem = canvasItems.find((item) => item.draftId === detailItemId) || null
   const filledTemplateSlotIds = new Set(canvasItems.map((item) => item.templateSlotId).filter(Boolean))
@@ -95,17 +122,17 @@ export function JournalDraftCanvas({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setDetailItemId(null)
+      if (event.key === 'Escape') { setDetailItemId(null); setSelection([]); onSelectItem(null) }
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedItemId) {
         const target = document.activeElement as HTMLElement | null
         const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
-        if (!typing) removeSelectedItem(selectedItemId)
+        if (!typing) { event.preventDefault(); selectedIds.forEach(removeSelectedItem) }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItemId])
+  }, [selectedItemId, selection])
 
   useEffect(() => {
     if (detailItemId && !canvasItems.some((item) => item.draftId === detailItemId)) setDetailItemId(null)
@@ -232,6 +259,7 @@ export function JournalDraftCanvas({
       >
       <div data-journal-canvas-ui="true" className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
         <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
+        <span className="px-2 text-xs text-text-muted">{t('journal.multiSelectHint')}</span>
         <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={() => onZoomChange(Math.min(1.25, zoom + 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomIn')}><Plus size={15} /></button>
       </div>
@@ -244,6 +272,7 @@ export function JournalDraftCanvas({
           style={{ width: pageSize.width, height: pageSize.height, transform: `scale(${zoom})`, transformOrigin: 'top left', ...getPageBackground(background) }}
           onClick={(event) => {
             if (event.currentTarget === event.target) {
+              setSelection([])
               onSelectItem(null)
               setDetailItemId(null)
             }
@@ -275,18 +304,21 @@ export function JournalDraftCanvas({
               note={item.sourceId ? notesById.get(item.sourceId) : undefined}
               illustration={item.sourceId ? illustrationsById.get(item.sourceId) : undefined}
               journalImage={item.sourceId ? journalImagesById.get(item.sourceId) : undefined}
-              selected={item.draftId === selectedItemId}
+              selected={selectedIds.includes(item.draftId)}
+              showHandles={selectedIds.length <= 1}
+              onGroupMoveStart={startGroupMove}
+              onGroupMove={moveGroup}
               orientation={orientation}
               zoom={zoom}
               pageRef={pageRef}
-              onSelect={onSelectItem}
+              onSelect={selectItem}
               onOpenDetail={(itemId) => { onSelectItem(itemId); setDetailItemId(itemId) }}
               onUpdateItem={onUpdateItem}
               onStageItem={onStageItem}
             />
           ))}
 
-          <div className="pointer-events-none absolute inset-0">
+          <div className="pointer-events-none absolute inset-0" style={{ zIndex: Math.max(0, ...canvasItems.map((item) => item.zIndex)) + 1 }}>
             <StampOverlay stamp={stamp} />
             <StampPlacementLayer active={Boolean(stampPlacementDraft)} stamp={stampPlacementDraft} soundEnabled={stampSoundEnabled} onPlace={onStampPlace} onComplete={onStampPlacementComplete} onCancel={onStampPlacementCancel} />
           </div>
@@ -295,26 +327,31 @@ export function JournalDraftCanvas({
 
       {selectedItem && (
         <div data-journal-canvas-ui="true" className="fixed bottom-5 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-border-color bg-bg-card/95 p-1.5 shadow-xl backdrop-blur">
+          {selectedIds.length > 1 ? <span className="px-3 text-sm text-text-secondary">{t('journal.selectedCount', { count: selectedIds.length })}</span> : <>
           <button className={toolButtonClass} type="button" onClick={() => resizeSelected(selectedItem, -18, -18, orientation, onUpdateItem)}><Minus size={15} /></button>
           <button className={toolButtonClass} type="button" onClick={() => resizeSelected(selectedItem, 18, 18, orientation, onUpdateItem)}><Plus size={15} /></button>
           <button className={toolButtonClass} type="button" onClick={() => rotateSelected(selectedItem, -5, orientation, onUpdateItem)}>-5</button>
           <button className={toolButtonClass} type="button" onClick={() => onUpdateItem(selectedItem.draftId, getItemLayout({ ...selectedItem, rotation: 0 }))}><RotateCcw size={15} /></button>
           <button className={toolButtonClass} type="button" onClick={() => rotateSelected(selectedItem, 5, orientation, onUpdateItem)}>+5</button>
-          <button className={toolButtonClass} type="button" onClick={() => onBringForward(selectedItem.draftId)}><ArrowUp size={15} /></button>
-          <button className={toolButtonClass} type="button" onClick={() => onStageItem(selectedItem.draftId)} title={t('journal.returnToBoard')}><Inbox size={15} /></button>
+          <JournalLayerControls layer={layerOf(selectedItem.draftId)} onChange={(action) => onChangeLayer(selectedItem.draftId, action)} />
+
           {selectedItem.itemType === 'material' && (
             <label className="flex h-9 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-text-muted">
               {t('journalCreate.glassStrength')}
               <input type="range" min={0} max={100} step={5} value={getMaterialGlassStrength(selectedItem)} onChange={(event) => updateMaterialGlassStrength(selectedItem, Number(event.target.value), onUpdateItem)} className="w-24 accent-[var(--color-accent)]" />
             </label>
           )}
-          <button className={`${toolButtonClass} text-red-500`} type="button" onClick={() => removeSelectedItem(selectedItem.draftId)}><Trash2 size={15} /></button>
+          </>}
+          <button className={toolButtonClass} type="button" onClick={() => selectedIds.forEach(onStageItem)} title={t('journal.returnToBoard')}><Inbox size={15} /></button>
+          <button className={`${toolButtonClass} text-red-500`} type="button" title={t('journalInspector.removeFromPage')} onClick={() => selectedIds.forEach(removeSelectedItem)}><Trash2 size={15} /></button>
         </div>
       )}
 
       {detailItem && (
         <JournalItemDetailPanel
           item={detailItem}
+          layer={layerOf(detailItem.draftId)}
+          onChangeLayer={(action) => onChangeLayer(detailItem.draftId, action)}
           note={detailItem.sourceId ? notesById.get(detailItem.sourceId) : undefined}
           illustration={detailItem.sourceId ? illustrationsById.get(detailItem.sourceId) : undefined}
           orientation={orientation}
