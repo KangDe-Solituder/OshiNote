@@ -51,3 +51,6 @@ local-dev-plan/
 *.njsproj
 *.sln
 *.sw?
+
+# ZCode local session data
+.zcode/
