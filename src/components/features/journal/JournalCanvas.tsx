@@ -60,7 +60,14 @@ export function JournalCanvas({
   const { panning, panHandlers } = useJournalDragPan(viewportRef, Boolean(stampPlacementDraft))
 
   return (
-    <div ref={viewportRef} className={clsx('journal-canvas-viewport relative h-full min-h-0 min-w-0 flex-1 overflow-auto', panning && 'cursor-grabbing')} {...panHandlers}>
+    <div ref={viewportRef} className={clsx('journal-canvas-viewport relative h-full min-h-0 min-w-0 flex-1 overflow-auto', panning && 'cursor-grabbing')} {...panHandlers}
+      onClick={(event) => {
+        if (stampPlacementDraft) return
+        const target = event.target as HTMLElement
+        if (target.closest('[data-journal-item-frame], [data-journal-canvas-ui], button, a, input, textarea, select, aside, [role="dialog"]')) return
+        onSelectItem(null)
+      }}
+    >
       <div
         data-journal-canvas-ui="true"
         className="sticky top-4 z-[60] flex h-10 w-max items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur"
@@ -86,14 +93,11 @@ export function JournalCanvas({
             transformOrigin: 'top left',
             ...getPageBackground(page?.background || 'paper'),
           }}
-          onClick={(e) => {
-            if (e.currentTarget === e.target) onSelectItem(null)
-          }}
         >
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-8 py-5 text-xs text-text-muted">
             <span>{page?.title || t('journalEditor.canvasLabel')}</span>
-            <span>{page ? page.page_index + 1 : 1}</span>
           </div>
+          <span className="pointer-events-none absolute bottom-5 right-8 z-50 text-xs text-text-muted">{page ? page.page_index + 1 : 1}</span>
 
           {loading && (
             <div

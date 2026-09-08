@@ -5,47 +5,43 @@ import { useJournalStore } from '../stores/journalStore'
 import { createCompositionDraft, createDraftSavePlan, draftItemToJournalLayout } from '../features/journal/journalDraftAdapters'
 import {
   createJournalItemForIllustration, createJournalItemForImage, createJournalItemForMaterial,
-  createJournalItemForNote, fetchJournalPageById, fetchJournalBookById, removeJournalItem,
-  setJournalItemStaged, updateJournalItemStyle, updateJournalPage,
+  createJournalItemForNote, removeJournalItem,
+  setJournalItemStaged, updateJournalItemStyle, updateJournalItemLayout, updateJournalPage,
 } from '../features/journal/journalService'
 import { JournalCreationFlow } from '../components/features/journal/JournalCreationFlow'
 import { JournalPageView } from '../components/features/journal/JournalPageView'
 import { useI18n } from '../i18n/useI18n'
-import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
+import { persistStampForTarget } from '../features/stamps/stampService'
+import { loadJournalEditorSnapshot, type JournalEditorSnapshot } from '../features/journal/journalEditorSnapshot'
 
 export function JournalEditorPage() {
+  const { pageId = '' } = useParams<{ pageId: string }>()
+  const [searchParams] = useSearchParams()
+  // View/edit transitions create a new session, including a return to a URL
+  // visited earlier. A previous ready flag must never expose a stale draft.
+  return <JournalEditorSession key={`${pageId}:${searchParams.get('view') === '1'}`} />
+}
+
+function JournalEditorSession() {
   const { t } = useI18n()
   const { pageId = '' } = useParams<{ pageId: string }>()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [readyPageId, setReadyPageId] = useState('')
   const [loadError, setLoadError] = useState('')
-  const [loadedPage, setLoadedPage] = useState<JournalPage | null>(null)
-  const [bookTitle, setBookTitle] = useState('')
-  const [stampDraft, setStampDraft] = useState<Stamp | StampInput | null>(null)
-  const { pages, items, error, openPageForEditing, updateItemLayout, updateItemStyle } = useJournalStore()
-  // Keep the book view mounted when its initial page is deleted or detached;
-  // JournalPageView then shows the remaining pages using the store's state.
-  const activePage = pages.find((page) => page.id === pageId) || (loadedPage?.id === pageId ? loadedPage : null)
+  const [snapshot, setSnapshot] = useState<JournalEditorSnapshot | null>(null)
+  const openPageForEditing = useJournalStore((state) => state.openPageForEditing)
+  const activePage = snapshot?.page
   const viewing = searchParams.get('view') === '1'
 
   useEffect(() => {
     let alive = true
     async function load() {
       if (!pageId) return
-      const page = await fetchJournalPageById(pageId)
+      const next = await loadJournalEditorSnapshot(pageId)
       if (!alive) return
-      if (!page) throw new Error('Journal page not found')
-      await openPageForEditing(pageId, page.oshi_id)
-      const [stamp, book] = await Promise.all([
-        fetchStampForTarget('journal_page', pageId),
-        page.book_id ? fetchJournalBookById(page.book_id) : Promise.resolve(null),
-      ])
+      if (viewing) await openPageForEditing(pageId, next.page.oshi_id)
       if (!alive) return
-      setStampDraft(stamp)
-      setLoadedPage(page)
-      setBookTitle(book?.title || page.title)
-      setReadyPageId(`${pageId}:${viewing}`)
+      setSnapshot(next)
     }
     setLoadError('')
     void load().catch((error: unknown) => { if (alive) setLoadError(String(error)) })
@@ -62,7 +58,7 @@ export function JournalEditorPage() {
     items: JournalDraftItem[]
     stamp: Stamp | StampInput | null
   }) {
-    if (!activePage) return
+    if (!activePage || !snapshot) return
     await updateJournalPage(activePage.id, {
       title: draft.title.trim() || t('journalEditor.defaultPageTitle'),
       description: draft.description.trim(),
@@ -71,16 +67,16 @@ export function JournalEditorPage() {
       orientation: draft.orientation,
     })
 
-    const savePlan = createDraftSavePlan(draft.items, items)
+    const savePlan = createDraftSavePlan(draft.items, snapshot.items)
     await Promise.all(savePlan.existingItemsToRemove.map((item) => removeJournalItem(item.id)))
 
     await Promise.all(savePlan.itemsToUpdate.map(async (item) => {
       const layout = draftItemToJournalLayout(item)
       if (!item.originItemId) return
-      await updateItemLayout(item.originItemId, layout)
+      await updateJournalItemLayout(item.originItemId, layout)
       await setJournalItemStaged(item.originItemId, item.staged === true)
       if (item.stylePayload !== undefined) {
-        await updateItemStyle(item.originItemId, { style_payload: item.stylePayload })
+        await updateJournalItemStyle(item.originItemId, { style_payload: item.stylePayload })
       }
     }))
 
@@ -101,18 +97,17 @@ export function JournalEditorPage() {
       }
     }))
 
-    setStampDraft(await persistStampForTarget('journal_page', activePage.id, draft.stamp))
-    await openPageForEditing(activePage.id, activePage.oshi_id)
+    await persistStampForTarget('journal_page', activePage.id, draft.stamp)
     navigate(`/journal/pages/${activePage.id}/edit?view=1`, { replace: true })
   }
 
   if (!pageId) return <JournalCreationFlow />
-  if (readyPageId !== `${pageId}:${viewing}` || !activePage) return <div role="status" className="p-6 text-text-muted">{loadError || error || t('common.loading')}</div>
+  if (!snapshot || !activePage) return <div role="status" className="p-6 text-text-muted">{loadError || t('common.loading')}</div>
   if (viewing) return (
     <JournalPageView
       oshiId={activePage.oshi_id}
       bookId={activePage.book_id}
-      bookTitle={bookTitle}
+      bookTitle={snapshot.bookTitle}
       initialPageId={pageId}
       standalonePostcard={activePage.standalone ? activePage : null}
       onBack={() => navigate('/journal')}
@@ -123,7 +118,7 @@ export function JournalEditorPage() {
       key={pageId}
       mode="edit"
       initialStep={searchParams.get('setup') === '1' ? 'setup' : 'draft'}
-      initialDraft={createCompositionDraft(activePage, items, stampDraft)}
+      initialDraft={createCompositionDraft(activePage, snapshot.items, snapshot.stamp)}
       onSaveDraft={handleSaveCompositionDraft}
       onCancelEdit={() => navigate(`/journal/pages/${pageId}/edit?view=1`, { replace: true })}
     />

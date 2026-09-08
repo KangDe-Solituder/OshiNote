@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Check, FileImage, ImageIcon, ImageDown, LayoutGrid, Loader2, MoreHorizontal, Palette, Plus, Trash2, X } from 'lucide-react'
@@ -60,6 +60,9 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
   const [showPageActions, setShowPageActions] = useState(false)
   const [pageDraft, setPageDraft] = useState({ title: '', description: '', date_label: '', background: 'paper' })
   const [availableBooks, setAvailableBooks] = useState<JournalBook[]>([])
+  // Set once the user explicitly opens a page; prevents the mount-time
+  // openBook().then(setActivePage(initialPageId)) chain from clobbering it.
+  const userPickedPageRef = useRef(false)
   const [exporting, setExporting] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
   const {
@@ -86,7 +89,7 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
   useEffect(() => {
     let alive = true
     if (bookId) void openBook(bookId, oshiId).then(() => {
-      if (alive && initialPageId) void setActivePage(initialPageId, oshiId)
+      if (alive && initialPageId && !userPickedPageRef.current) void setActivePage(initialPageId, oshiId)
     })
     return () => { alive = false }
   }, [bookId, openBook, oshiId, initialPageId, setActivePage])
@@ -109,6 +112,7 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
     setPopoverItemId(null)
     setPopoverAnchor(null)
     setShowPageSidebar(false)
+    userPickedPageRef.current = false
   }, [bookId, standalonePostcard?.id, initialPageId])
 
   const activePage = useMemo(
@@ -259,6 +263,7 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
   }
 
   function handleOpenPage(pageId: string) {
+    userPickedPageRef.current = true
     setSelectedItemId(null)
     setViewingPageId(pageId)
     setActivePage(pageId, oshiId)
@@ -673,7 +678,7 @@ function PagePreviewCard({
           />
         ))}
         <StampOverlay stamp={stamp || null} />
-        <span className="absolute right-3 top-3 rounded-full bg-bg-card/90 px-2 py-0.5 text-xs font-semibold text-accent">
+        <span className="absolute bottom-3 right-3 z-30 rounded-full bg-bg-card/90 px-2 py-0.5 text-xs font-semibold text-accent">
           {page.page_index + 1}
         </span>
       </div>

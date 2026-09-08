@@ -256,10 +256,17 @@ export function JournalDraftCanvas({
         ref={viewportRef}
         className={clsx('journal-canvas-viewport relative flex min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6', panning && 'cursor-grabbing')}
         {...panHandlers}
+        onClick={(event) => {
+          if (stampPlacementDraft) return
+          const target = event.target as HTMLElement
+          if (target.closest('[data-journal-item-frame], [data-journal-canvas-ui], [data-journal-detail-panel], button, a, input, textarea, select, aside, [role="dialog"]')) return
+          setSelection([])
+          onSelectItem(null)
+          setDetailItemId(null)
+        }}
       >
       <div data-journal-canvas-ui="true" className="fixed right-6 top-24 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
         <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
-        <span className="px-2 text-xs text-text-muted">{t('journal.multiSelectHint')}</span>
         <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={() => onZoomChange(Math.min(1.25, zoom + 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomIn')}><Plus size={15} /></button>
       </div>
@@ -270,13 +277,6 @@ export function JournalDraftCanvas({
           data-journal-draft-page="true"
           className="journal-paper-page relative cursor-grab overflow-hidden"
           style={{ width: pageSize.width, height: pageSize.height, transform: `scale(${zoom})`, transformOrigin: 'top left', ...getPageBackground(background) }}
-          onClick={(event) => {
-            if (event.currentTarget === event.target) {
-              setSelection([])
-              onSelectItem(null)
-              setDetailItemId(null)
-            }
-          }}
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' }}
           onDrop={handleDrop}
         >

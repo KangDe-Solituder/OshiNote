@@ -2,6 +2,15 @@ import { create } from 'zustand'
 import type { Illustration, JournalBook, JournalCoverDecoration, JournalCoverStyle, JournalItemStyle, JournalItemWithNote, JournalPage, Note } from '../types'
 import * as journalService from '../features/journal/journalService'
 
+// Monotonic sequence for page-level loads (openBook / setActivePage /
+// openPageForEditing): when several loads overlap (fast page switching between
+// view and edit routes), a stale async completion must not overwrite the
+// selection/items of a newer load.
+let pageLoadSeq = 0
+function beginPageLoad(): number {
+  return ++pageLoadSeq
+}
+
 interface LayoutInput {
   x: number
   y: number
@@ -90,14 +99,17 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   error: null,
 
   loadBookshelf: async (oshiId) => {
+    const loadSeq = beginPageLoad()
     set({ loading: true, error: null })
     try {
       const [books, postcards] = await Promise.all([
         journalService.fetchJournalBooks(oshiId),
         journalService.fetchStandalonePostcards(oshiId),
       ])
+      if (loadSeq !== pageLoadSeq) return
       set({ books, postcards, activeBookId: null, activeStandalonePageId: null, pages: [], activePageId: null, items: [], unplacedNotes: [], unplacedIllustrations: [], loading: false })
     } catch (e) {
+      if (loadSeq !== pageLoadSeq) return
       set({ error: String(e), loading: false })
     }
   },
@@ -148,6 +160,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   openBook: async (bookId, oshiId) => {
+    const loadSeq = beginPageLoad()
     set({ loading: true, error: null })
     try {
       const firstPage = await journalService.ensureJournalPage(bookId)
@@ -162,13 +175,16 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         journalService.fetchUnplacedIllustrations(activePageId, oshiId),
       ])
       pages = await journalService.fetchJournalPages(bookId)
+      if (loadSeq !== pageLoadSeq) return
       set({ activeBookId: bookId, activeStandalonePageId: null, pages, activePageId, items, unplacedNotes, unplacedIllustrations, loading: false })
     } catch (e) {
+      if (loadSeq !== pageLoadSeq) return
       set({ error: String(e), loading: false })
     }
   },
 
   openPostcard: async (pageId, oshiId) => {
+    const loadSeq = beginPageLoad()
     set({ loading: true, error: null })
     try {
       const items = await journalService.fetchJournalItems(pageId)
@@ -178,6 +194,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       ])
       const postcards = await journalService.fetchStandalonePostcards(oshiId)
       const page = postcards.find((candidate) => candidate.id === pageId)
+      if (loadSeq !== pageLoadSeq) return
       set({
         activeBookId: null,
         activeStandalonePageId: pageId,
@@ -189,11 +206,13 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         loading: false,
       })
     } catch (e) {
+      if (loadSeq !== pageLoadSeq) return
       set({ error: String(e), loading: false })
     }
   },
 
   openPageForEditing: async (pageId, oshiId) => {
+    const loadSeq = beginPageLoad()
     set({ loading: true, error: null })
     try {
       const page = await journalService.fetchJournalPageById(pageId)
@@ -206,6 +225,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         journalService.fetchUnplacedIllustrations(page.id, oshiId),
       ])
 
+      if (loadSeq !== pageLoadSeq) return
       set({
         activeBookId: page.book_id,
         activeStandalonePageId: page.standalone ? page.id : null,
@@ -217,6 +237,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         loading: false,
       })
     } catch (e) {
+      if (loadSeq !== pageLoadSeq) return
       set({ error: String(e), loading: false })
     }
   },
@@ -272,18 +293,24 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     }
   },
 
-  closeBook: () => set({ activeBookId: null, activeStandalonePageId: null, pages: [], activePageId: null, items: [], unplacedNotes: [], unplacedIllustrations: [] }),
+  closeBook: () => {
+    beginPageLoad()
+    set({ activeBookId: null, activeStandalonePageId: null, pages: [], activePageId: null, items: [], unplacedNotes: [], unplacedIllustrations: [], loading: false, error: null })
+  },
 
   setActivePage: async (pageId, oshiId) => {
-    set({ activePageId: pageId, loading: true, error: null })
+    const loadSeq = beginPageLoad()
+    set({ activePageId: pageId, items: [], unplacedNotes: [], unplacedIllustrations: [], loading: true, error: null })
     try {
       const items = await journalService.fetchJournalItems(pageId)
       const [unplacedNotes, unplacedIllustrations] = oshiId ? await Promise.all([
         journalService.fetchUnplacedNotes(pageId, oshiId),
         journalService.fetchUnplacedIllustrations(pageId, oshiId),
       ]) : [[], []]
+      if (loadSeq !== pageLoadSeq) return
       set({ items, unplacedNotes, unplacedIllustrations, loading: false })
     } catch (e) {
+      if (loadSeq !== pageLoadSeq) return
       set({ error: String(e), loading: false })
     }
   },
@@ -410,9 +437,11 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   refreshItems: async () => {
+    const loadSeq = pageLoadSeq
     const activePageId = get().activePageId
     if (!activePageId) return
     const items = await journalService.fetchJournalItems(activePageId)
+    if (loadSeq !== pageLoadSeq || get().activePageId !== activePageId) return
     set({ items })
   },
 }))

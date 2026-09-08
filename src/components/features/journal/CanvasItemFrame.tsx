@@ -10,6 +10,7 @@ import {
   angleFromCenter,
   getDraggedLayout,
   getHandleClass,
+  getResizeCursor,
   getItemCenter,
   getItemLayout,
   type FrameDragMode,
@@ -57,7 +58,10 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
       const rect = pageRef.current?.getBoundingClientRect()
       if (rect) startAngle = angleFromCenter(event.clientX, event.clientY, { x: rect.left + center.x * zoom, y: rect.top + center.y * zoom })
     }
-    event.currentTarget.setPointerCapture(event.pointerId)
+    // Capture on the frame even when a child resize/rotation handle is pressed.
+    const frame = event.currentTarget.closest<HTMLDivElement>('[data-journal-item-frame="true"]')!
+    frame.setPointerCapture(event.pointerId)
+    frame.style.cursor = mode === 'resize' ? getResizeCursor(handle || 'se', item.rotation) : mode === 'rotate' ? 'grabbing' : 'move'
     dragRef.current = {
       pointerId: event.pointerId,
       mode,
@@ -93,6 +97,7 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
     dragRef.current = null
+    event.currentTarget.style.cursor = ''
     event.currentTarget.releasePointerCapture(event.pointerId)
     if (movingGroup.current) {
       movingGroup.current = false
@@ -125,6 +130,7 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
         }
         movingGroup.current = false
         dragRef.current = null
+        event.currentTarget.style.cursor = ''
       }}
       className={clsx('absolute cursor-default touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
       style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
@@ -136,7 +142,8 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
             <button
               key={handle}
               type="button"
-              className={clsx('absolute z-20 h-3 w-3 rounded-full border border-accent bg-bg-primary shadow-sm', getHandleClass(handle))}
+              className={clsx('absolute z-20 h-3 w-3 rounded-full border border-accent bg-bg-primary shadow-sm', getHandleClass(handle, item.rotation))}
+              style={{ cursor: getResizeCursor(handle, item.rotation) }}
               onPointerDown={(event) => startDrag(event as unknown as PointerEvent<HTMLDivElement>, 'resize', handle)}
               aria-label={`resize ${handle}`}
             />

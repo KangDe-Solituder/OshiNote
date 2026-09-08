@@ -1,10 +1,13 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    include: ['src/**/*.test.{ts,tsx}'],
+  },
   clearScreen: false,
   server: {
     port: 5173,

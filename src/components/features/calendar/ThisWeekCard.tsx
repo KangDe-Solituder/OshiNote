@@ -15,6 +15,7 @@ import { fetchArchivesByOshi } from '../../../features/oshis/archiveService'
 import { buildWeeklyRecap, stashWeeklyHandoff } from '../../../features/journal/weeklyRecap'
 import type { Archive } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
+import { useAutoHideScroll } from '../../ui/useAutoHideScroll'
 
 interface WeekEntry extends DayScheduleEntry {
   isToday: boolean
@@ -85,9 +86,11 @@ export function ThisWeekCard({ oshi, refreshToken }: { oshi: Oshi; refreshToken?
 
   const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
+  const scrollRef = useAutoHideScroll<HTMLDivElement>('[data-scroll-activity]')
+
   return (
-    <section className="rounded-2xl border border-border-color bg-bg-card p-5 shadow-e1">
-      <div className="mb-3 flex items-center gap-2">
+    <section data-scroll-activity className="flex h-full flex-col rounded-2xl border border-border-color bg-bg-card p-5 shadow-e1">
+      <div className="mb-3 flex shrink-0 items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-soft/30 text-accent">
           <CalendarDays size={16} />
         </span>
@@ -105,7 +108,7 @@ export function ThisWeekCard({ oshi, refreshToken }: { oshi: Oshi; refreshToken?
       {entries.length === 0 ? (
         <p className="py-4 text-center text-sm text-text-muted">{t('calendar.noWeekSchedules')}</p>
       ) : (
-        <div className="space-y-1.5">
+        <div ref={scrollRef} className="scroll-fade min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
           {entries.map((entry) => (
             <div
               key={`${entry.schedule.id}-${entry.date}`}
