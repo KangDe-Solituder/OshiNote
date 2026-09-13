@@ -439,6 +439,166 @@ function AnchorArt() {
   )
 }
 
+function GhostArt() {
+  return (
+    <>
+      <path d="M17 31 C13 18 21 9 31 9 C42 8 48 17 47 28 C47 36 51 40 56 40 C53 47 46 46 42 43 C40 53 31 58 20 54 C26 51 26 47 24 44 C18 48 11 45 8 40 C15 40 18 37 17 31 Z" fill={PALE} stroke={SOFT} strokeWidth={1.3} strokeLinejoin="round" />
+      <path d="M39 13 C50 27 39 35 43 41 C42 50 32 55 24 54 C36 48 33 43 36 37 C41 26 43 21 39 13 Z" fill="currentColor" opacity={0.45} />
+      <path d="M21 23 C21 18 25 14 29 14" stroke={WHITE} strokeWidth={2.5} strokeLinecap="round" />
+      <ellipse cx={26} cy={28} rx={3} ry={4.7} transform="rotate(12 26 28)" fill={INK} />
+      <ellipse cx={38} cy={27} rx={2.8} ry={4.5} transform="rotate(-12 38 27)" fill={INK} />
+      <path d="M30 37 C28 31 35 31 35 37 C35 41 31 42 30 37 Z" fill={INK} />
+      <path d="M10 23 C6 20 7 16 10 13 C10 17 14 19 10 23 Z M53 32 C50 29 53 25 55 24 C54 28 58 30 53 32 Z" fill="currentColor" opacity={0.65} />
+    </>
+  )
+}
+
+function BloodHandprintArt() {
+  return (
+    <>
+      <path d="M21 29 L15 17 C13 12 17 10 19 14 L26 27 L23 9 C22 4 27 3 28 8 L31 25 L33 7 C34 2 39 4 38 9 L37 26 L43 13 C45 9 49 11 47 16 L41 31 C45 33 47 29 50 28 C54 26 57 30 53 33 L47 39 C44 41 44 45 41 48 C36 52 24 50 22 44 L19 36 C18 32 20 31 21 29 Z" fill="currentColor" />
+      <path d="M23 36 C25 31 30 30 33 31 M28 43 C33 46 38 44 40 40 M24 15 L26 24 M35 12 L34 23 M43 19 L40 26" stroke={DEEP} strokeWidth={1.5} strokeLinecap="round" opacity={0.48} />
+      <path d="M25 47 L25 54 Q23 59 26 59 Q29 59 27 54 L28 48 M37 48 L38 56 Q40 60 41 57 L40 47" fill="currentColor" />
+      <path d="M27 33 L30 34 M32 39 L36 37 M28 40 L29 42" stroke={PALE} strokeWidth={1.3} strokeLinecap="round" opacity={0.5} />
+      <path d="M10 31 L12 36 M49 46 L51 49" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" />
+      <circle cx={13} cy={42} r={1.8} fill="currentColor" /><circle cx={47} cy={54} r={1.3} fill="currentColor" />
+    </>
+  )
+}
+
+function HeartArrowArt() {
+  return (
+    <>
+      <path d="M5 48 L30 33" stroke={SHADE} strokeWidth={3.6} strokeLinecap="round" />
+      <path d="M4.5 48.5 L13.5 41 L12 49 L19.5 46 Z" fill={SHADE} />
+      <path d="M34 47 C23 39 14.5 31.5 14.5 22.5 C14.5 14 20.5 9 27.5 9 C31 9 33.5 11 34.5 13.5 C35.5 11 38 9 41.5 9 C48.5 9 54.5 14 54.5 22.5 C54.5 31.5 45 39 34 47 Z" fill="currentColor" />
+      <path d="M34.5 47 C45 39 54.5 31.5 54.5 22.5 C54.5 20 54 17.5 52.5 15.5 C53 29 42 39 31.5 45 Z" fill={SHADE} opacity={0.5} />
+      <ellipse cx={24} cy={17} rx={5} ry={3.2} transform="rotate(-24 24 17)" fill={WHITE} opacity={0.65} />
+      <circle cx={47} cy={15} r={1.8} fill={WHITE} opacity={0.8} />
+      <path d="M39.5 25.3 L58 14.2" stroke={SHADE} strokeWidth={3.6} strokeLinecap="round" />
+      <path d="M60 12.8 L49 13.4 L56.6 21.8 Z" fill={SHADE} />
+      <circle cx={20.5} cy={38.7} r={1.7} fill={WHITE} opacity={0.9} />
+      <circle cx={46.8} cy={22.9} r={1.7} fill={WHITE} opacity={0.9} />
+    </>
+  )
+}
+
+function WoodenClubArt() {
+  return (
+    <g transform="rotate(37 32 32)">
+      <path d="M25 7 L34 5 L40 9 L39 18 L37 23 L35 38 L34 53 Q36 57 32 59 Q27 60 27 55 L28 37 L25 27 L23 15 Z" fill="currentColor" stroke={SHADE} strokeWidth={1.3} strokeLinejoin="round" />
+      <path d="M34 7 L37 11 L35 25 L32 38 L32 56 L34 56 L35 37 L38 20 L40 9 Z" fill={SHADE} />
+      <path d="M27 10 L26 17 L29 26 L30 35 M32 12 L30 20 L32 25 M35 28 L32 33" stroke={DEEP} strokeWidth={1.3} strokeLinecap="round" opacity={0.7} />
+      <path d="M26 8 L31 7 M26 12 L27 18" stroke={SOFT} strokeWidth={1.6} strokeLinecap="round" />
+      <ellipse cx={33} cy={15} rx={1.5} ry={3} fill="none" stroke={SHADE} strokeWidth={1.2} />
+      <path d="M27.5 41 L34.5 40 L34 53 L27 54 Z" fill={DEEP} />
+      <path d="M28 43 L34 45 M28 47 L34 49 M28 51 L33 53" stroke={SOFT} strokeWidth={1.7} strokeLinecap="round" />
+    </g>
+  )
+}
+
+function AngelWingsArt() {
+  return (
+    <>
+      {[false, true].map((mirror) => (
+        <g key={String(mirror)} transform={mirror ? 'translate(64 0) scale(-1 1)' : undefined}>
+          <path d="M30 43 C29 29 20 28 9 14 C5 23 6 31 9 36 C6 39 10 44 14 44 C12 48 17 51 21 48 C23 53 29 49 30 43 Z" fill={PALE} stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" />
+          <path d="M10 20 C12 31 23 35 27 43 M10 30 C13 36 18 39 24 43 M12 39 Q16 43 21 44" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" opacity={0.7} />
+          <path d="M15 25 Q24 29 28 37" fill="none" stroke={WHITE} strokeWidth={3.5} strokeLinecap="round" />
+        </g>
+      ))}
+      <ellipse cx={32} cy={12} rx={8} ry={3} stroke="#e5c887" strokeWidth={2} />
+      <path d="M26 11 Q32 9 37 11" stroke={WHITE} strokeWidth={1.2} strokeLinecap="round" />
+      <path d="M9 49 L10 53 L14 54 L10 55 L9 59 L8 55 L4 54 L8 53 Z M54 8 L55 11 L58 12 L55 13 L54 16 L53 13 L50 12 L53 11 Z" fill="#e5c887" />
+    </>
+  )
+}
+
+function HannyaMaskArt() {
+  const warmShade = 'color-mix(in srgb, currentColor 72%, #b67d58)'
+  return (
+    <>
+      {/* Familiar horned mask, softened into a warm, closed-eye smile. */}
+      <path d="M19 18 C14 15 12 9 13 5 C16 10 19 12 23 13 M45 18 C50 15 52 9 51 5 C48 10 45 12 41 13" fill="#d6ac6c" stroke="#aa7953" strokeWidth={1.1} strokeLinejoin="round" />
+      <path d="M15 11 L19 15 M49 11 L45 15" stroke="#f7dfaa" strokeWidth={1.5} strokeLinecap="round" />
+      <path d="M16 24 L12 22 L13 33 L18 36 M48 24 L52 22 L51 33 L46 36" fill="currentColor" stroke={warmShade} strokeWidth={1.2} strokeLinejoin="round" />
+      <path d="M16 23 C15 13 23 8 32 7 C41 8 49 13 48 23 L47 37 C46 48 40 56 32 58 C24 56 18 48 17 37 Z" fill="currentColor" stroke={warmShade} strokeWidth={1.1} />
+      <path d="M37 10 C46 14 49 22 45 34 L44 43 Q41 54 32 57 L35 50 L38 42 L37 31 Z" fill={warmShade} opacity={0.3} />
+      <path d="M18 19 C20 14 24 11 28 10 M46 19 C44 14 40 11 36 10" fill="none" stroke="#967052" strokeWidth={1.3} strokeLinecap="round" />
+      {/* Sculpted brows remain, with relaxed curves instead of a frown. */}
+      <path d="M18 24 Q24 20 29 24 M46 24 Q40 20 35 24" fill="none" stroke={SOFT} strokeWidth={3} strokeLinecap="round" />
+      <path d="M19 25 Q24 22 28 25 M45 25 Q40 22 36 25" fill="none" stroke={warmShade} strokeWidth={1} strokeLinecap="round" />
+      <path d="M19.5 31 Q24 25.5 28.5 31 M35.5 31 Q40 25.5 44.5 31" fill="none" stroke="#876047" strokeWidth={2.2} strokeLinecap="round" />
+      <ellipse cx={22} cy={36} rx={4} ry={2.3} fill="#e99a86" opacity={0.65} />
+      <ellipse cx={42} cy={36} rx={4} ry={2.3} fill="#e99a86" opacity={0.65} />
+      <path d="M32 25 L29 35 Q27 39 31 40 L35 39 Q37 38 34 35 Z" fill={SOFT} />
+      <path d="M32 28 L33 36" stroke={WHITE} strokeWidth={1.2} strokeLinecap="round" opacity={0.65} />
+      <path d="M29 38 Q30 37 31 38 M33 38 Q34 37 35 38" stroke={warmShade} strokeWidth={1.1} strokeLinecap="round" />
+      <path d="M23 42 Q32 47 41 42 C39 49 36 52 32 52 C28 52 25 49 23 42 Z" fill="#aa6751" stroke="#b87960" strokeWidth={1.1} strokeLinejoin="round" />
+      <path d="M25 43 Q32 46 39 43 L37 46 Q32 48 27 46 Z" fill="#fff2cd" />
+      <path d="M26 44 L28.5 45 L27.5 48 Z M38 44 L35.5 45 L36.5 48 Z" fill="#fff8e6" />
+      <path d="M28.5 50 Q32 47 35.5 50 Q32 52 28.5 50 Z" fill="#e9a18d" />
+      <path d="M29 54 Q32 55 35 54" fill="none" stroke={warmShade} strokeWidth={1} strokeLinecap="round" opacity={0.5} />
+    </>
+  )
+}
+
+function FormulaRaceCarArt() {
+  return (
+    <g transform="rotate(35 32 32)">
+      {/* Open wheels and wishbones, viewed from above. */}
+      <path d="M19 19 L29 23 L19 24 M45 19 L35 23 L45 24 M18 42 L27 39 L18 46 M46 42 L37 39 L46 46" stroke={INK} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <g fill={INK}>
+        <rect x={13} y={15} width={8} height={13} rx={3} />
+        <rect x={43} y={15} width={8} height={13} rx={3} />
+        <rect x={12} y={38} width={9} height={15} rx={3.2} />
+        <rect x={43} y={38} width={9} height={15} rx={3.2} />
+      </g>
+      <path d="M15 18 V25 M49 18 V25 M14 41 V50 M50 41 V50" stroke={WHITE} strokeWidth={1.2} strokeLinecap="round" opacity={0.35} />
+      {/* Floor, sculpted sidepods and tapered engine cover. */}
+      <path d="M26 26 Q32 23 38 26 L42 43 L40 49 H24 L22 43 Z" fill={DEEP} />
+      <path d="M26 27 Q23 29 23 34 L24 43 Q26 46 30 46 H34 Q38 46 40 43 L41 34 Q41 29 38 27 L35 30 H29 Z" fill="currentColor" />
+      <path d="M25 32 L27 30 L28 41 L25 42 Z M39 32 L37 30 L36 41 L39 42 Z" fill={SOFT} />
+      <path d="M29 35 H35 L37 47 H27 Z" fill={SHADE} />
+      <path d="M31 37 H33 L34 47 H30 Z" fill={PALE} />
+      {/* Long nose and two-tier front wing. */}
+      <path d="M29.5 10 Q32 8 34.5 10 L36 27 Q32 30 28 27 Z" fill="currentColor" />
+      <path d="M31 12 H33 L34 23 H30 Z" fill={WHITE} opacity={0.85} />
+      <path d="M19 8 Q32 11 45 8 L45 13 Q32 16 19 13 Z" fill="currentColor" />
+      <path d="M20 12 Q32 15 44 12" stroke={SHADE} strokeWidth={1.6} strokeLinecap="round" />
+      <path d="M21 9.5 Q32 12 43 9.5" stroke={SOFT} strokeWidth={1.2} strokeLinecap="round" />
+      <rect x={17.5} y={7.5} width={3} height={7} rx={1} fill={DEEP} />
+      <rect x={43.5} y={7.5} width={3} height={7} rx={1} fill={DEEP} />
+      {/* Recessed cockpit, driver's helmet and protective halo. */}
+      <rect x={27.5} y={25} width={9} height={12} rx={4.5} fill={INK} />
+      <circle cx={32} cy={31.5} r={3} fill="#ffd97a" />
+      <path d="M29.5 30.5 Q32 29.5 34.5 30.5 L34 32 H30 Z" fill={INK} />
+      <path d="M28 30 V28 Q28 24 32 24 Q36 24 36 28 V30 M32 24 V28" stroke={PALE} strokeWidth={1.8} strokeLinecap="round" />
+      {/* Broad rear wing with inset highlight and endplates. */}
+      <path d="M27 47 V52 M37 47 V52" stroke={DEEP} strokeWidth={2} />
+      <rect x={21} y={49} width={22} height={6} rx={1.5} fill="currentColor" />
+      <path d="M24 51 H40" stroke={SOFT} strokeWidth={1.6} strokeLinecap="round" />
+      <path d="M23 54 H41" stroke={SHADE} strokeWidth={1.5} strokeLinecap="round" />
+      <rect x={19.5} y={48} width={3} height={8} rx={1} fill={DEEP} />
+      <rect x={41.5} y={48} width={3} height={8} rx={1} fill={DEEP} />
+    </g>
+  )
+}
+
+function WhiteDressArt() {
+  return (
+    <>
+      <path d="M29 9 C29 4 36 4 36 8 C36 11 32 11 32 14 V16 L48 24 Q50 26 47 26 H17 Q14 26 16 24 L32 16" stroke="#aa917b" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M23 19 L27 20 Q32 26 37 20 L41 19 L40 29 L37 33 C39 40 45 47 48 55 Q32 61 16 55 C19 47 25 40 27 33 L24 29 Z" fill="currentColor" stroke="#c5c5d3" strokeWidth={1.2} strokeLinejoin="round" />
+      <path d="M25 22 L28 30 M39 22 L36 30" stroke={WHITE} strokeWidth={1.8} strokeLinecap="round" />
+      <path d="M27 34 Q24 46 22 54 M32 36 V56 M37 34 Q40 46 42 54" stroke="#dcdce6" strokeWidth={1.6} strokeLinecap="round" />
+      <path d="M26 32 Q32 34 38 32" stroke="#b9adc9" strokeWidth={2} />
+      <path d="M32 33 C24 27 24 37 32 33 C40 27 40 37 32 33 M32 34 L29 39 M32 34 L35 39" fill="none" stroke="#b9adc9" strokeWidth={1.3} strokeLinecap="round" />
+      <path d="M19 54 Q32 58 45 54" stroke={WHITE} strokeWidth={2} strokeLinecap="round" />
+    </>
+  )
+}
+
 const STICKER_ART: Record<string, () => ReactElement> = {
   heart: HeartArt,
   star: StarArt,
@@ -463,4 +623,12 @@ const STICKER_ART: Record<string, () => ReactElement> = {
   anchor: AnchorArt,
   'tennis-ball': TennisBallArt,
   'tennis-racket': TennisRacketArt,
+  ghost: GhostArt,
+  'blood-handprint': BloodHandprintArt,
+  'heart-arrow': HeartArrowArt,
+  'wooden-club': WoodenClubArt,
+  'angel-wings': AngelWingsArt,
+  'white-dress': WhiteDressArt,
+  'hannya-mask': HannyaMaskArt,
+  'mini-4wd': FormulaRaceCarArt,
 }
