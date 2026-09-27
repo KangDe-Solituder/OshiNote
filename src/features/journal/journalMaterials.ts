@@ -31,6 +31,8 @@ export const JOURNAL_MATERIALS: JournalMaterialDefinition[] = [
   sticker('headphones', 'live', 'journalMaterials.headphones', 76, 72, -5, { icon: 'headphones', color: '#7d86d9' }),
   sticker('monitor', 'live', 'journalMaterials.monitor', 80, 72, 4, { icon: 'monitor', color: '#6f9fc0' }),
   sticker('gamepad', 'live', 'journalMaterials.gamepad', 80, 72, -7, { icon: 'gamepad', color: '#9a7fd4' }),
+  sticker('pteranodon', 'live', 'journalMaterials.pteranodon', 86, 76, -5, { icon: 'pteranodon', color: '#82a99b' }),
+  sticker('radio', 'live', 'journalMaterials.radio', 78, 74, 5, { icon: 'radio', color: '#d49a74' }),
   sticker('sakura', 'nature', 'journalMaterials.sakura', 76, 76, -6, { icon: 'sakura', color: '#f2a2c0' }),
   sticker('straw-hat', 'nature', 'journalMaterials.strawHat', 84, 68, 5, { icon: 'straw-hat', color: '#dfb75c' }),
   sticker('maple-leaf', 'nature', 'journalMaterials.mapleLeaf', 74, 76, -8, { icon: 'maple-leaf', color: '#df7f4a' }),

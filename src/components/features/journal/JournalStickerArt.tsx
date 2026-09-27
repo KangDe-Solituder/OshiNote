@@ -191,6 +191,49 @@ function GamepadArt() {
   )
 }
 
+function PteranodonArt() {
+  return (
+    <>
+      {/* Swept wings and a long head crest make the flying reptile readable at sticker size. */}
+      <path d="M31 34 C23 26 16 17 6 9 C8 18 9 23 13 27 L3 26 C9 35 16 39 25 39 L31 43 Z" fill="currentColor" stroke={SHADE} strokeWidth={1.2} strokeLinejoin="round" />
+      <path d="M33 34 C40 25 48 18 59 12 C56 21 53 26 49 29 L61 27 C55 36 47 41 39 40 L33 43 Z" fill="currentColor" stroke={SHADE} strokeWidth={1.2} strokeLinejoin="round" />
+      <path d="M8 13 C14 26 23 32 29 35 M55 16 C48 28 40 34 35 36" fill="none" stroke={SOFT} strokeWidth={2.2} strokeLinecap="round" opacity={0.8} />
+      <path d="M17 31 L25 37 M48 33 L40 38" stroke={DEEP} strokeWidth={1.4} strokeLinecap="round" opacity={0.55} />
+      <path d="M27 37 C29 33 34 32 37 36 L40 42 L34 48 L28 43 Z" fill={SHADE} />
+      <path d="M31 44 L27 56 L31 54 L35 48 Z" fill={DEEP} />
+      <path d="M35 35 C38 30 41 27 42 23 L45 11 L47 25 C51 26 55 28 58 31 L46 34 C43 39 39 42 35 42 Z" fill="currentColor" stroke={SHADE} strokeWidth={1.2} strokeLinejoin="round" />
+      <path d="M46 33 L61 34 L48 38 L42 37 Z" fill={PALE} stroke={SHADE} strokeWidth={1} strokeLinejoin="round" />
+      <path d="M42 23 L45 13 L45 28" fill="none" stroke={SOFT} strokeWidth={1.8} strokeLinecap="round" />
+      <circle cx={48} cy={29} r={1.5} fill={INK} />
+      <circle cx={48.5} cy={28.5} r={0.45} fill={WHITE} />
+      <path d="M32 44 L27 50 M36 45 L40 50" stroke={DEEP} strokeWidth={2} strokeLinecap="round" />
+    </>
+  )
+}
+
+function RadioArt() {
+  return (
+    <>
+      <path d="M18 23 L45 10" stroke={DEEP} strokeWidth={2.8} strokeLinecap="round" />
+      <circle cx={45} cy={10} r={2.1} fill={SOFT} />
+      <path d="M11 24 C11 21 14 18 17 18 H49 C52 18 55 21 55 24 V47 C55 51 52 54 48 54 H16 C12 54 9 51 9 47 Z" fill="currentColor" stroke={SHADE} strokeWidth={1.3} />
+      <path d="M12 25 C12 22 14 21 17 21 H48 C51 21 52 23 52 26" fill="none" stroke={SOFT} strokeWidth={2.3} strokeLinecap="round" />
+      <path d="M13 44 H51 V48 C51 50 49 51 47 51 H17 C15 51 13 49 13 47 Z" fill={SHADE} opacity={0.35} />
+      <circle cx={26} cy={37} r={12} fill={DEEP} />
+      <circle cx={26} cy={37} r={9} fill={PALE} />
+      <circle cx={26} cy={37} r={6.5} fill={SHADE} />
+      <circle cx={26} cy={37} r={3.5} fill={SOFT} />
+      <path d="M26 28 V46 M17 37 H35 M20 31 L32 43 M32 31 L20 43" stroke={DEEP} strokeWidth={1} opacity={0.5} />
+      <rect x={41} y={28} width={10} height={4} rx={2} fill={PALE} />
+      <circle cx={44} cy={42} r={3.5} fill={PALE} stroke={DEEP} strokeWidth={1.2} />
+      <circle cx={51} cy={42} r={1.5} fill={SOFT} />
+      <path d="M39 29 H44" stroke={WHITE} strokeWidth={1.2} strokeLinecap="round" />
+      <path d="M18 54 L17 57 M47 54 L48 57" stroke={DEEP} strokeWidth={2.5} strokeLinecap="round" />
+      <path d="M52 11 C55 13 56 16 56 19 M55 7 C59 10 61 14 61 18" fill="none" stroke={SOFT} strokeWidth={1.7} strokeLinecap="round" />
+    </>
+  )
+}
+
 function SakuraArt() {
   const angles = [0, 72, 144, 216, 288]
   return (
@@ -609,6 +652,8 @@ const STICKER_ART: Record<string, () => ReactElement> = {
   headphones: HeadphonesArt,
   monitor: MonitorArt,
   gamepad: GamepadArt,
+  pteranodon: PteranodonArt,
+  radio: RadioArt,
   sakura: SakuraArt,
   'straw-hat': StrawHatArt,
   'maple-leaf': MapleLeafArt,
