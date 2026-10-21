@@ -8,6 +8,8 @@ import { clampLayout, getNextZIndex } from '../../../features/journal/journalLay
 import { useI18n } from '../../../i18n/useI18n'
 import type { TranslationKey } from '../../../i18n/translations'
 import { getJournalMaterialDefinition, parseMaterialStyle } from '../../../features/journal/journalMaterials'
+import { journalItemToDraftItem } from '../../../features/journal/journalDraftAdapters'
+import { isItemLocked, resizeDraftItem } from '../../../features/journal/journalEditing'
 
 interface JournalInspectorProps {
   oshiId: string
@@ -82,8 +84,24 @@ export function JournalInspector({
 
   const editing = editingItemId === selectedItem.id
   const activeItem = selectedItem
+  const draftItem = journalItemToDraftItem(activeItem)[0]
+
+  if (draftItem && isItemLocked(draftItem)) {
+    return (
+      <aside className="w-72 rounded-2xl border border-border-color bg-bg-primary p-4 shadow-xl">
+        <p className="mb-3 text-sm text-text-secondary">{t('journalEdit.lock')}</p>
+        <Link to={`/journal/pages/${activeItem.page_id}/edit`} className="text-sm text-accent">{t('journalCreate.editPage')}</Link>
+        {onClose && <button type="button" onClick={onClose} className="ml-4 text-text-muted" aria-label={t('window.close')}><X size={16} /></button>}
+      </aside>
+    )
+  }
 
   function patchLayout(change: Partial<Pick<JournalItemWithNote, 'width' | 'height' | 'rotation'>>) {
+    if (draftItem) {
+      const next = resizeDraftItem(draftItem, change, orientation)
+      onUpdateLayout(activeItem, { x: next.x, y: next.y, width: next.width, height: next.height, rotation: change.rotation ?? next.rotation })
+      return
+    }
     const activeMaterial = activeItem.item_type === 'material' ? getJournalMaterialDefinition(activeItem.material_id) : null
     onUpdateLayout(activeItem, clampLayout({
       x: activeItem.x,

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './components/features/themes/ThemeProvider'
 import { MotionProvider } from './components/features/themes/MotionProvider'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
@@ -26,45 +26,45 @@ const ResourcesPage = lazy(() => import('./pages/ResourcesPage').then((module) =
 const ResourceTemplatesPage = lazy(() => import('./pages/ResourceTemplatesPage').then((module) => ({ default: module.ResourceTemplatesPage })))
 const ResourceMaterialsPage = lazy(() => import('./pages/ResourceMaterialsPage').then((module) => ({ default: module.ResourceMaterialsPage })))
 
+const router = createBrowserRouter(createRoutesFromElements(
+  <Route element={<MainLayout />}>
+    <Route index element={<HomePage />} />
+    <Route path="oshis" element={<OshiListPage />} />
+    <Route path="oshis/:oshiId" element={<OshiOverviewPage />} />
+    <Route path="oshis/:oshiId/notes" element={<OshiDetailPage />} />
+    <Route path="oshis/:oshiId/journal" element={<Navigate to="/journal" replace />} />
+    <Route path="oshis/:oshiId/journal/pages/:pageId/edit" element={<JournalEditorPage />} />
+    <Route path="oshis/:oshiId/illustrations" element={<OshiIllustrationsPage />} />
+    <Route path="oshis/:oshiId/tags" element={<OshiTagsPage />} />
+    <Route path="oshis/:oshiId/notes/new" element={<NoteEditorPage />} />
+    <Route path="oshis/:oshiId/notes/:noteId" element={<NoteEditorPage />} />
+    <Route path="notes" element={<NotesPage />} />
+    <Route path="notes/new" element={<NoteEditorPage />} />
+    <Route path="notes/:noteId" element={<NoteEditorPage />} />
+    <Route path="journal" element={<JournalHomePage />} />
+    <Route path="journal/create" element={<JournalEditorPage />} />
+    <Route path="journal/pages/:pageId/edit" element={<JournalEditorPage />} />
+    <Route path="resources" element={<ResourcesPage />} />
+    <Route path="resources/templates" element={<ResourceTemplatesPage />} />
+    <Route path="resources/materials" element={<ResourceMaterialsPage />} />
+    <Route path="illustrations" element={<IllustrationsPage />} />
+    <Route path="tags" element={<TagsPage />} />
+    <Route path="tags/:tagName" element={<TagDetailPage />} />
+    <Route path="export" element={<ExportPage />} />
+    <Route path="settings" element={<SettingsPage />} />
+  </Route>
+
+))
 export default function App() {
   return (
     <ThemeProvider>
       <MotionProvider>
-        <BrowserRouter>
-          <UpdateNotifier />
-          <ErrorBoundary>
-            <Suspense fallback={<PageLoadingState label="Loading page" layout="detail" className="p-6" />}>
-            <Routes>
-              <Route element={<MainLayout />}>
-              <Route index element={<HomePage />} />
-              <Route path="oshis" element={<OshiListPage />} />
-              <Route path="oshis/:oshiId" element={<OshiOverviewPage />} />
-              <Route path="oshis/:oshiId/notes" element={<OshiDetailPage />} />
-              <Route path="oshis/:oshiId/journal" element={<Navigate to="/journal" replace />} />
-              <Route path="oshis/:oshiId/journal/pages/:pageId/edit" element={<JournalEditorPage />} />
-              <Route path="oshis/:oshiId/illustrations" element={<OshiIllustrationsPage />} />
-              <Route path="oshis/:oshiId/tags" element={<OshiTagsPage />} />
-              <Route path="oshis/:oshiId/notes/new" element={<NoteEditorPage />} />
-              <Route path="oshis/:oshiId/notes/:noteId" element={<NoteEditorPage />} />
-              <Route path="notes" element={<NotesPage />} />
-              <Route path="notes/new" element={<NoteEditorPage />} />
-              <Route path="notes/:noteId" element={<NoteEditorPage />} />
-              <Route path="journal" element={<JournalHomePage />} />
-              <Route path="journal/create" element={<JournalEditorPage />} />
-              <Route path="journal/pages/:pageId/edit" element={<JournalEditorPage />} />
-              <Route path="resources" element={<ResourcesPage />} />
-              <Route path="resources/templates" element={<ResourceTemplatesPage />} />
-              <Route path="resources/materials" element={<ResourceMaterialsPage />} />
-              <Route path="illustrations" element={<IllustrationsPage />} />
-              <Route path="tags" element={<TagsPage />} />
-              <Route path="tags/:tagName" element={<TagDetailPage />} />
-              <Route path="export" element={<ExportPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
-            </Routes>
-            </Suspense>
-          </ErrorBoundary>
-        </BrowserRouter>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoadingState label="Loading page" layout="detail" className="p-6" />}>
+            <UpdateNotifier />
+            <RouterProvider router={router} />
+          </Suspense>
+        </ErrorBoundary>
       </MotionProvider>
     </ThemeProvider>
   )

@@ -11,6 +11,16 @@ const baseDrag: FrameDragState = {
 }
 
 describe('journalDraftCanvasGeometry', () => {
+  for (const handle of RESIZE_HANDLES) {
+    it(`preserves aspect ratio for ${handle} at maximum and minimum size`, () => {
+      for (const distance of [-2000, 50, 2000]) {
+        const result = getDraggedLayout({ ...baseDrag, mode: 'resize', handle, aspectLocked: true, startLayout: { x: 200, y: 200, width: 200, height: 100, rotation: 30 } }, { clientX: 100 + distance, clientY: 100 + distance }, 1, 'landscape', { minWidth: 80, minHeight: 60 }, null)
+        expect(result.width / result.height).toBeCloseTo(2)
+        expect(result.width).toBeLessThanOrEqual(944)
+        expect(result.height).toBeGreaterThanOrEqual(60)
+      }
+    })
+  }
   function point(layout: FrameDragState['startLayout'], localX: number, localY: number) {
     const angle = layout.rotation * Math.PI / 180
     return {

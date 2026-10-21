@@ -19,13 +19,14 @@ import { asNumber, asString, isRecord } from '../../../utils/safeJson'
 import { MediaImage } from '../../ui/MediaImage'
 import { JournalStickerArt } from './JournalStickerArt'
 
-export function JournalDraftItemRenderer({ item, note, illustration, journalImage }: { item: JournalDraftItem; note?: Note; illustration?: Illustration; journalImage?: JournalImage }) {
+export function JournalDraftItemRenderer({ item, note, illustration, journalImage, editing = false }: { item: JournalDraftItem; note?: Note; illustration?: Illustration; journalImage?: JournalImage; editing?: boolean }) {
+  const { t } = useI18n()
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
   const stylePayload = getMaterialStylePayload(item.stylePayload, material?.id)
   if (item.itemType === 'note') return <DraftNoteBody item={item} note={note} />
   if (item.itemType === 'illustration') return <DraftIllustrationBody item={item} illustration={illustration} />
   if (item.itemType === 'image') return <DraftJournalImageBody item={item} journalImage={journalImage} />
-  if (material) return <DraftMaterialBody materialId={material.id} stylePayload={stylePayload} />
+  if (material) return <DraftMaterialBody materialId={material.id} stylePayload={stylePayload} emptyText={editing ? t('journalEdit.emptyText') : ''} />
   return null
 }
 
@@ -133,7 +134,7 @@ function DraftJournalImageBody({ item, journalImage }: { item: JournalDraftItem;
   )
 }
 
-function DraftMaterialBody({ materialId, stylePayload }: { materialId: string; stylePayload: Record<string, unknown> }) {
+function DraftMaterialBody({ materialId, stylePayload, emptyText }: { materialId: string; stylePayload: Record<string, unknown>; emptyText: string }) {
   const material = getJournalMaterialDefinition(materialId)
   if (!material) return null
   const color = asString(stylePayload.color) || '#d9c4ff'
@@ -163,10 +164,10 @@ function DraftMaterialBody({ materialId, stylePayload }: { materialId: string; s
             className="flex h-full w-full flex-col overflow-hidden px-3.5 py-2.5"
             style={{ color: textColor, fontFamily, fontSize, fontWeight, lineHeight }}
           >
-            {title && <strong className="mb-1 truncate" style={{ fontWeight: Math.min(800, fontWeight + 200) }}>{title}</strong>}
+            {title && <strong className="mb-1 shrink-0 whitespace-pre-wrap break-words" style={{ fontWeight: Math.min(800, fontWeight + 200) }}>{title}</strong>}
             <span className="whitespace-pre-wrap break-words">{body}</span>
           </span>
-        ) : transparent ? (
+        ) : noteCard ? (<span data-journal-placeholder="true" className="block p-4 text-sm text-text-muted/60">{emptyText}</span>) : transparent ? (
           <span className="absolute inset-0 rounded-[10px] border border-dashed border-text-muted/40" />
         ) : null}
       </span>

@@ -24,9 +24,10 @@ export function getDefaultIllustrationItemSize(
 
 export function getDraftItemConstraints(item: JournalDraftItem): { minWidth?: number; minHeight?: number } | undefined {
   const materialKind = getJournalMaterialDefinition(item.materialId)?.kind
+  if (materialKind === 'paper') return { minWidth: 120, minHeight: 60 }
   if (materialKind === 'tape') return { minWidth: 90, minHeight: 18 }
   if (materialKind === 'sticker') return { minWidth: 30, minHeight: 30 }
-  if (item.itemType === 'illustration') return { minWidth: 80, minHeight: 80 }
+  if (item.itemType === 'illustration' || item.itemType === 'image') return { minWidth: 80, minHeight: 80 }
   if (item.itemType === 'note') return { minWidth: 120, minHeight: 90 }
   return undefined
 }

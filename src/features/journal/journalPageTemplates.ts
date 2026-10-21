@@ -30,6 +30,8 @@ export interface JournalTemplateDecoration {
 
 export interface JournalPageTemplateDefinition {
   id: string
+  name?: string
+  description?: string
   nameKey: TranslationKey
   descriptionKey: TranslationKey
   preferredOrientation: JournalPageOrientation
@@ -50,6 +52,7 @@ export interface JournalTemplateApplication {
 }
 
 export const JOURNAL_PAGE_TEMPLATES: JournalPageTemplateDefinition[] = [
+  createWeeklyTemplate(4),
   {
     id: 'live-highlight',
     nameKey: 'journalTemplates.liveHighlight.name',
@@ -136,7 +139,11 @@ export const JOURNAL_PAGE_TEMPLATES: JournalPageTemplateDefinition[] = [
 ]
 
 export function getJournalPageTemplateDefinition(id: string | null | undefined): JournalPageTemplateDefinition | null {
-  return JOURNAL_PAGE_TEMPLATES.find((template) => template.id === id) || null
+  if (id?.startsWith('weekly-reflections-')) {
+    const count = Number(id.slice('weekly-reflections-'.length))
+    if (Number.isInteger(count) && count >= 2 && count <= 6) return createWeeklyTemplate(count)
+  }
+  return JOURNAL_PAGE_TEMPLATES.find((template) => template.id === id) || customTemplates.get(id || '') || null
 }
 
 export function materializeTemplateLayout(layout: NormalizedJournalLayout, orientation: JournalPageOrientation) {
@@ -167,7 +174,7 @@ export function getAvailableTemplateSlot(
   orientation: JournalPageOrientation,
   point?: { x: number; y: number }
 ): MaterializedJournalTemplateSlot | null {
-  const filledSlotIds = new Set(items.map((item) => item.templateSlotId).filter(Boolean))
+  const filledSlotIds = new Set(items.filter(item => !item.staged).map((item) => item.templateSlotId).filter(Boolean))
   const available = getMaterializedTemplateSlots(templateId, orientation)
     .filter((templateSlot) => templateSlot.kind === kind && !filledSlotIds.has(templateSlot.id))
   if (!point) return available[0] || null
@@ -178,6 +185,7 @@ export function placeDraftItemInTemplateSlot(item: JournalDraftItem, templateId:
   return {
     ...item,
     ...templateSlot.layout,
+    staged: false,
     templateSlotId: templateSlot.id,
     templateSourceId: templateId,
     templateGenerated: false,
@@ -209,9 +217,10 @@ export function applyJournalPageTemplate(
   }
   const nextSlotIndex = { note: 0, illustration: 0 }
   const reassignedItems = userItems.map((item) => {
-    if (item.itemType !== 'note' && item.itemType !== 'illustration') return clearTemplateMetadata(item)
-    const slotList = slotsByKind[item.itemType]
-    const templateSlot = slotList[nextSlotIndex[item.itemType]++]
+    if (item.itemType !== 'note' && item.itemType !== 'illustration' && item.itemType !== 'image') return clearTemplateMetadata(item)
+    const kind = item.itemType === 'image' ? 'illustration' : item.itemType
+    const slotList = slotsByKind[kind]
+    const templateSlot = slotList[nextSlotIndex[kind]++]
     if (!templateSlot) return clearTemplateMetadata(item)
     return placeDraftItemInTemplateSlot(item, template.id, {
       ...templateSlot,
@@ -322,4 +331,27 @@ function createTemplateDraftId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `template-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+const customTemplates = new Map<string, JournalPageTemplateDefinition>()
+export function registerJournalTemplate(template: JournalPageTemplateDefinition) {
+  customTemplates.set(template.id, template)
+  return template
+}
+
+export function createWeeklyTemplate(count: number): JournalPageTemplateDefinition {
+  const rows = Math.max(2, Math.min(6, Math.round(count)))
+  const height = (0.88 - (rows - 1) * 0.035) / rows
+  return {
+    id: `weekly-reflections-${rows}`, nameKey: 'journalEdit.weeklyName', descriptionKey: 'journalEdit.weeklyDescription',
+    preferredOrientation: 'landscape', background: 'sakura',
+    slots: [
+      ...Array.from({ length: rows }, (_, i) => slot(`week-note-${i}`, 'note', 0.64 + (i % 2) * 0.07, 0.065 + i * 0.035, 0.25, 0.24, i % 2 ? -2 : 2, 10 + i)),
+      slot('week-image', 'illustration', 0.65, 0.55, 0.28, 0.38, 0, 20),
+    ],
+    decorations: Array.from({ length: rows }, (_, i) => decoration(
+      ['memo-cream', 'memo-pink', 'memo-blue'][i % 3], 0.035, 0.06 + i * (height + 0.035), 0.53, height, 0, i + 1,
+      { line: false, noteCard: { titleText: '', bodyText: '', fontSize: 17, fontWeight: 600, lineHeight: 1.5 } }
+    )),
+  }
 }

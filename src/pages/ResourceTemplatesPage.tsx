@@ -1,3 +1,4 @@
+import { readReusableLayout } from '../features/journal/journalReusableLayouts'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, FileText, Layers3, PackageOpen, ScrollText, Stamp as StampIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -22,7 +23,7 @@ export function ResourceTemplatesPage() {
 
   useEffect(() => {
     fetchResourceTemplates()
-      .then(setTemplates)
+      .then(rows => { rows.filter(row => row.type === 'journal_page' && row.source === 'user').forEach(readReusableLayout); setTemplates(rows) })
       .catch(() => setTemplates([]))
   }, [])
 

@@ -11,6 +11,7 @@ export interface FrameDragState {
   startClientX: number
   startClientY: number
   startLayout: JournalLayoutInput & { zIndex?: number }
+  aspectLocked?: boolean
   moved: boolean
   startAngle?: number
   center?: { x: number; y: number }
@@ -37,10 +38,19 @@ export function getDraggedLayout(
     const delta = nextAngle - (drag.startAngle || 0)
     return clampLayout({ ...drag.startLayout, rotation: drag.startLayout.rotation + delta }, constraints, orientation)
   }
-  return resizeLayout(drag.startLayout, drag.handle || 'se', dx, dy, (size) => clampLayout(size, constraints, orientation))
+  const ratio = drag.aspectLocked ? drag.startLayout.width / drag.startLayout.height : undefined
+  return resizeLayout(drag.startLayout, drag.handle || 'se', dx, dy, (size) => {
+    if (!ratio) return clampLayout(size, constraints, orientation)
+    const limit = clampLayout({ ...size, width: Number.MAX_SAFE_INTEGER, height: Number.MAX_SAFE_INTEGER }, constraints, orientation)
+    const minWidth = constraints?.minWidth ?? 180, minHeight = constraints?.minHeight ?? 130
+    const minimum = Math.max(minWidth, minHeight * ratio)
+    const maximum = Math.min(limit.width, limit.height * ratio)
+    const width = Math.min(maximum, Math.max(Math.min(minimum, maximum), size.width))
+    return { ...size, width, height: width / ratio }
+  }, ratio)
 }
 
-export function resizeLayout(layout: JournalLayoutInput & { zIndex?: number }, handle: ResizeHandle, dx: number, dy: number, constrainSize?: (layout: JournalLayoutInput) => JournalLayoutInput): JournalLayoutInput {
+export function resizeLayout(layout: JournalLayoutInput & { zIndex?: number }, handle: ResizeHandle, dx: number, dy: number, constrainSize?: (layout: JournalLayoutInput) => JournalLayoutInput, aspectRatio?: number): JournalLayoutInput {
   let { width, height } = layout
   const { rotation } = layout
   const radians = rotation * Math.PI / 180
@@ -52,9 +62,13 @@ export function resizeLayout(layout: JournalLayoutInput & { zIndex?: number }, h
   const vertical = handle.includes('s') ? 1 : handle.includes('n') ? -1 : 0
   if (horizontal) width += horizontal * localX
   if (vertical) height += vertical * localY
+  if (aspectRatio) {
+    if (!horizontal || (vertical && Math.abs(localY / layout.height) > Math.abs(localX / layout.width))) width = height * aspectRatio
+    else height = width / aspectRatio
+  }
   const constrained = constrainSize?.({ ...layout, width, height })
-  if (horizontal) width = constrained?.width ?? width
-  if (vertical) height = constrained?.height ?? height
+  if (horizontal || aspectRatio) width = constrained?.width ?? width
+  if (vertical || aspectRatio) height = constrained?.height ?? height
   // CSS rotates about the changing center. Move that center by half the actual
   // local size change so the opposite edge/corner stays fixed in page space.
   // Do not clamp x/y afterwards: doing so translates the supposedly fixed edge.

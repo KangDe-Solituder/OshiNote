@@ -35,8 +35,8 @@ describe('journalPageTemplates', () => {
     expect(materializeTemplateLayout(normalized, 'landscape')).toEqual({ x: 98, y: 140, width: 490, height: 175, rotation: 3, zIndex: 4 })
   })
 
-  it('provides five built-in templates with valid materials', () => {
-    expect(JOURNAL_PAGE_TEMPLATES).toHaveLength(5)
+  it('provides six built-in templates with valid materials', () => {
+    expect(JOURNAL_PAGE_TEMPLATES).toHaveLength(6)
     for (const template of JOURNAL_PAGE_TEMPLATES) {
       expect(createTemplateDecorationItems(template, () => `${template.id}-decoration`)).toHaveLength(template.decorations.length)
     }

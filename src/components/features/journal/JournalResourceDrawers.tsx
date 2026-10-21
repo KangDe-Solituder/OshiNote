@@ -275,7 +275,7 @@ export function JournalReviewDrawer({ title, dateLabel, description, background,
   return (
     <div className="grid gap-3">
       <ReviewCard label={t('journalCreate.review.storage')} value={title || t('journalEditor.defaultPageTitle')} subValue={description || dateLabel} />
-      <ReviewCard label={t('journalTemplates.startingLayout')} value={template ? t(template.nameKey) : t('journalTemplates.blank.name')} />
+      <ReviewCard label={t('journalTemplates.startingLayout')} value={template ? template.name || t(template.nameKey) : t('journalTemplates.blank.name')} />
       <ReviewCard label={t('journalCreate.review.background')} value={preset ? t(preset.labelKey) : background} />
       <ReviewCard label={t('journalCreate.review.orientation')} value={t(`journalCreate.orientation.${orientation}` as never)} />
       <ReviewCard label={t('journalCreate.review.items')} value={String(itemCount)} />

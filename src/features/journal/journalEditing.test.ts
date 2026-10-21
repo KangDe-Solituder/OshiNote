@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JournalDraftItem } from '../../types'
-import { moveDraftGroup, reorderDraftLayer } from './journalEditing'
+import { arrangeDraftItems, getDraftSizeLimits, isAspectLocked, moveDraftGroup, reorderDraftLayer, resizeDraftItem } from './journalEditing'
 import { clampLayout } from './journalLayout'
 
 function item(id: string, x: number, zIndex: number, rotation = 0): JournalDraftItem {
@@ -8,6 +8,31 @@ function item(id: string, x: number, zIndex: number, rotation = 0): JournalDraft
 }
 
 describe('journal editing', () => {
+  it('resizes images with one scale at either limit without moving their position', () => {
+    const image = { ...item('image', 620, 1), itemType: 'image' as const, materialId: undefined, width: 200, height: 400 }
+    const resized = resizeDraftItem(image, { width: 900 }, 'landscape')
+    expect(resized.width / resized.height).toBe(0.5)
+    expect(resized.height).toBe(664)
+    expect(resized.x).toBe(image.x)
+    expect(resized.y).toBe(image.y)
+    expect(getDraftSizeLimits(image, 'landscape').maxWidth).toBe(332)
+    expect(resizeDraftItem(image, { width: 1 }, 'landscape').width).toBe(80)
+    expect(isAspectLocked(image)).toBe(true)
+  })
+  it('allows independent dimensions after unlocking the aspect ratio', () => {
+    const source = { ...item('a', 100, 1), stylePayload: '{"aspectLocked":false}' }
+    expect(resizeDraftItem(source, { width: 200 }, 'landscape')).toMatchObject({ width: 200, height: 60, x: 100, y: 100 })
+  })
+  it('aligns and distributes uneven widths while leaving locked items untouched', () => {
+    const selection = [item('a', 100, 1), { ...item('b', 280, 2), width: 120 }, item('c', 500, 3), { ...item('locked', 10, 4), stylePayload: '{"locked":true}' }]
+    const aligned = arrangeDraftItems(selection, 'left', 'landscape')
+    expect(aligned.map(i => i.x)).toEqual([100, 100, 100, 10])
+    const distributed = arrangeDraftItems(selection, 'horizontal', 'landscape')
+    expect(distributed[1].x - distributed[0].x - distributed[0].width).toBe(distributed[2].x - distributed[1].x - distributed[1].width)
+    expect(distributed[0].x).toBe(100)
+    expect(distributed[2].x).toBe(500)
+    expect(distributed[3]).toEqual(selection[3])
+  })
   it('moves exactly one layer despite gaps and duplicate old z indices', () => {
     const items = [item('a', 100, 10), item('b', 200, 10), item('c', 300, 90)]
     const up = reorderDraftLayer(items, 'a', 'up')

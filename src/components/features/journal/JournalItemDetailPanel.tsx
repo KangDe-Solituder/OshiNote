@@ -1,10 +1,12 @@
+import { JournalNumberField as NumberField } from './JournalNumberField'
+import { getDraftSizeLimits, isAspectLocked, isItemLocked, resizeDraftItem } from '../../../features/journal/journalEditing'
 import { JournalLayerControls } from './JournalLayerControls'
 import type { LayerAction } from '../../../features/journal/journalEditing'
 import clsx from 'clsx'
 import { Trash2, X } from 'lucide-react'
 import type { Illustration, JournalDraftItem, JournalPageOrientation, Note } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
-import { clampLayout, type JournalLayoutInput } from '../../../features/journal/journalLayout'
+import { type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
 import {
   getDraftImageItemStyle,
@@ -14,7 +16,6 @@ import {
   type ImageItemStyle,
   type NoteCardStyle,
 } from '../../../features/journal/journalItemStyles'
-import { getDraftItemConstraints } from '../../../features/journal/journalItemSizing'
 import { asNumber, asString, isRecord, safeJsonParse } from '../../../utils/safeJson'
 import { Button } from '../../ui/Button'
 import { getItemLayout } from './journalDraftCanvasGeometry'
@@ -28,13 +29,14 @@ export interface JournalItemDetailPanelProps {
   orientation: JournalPageOrientation
   onUpdateItem: (itemId: string, layout: JournalLayoutInput & { zIndex?: number; stylePayload?: string }) => void
   onRemoveItem: (itemId: string) => void
+  onFitHeight: () => void
   onClose: () => void
 }
 
-export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illustration, orientation, onUpdateItem, onRemoveItem, onClose }: JournalItemDetailPanelProps) {
+export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illustration, orientation, onUpdateItem, onRemoveItem, onFitHeight, onClose }: JournalItemDetailPanelProps) {
   const { t } = useI18n()
   return (
-    <aside data-journal-detail-panel="true" className="fixed bottom-5 right-5 top-20 z-[85] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-card/95 p-4 shadow-2xl backdrop-blur">
+    <aside data-journal-detail-panel="true" className="absolute bottom-20 right-3 top-16 z-[85] w-72 max-w-[85vw] overflow-y-auto rounded-2xl border border-border-color bg-bg-card/95 p-4 shadow-2xl backdrop-blur">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{t('journalCreate.detailPanel')}</p>
@@ -43,8 +45,11 @@ export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illus
         <button type="button" className="rounded-lg p-2 text-text-muted hover:bg-bg-secondary hover:text-text-primary" onClick={onClose} title={t('common.cancel')}><X size={16} /></button>
       </div>
       <div className="grid gap-4">
+        <ToggleField label={t('journalEdit.lock')} checked={isItemLocked(item)} onChange={locked => updateStylePayload(item, { locked }, onUpdateItem)} />
+        <fieldset disabled={isItemLocked(item)} className="grid gap-4 disabled:opacity-50">
         <JournalLayerControls layer={layer} onChange={onChangeLayer} />
-        {item.itemType === 'note' && <LayoutNumberControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
+        {(item.itemType === 'note' || getJournalMaterialDefinition(item.materialId)?.kind === 'paper') && <Button size="sm" onClick={onFitHeight}>{t('journalEdit.fitHeight')}</Button>}
+        <LayoutNumberControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />
         {item.itemType === 'note' && <NoteDetailControls item={item} note={note} onUpdateItem={onUpdateItem} />}
         {(item.itemType === 'illustration' || item.itemType === 'image') && <ImageDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
         {item.itemType === 'material' && <MaterialDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
@@ -52,6 +57,7 @@ export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illus
           <Trash2 size={15} />
           {t('journalInspector.removeFromPage')}
         </Button>
+        </fieldset>
       </div>
     </aside>
   )
@@ -79,7 +85,7 @@ function NoteDetailControls({ item, note, onUpdateItem }: { item: JournalDraftIt
   )
 }
 
-function ImageDetailControls({ item, orientation, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalItemDetailPanelProps['onUpdateItem'] }) {
+function ImageDetailControls({ item, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalItemDetailPanelProps['onUpdateItem'] }) {
   const { t } = useI18n()
   const style = getDraftImageItemStyle(item)
   function update(change: Partial<ImageItemStyle>) { updateStylePayload(item, { imageStyle: { ...style, ...change } }, onUpdateItem) }
@@ -92,12 +98,11 @@ function ImageDetailControls({ item, orientation, onUpdateItem }: { item: Journa
       <RangeField label={t('journalCreate.detail.radius')} value={style.radius} min={0} max={32} step={1} onChange={(value) => update({ radius: value })} />
       <RangeField label={t('journalCreate.detail.shadow')} value={style.shadow} min={0} max={40} step={1} onChange={(value) => update({ shadow: value })} />
       <ColorField label={t('journalCreate.detail.backgroundColor')} value={style.backgroundColor} onChange={(value) => update({ backgroundColor: value })} />
-      <LayoutNumberControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />
     </>
   )
 }
 
-function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalItemDetailPanelProps['onUpdateItem'] }) {
+function MaterialDetailControls({ item, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalItemDetailPanelProps['onUpdateItem'] }) {
   const { t } = useI18n()
   const material = getJournalMaterialDefinition(item.materialId)
   const style = getMaterialStylePayload(item.stylePayload, item.materialId)
@@ -144,21 +149,27 @@ function MaterialDetailControls({ item, orientation, onUpdateItem }: { item: Jou
         </>
       )}
       <RangeField label={t('journalCreate.glassStrength')} value={asNumber(style.glassStrength, 0)} min={0} max={100} step={5} onChange={(value) => update({ glassStrength: value })} />
-      <LayoutNumberControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />
     </>
   )
 }
 
 function LayoutNumberControls({ item, orientation, onUpdateItem }: { item: JournalDraftItem; orientation: JournalPageOrientation; onUpdateItem: JournalItemDetailPanelProps['onUpdateItem'] }) {
   const { t } = useI18n()
-  function update(change: Partial<JournalLayoutInput>) { onUpdateItem(item.draftId, clampLayout({ ...getItemLayout(item), ...change }, getDraftItemConstraints(item), orientation)) }
-  return (
+  const limits = getDraftSizeLimits(item, orientation)
+  function update(change: Partial<JournalLayoutInput>) {
+    const resized = change.width !== undefined || change.height !== undefined ? resizeDraftItem(item, change, orientation) : item
+    onUpdateItem(item.draftId, { ...getItemLayout(resized), ...(change.rotation !== undefined ? { rotation: change.rotation } : {}), ...(change.x !== undefined ? { x: change.x } : {}), ...(change.y !== undefined ? { y: change.y } : {}) })
+  }
+  return <>
+    <ToggleField label={t('journalEdit.aspect')} checked={isAspectLocked(item)} onChange={aspectLocked => updateStylePayload(item, { aspectLocked }, onUpdateItem)} />
     <div className="grid grid-cols-2 gap-2">
-      <NumberField label={t('journalInspector.width')} value={Math.round(item.width)} onChange={(value) => update({ width: value })} />
-      <NumberField label={t('journalInspector.height')} value={Math.round(item.height)} onChange={(value) => update({ height: value })} />
-      <NumberField label={t('journalInspector.rotation')} value={Math.round(item.rotation)} onChange={(value) => update({ rotation: value })} />
+      <NumberField label={t('journalInspector.width')} value={item.width} min={limits.minWidth} max={limits.maxWidth} onChange={width => update({ width })} />
+      <NumberField label={t('journalInspector.height')} value={item.height} min={limits.minHeight} max={limits.maxHeight} onChange={height => update({ height })} />
+      <NumberField label="X" value={item.x} onChange={x => update({ x })} />
+      <NumberField label="Y" value={item.y} onChange={y => update({ y })} />
+      <NumberField label={t('journalInspector.rotation')} value={item.rotation} onChange={rotation => update({ rotation })} />
     </div>
-  )
+  </>
 }
 
 function updateStylePayload(item: JournalDraftItem, change: Record<string, unknown>, onUpdateItem: JournalItemDetailPanelProps['onUpdateItem']) {
@@ -178,10 +189,6 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
 
 function TextAreaField({ label, value, rows, onChange }: { label: string; value: string; rows: number; onChange: (value: string) => void }) {
   return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<textarea value={value} rows={rows} onChange={(event) => onChange(event.target.value)} className={`${detailInputClass} resize-none`} /></label>
-}
-
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return <label className="grid gap-1.5 text-xs font-semibold text-text-muted">{label}<input type="number" value={value} onChange={(event) => onChange(Number(event.target.value))} className={detailInputClass} /></label>
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

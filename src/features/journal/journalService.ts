@@ -217,6 +217,12 @@ export async function fetchJournalPages(bookId: string): Promise<JournalPage[]> 
   return rows.map((row, index) => ({ ...deserializePage(row), page_index: index }))
 }
 
+export async function fetchRecentJournalPages(oshiId: string): Promise<JournalPage[]> {
+  const db = await getDb()
+  const rows = await db.select<JournalPageRow[]>('SELECT * FROM journal_pages WHERE oshi_id = ? ORDER BY updated_at DESC LIMIT 100', [oshiId])
+  return rows.map(deserializePage)
+}
+
 export async function fetchStandalonePostcards(oshiId: string): Promise<JournalPage[]> {
   const db = await getDb()
   const rows = await db.select<JournalPageRow[]>(

@@ -1,6 +1,7 @@
 import clsx from 'clsx'
+import { useState } from 'react'
 import { ImageIcon, LayoutTemplate, StickyNote } from 'lucide-react'
-import type { Oshi, JournalPageOrientation } from '../../../types'
+import type { Oshi, JournalPage, JournalPageOrientation } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
 import { getJournalPageSize } from '../../../features/journal/journalLayout'
@@ -24,6 +25,11 @@ interface JournalSetupStepProps {
   orientation: JournalPageOrientation
   templateId: string | null
   editMode: boolean
+  reusableLayouts: JournalPageTemplateDefinition[]
+  recentPages: JournalPage[]
+  loadingLayout: boolean
+  onReusePage: (id: string) => void
+  onSaveTemplate: () => void
   onOshiChange: (oshiId: string) => void
   onTitleChange: (value: string) => void
   onDateLabelChange: (value: string) => void
@@ -44,6 +50,7 @@ export function JournalSetupStep({
   orientation,
   templateId,
   editMode,
+  reusableLayouts, recentPages, loadingLayout, onReusePage, onSaveTemplate,
   onOshiChange,
   onTitleChange,
   onDateLabelChange,
@@ -54,6 +61,7 @@ export function JournalSetupStep({
   onNext,
 }: JournalSetupStepProps) {
   const { t } = useI18n()
+  const [moreTemplates, setMoreTemplates] = useState(false)
   const selectedTemplate = getJournalPageTemplateDefinition(templateId)
   const customized = Boolean(selectedTemplate && (
     selectedTemplate.background !== background
@@ -100,30 +108,29 @@ export function JournalSetupStep({
           </div>
         </div>
 
-        {!editMode && (
-          <div className="min-w-0">
-            <div className="mb-2 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{t('journalTemplates.startingLayout')}</p>
-                <p className="mt-1 text-xs text-text-muted">{t('journalTemplates.startingLayoutHint')}</p>
-              </div>
-            </div>
-            <div className="flex min-w-0 snap-x gap-3 overflow-x-auto pb-2 lg:grid lg:grid-cols-3 lg:overflow-visible xl:grid-cols-6">
-              <TemplateChoiceCard selected={!templateId} onClick={() => onTemplateChange(null)} title={t('journalTemplates.blank.name')} description={t('journalTemplates.blank.description')} />
-              {JOURNAL_PAGE_TEMPLATES.map((template) => (
-                <TemplateChoiceCard
-                  key={template.id}
-                  template={template}
-                  selected={templateId === template.id}
-                  onClick={() => onTemplateChange(template.id)}
-                  title={t(template.nameKey)}
-                  description={t(template.descriptionKey)}
-                />
-              ))}
-            </div>
+        <section className="grid gap-3 rounded-xl border border-border-color p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-text-primary">{t('journalTemplates.startingLayout')}</p>
+            <Button size="sm" onClick={onSaveTemplate}>{t('journalEdit.saveTemplate')}</Button>
           </div>
-        )}
-
+          {!editMode && <>
+            <label className="grid gap-2 text-xs text-text-secondary">{t('journalEdit.reuse')}
+              <select value="" disabled={loadingLayout} onChange={event => onReusePage(event.target.value)} className={fieldClassName}>
+                <option value="" disabled>{loadingLayout ? t('common.loading') : t('journalEdit.choosePage')}</option>
+                {recentPages.map(page => <option key={page.id} value={page.id}>{page.title} · {page.date_label}</option>)}
+              </select>
+            </label>
+            <p className="text-xs text-text-muted">{t('journalEdit.reuseHint')}</p>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              <TemplateChoiceCard selected={!templateId} onClick={() => onTemplateChange(null)} title={t('journalTemplates.blank.name')} description={t('journalTemplates.blank.description')} />
+              {JOURNAL_PAGE_TEMPLATES.filter(template => template.id.startsWith('weekly-reflections')).map(template => <TemplateChoiceCard key={template.id} template={template} selected={!!templateId?.startsWith('weekly-reflections')} onClick={() => onTemplateChange(template.id)} title={t(template.nameKey)} description={t(template.descriptionKey)} />)}
+              {reusableLayouts.map(template => <TemplateChoiceCard key={template.id} template={template} selected={templateId === template.id} onClick={() => onTemplateChange(template.id)} title={template.name || t(template.nameKey)} description={t('journalEdit.reuseHint')} />)}
+            </div>
+            {templateId?.startsWith('weekly-reflections-') && <label className="flex items-center gap-3 text-sm text-text-secondary">{t('journalEdit.weeklyCount')}<select value={templateId} onChange={event => onTemplateChange(event.target.value)} className={fieldClassName}>{[2, 3, 4, 5, 6].map(count => <option key={count} value={'weekly-reflections-' + count}>{count}</option>)}</select></label>}
+            <button type="button" onClick={() => setMoreTemplates(value => !value)} className="text-left text-xs text-accent">{t('journalEdit.moreTemplates')}</button>
+            {moreTemplates && <div className="flex gap-3 overflow-x-auto pb-2">{JOURNAL_PAGE_TEMPLATES.filter(template => !template.id.startsWith('weekly-reflections')).map(template => <TemplateChoiceCard key={template.id} template={template} selected={templateId === template.id} onClick={() => onTemplateChange(template.id)} title={t(template.nameKey)} description={t(template.descriptionKey)} />)}</div>}
+          </>}
+        </section>
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{t('journalCreate.orientation')}</p>
           <div className="grid max-w-lg grid-cols-2 gap-2">

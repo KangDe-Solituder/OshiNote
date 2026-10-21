@@ -27,6 +27,7 @@ import {
   getJournalImageItemStyle,
   getJournalNoteCardStyle,
   getNoteCardStyleFromPayload,
+  parseStylePayload,
 } from '../../../features/journal/journalItemStyles'
 import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
 import { exportJournalPageImage } from '../../../services/journalExport'
@@ -172,6 +173,7 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
 
   async function handleCommitLayout(itemId: string, layout: JournalLayoutInput) {
     const item = items.find((candidate) => candidate.id === itemId)
+    if (parseStylePayload(item?.style_payload).locked === true) return
     await updateItemLayout(itemId, {
       ...layout,
       z_index: item?.z_index,
@@ -179,15 +181,16 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
   }
 
   async function handleInspectorLayout(item: JournalItemWithNote, layout: JournalLayoutInput & { z_index?: number }) {
+    if (parseStylePayload(item.style_payload).locked === true) return
     await updateItemLayout(item.id, layout)
   }
 
   async function handleAutoArrange() {
     if (!confirm(t('journalPage.autoArrangeConfirm'))) return
-    const noteItems = items.filter((item) => item.note)
+    const noteItems = items.filter((item) => item.note && parseStylePayload(item.style_payload).locked !== true)
     const layouts = autoArrangeNotes(noteItems.map((item) => item.note!))
     await Promise.all(items.map((item) => {
-      if (!item.note) return Promise.resolve()
+      if (!item.note || parseStylePayload(item.style_payload).locked === true) return Promise.resolve()
       const layout = layouts.get(item.note.id)
       if (!layout) return Promise.resolve()
       return updateItemLayout(item.id, {

@@ -98,7 +98,6 @@ function JournalEditorSession() {
     }))
 
     await persistStampForTarget('journal_page', activePage.id, draft.stamp)
-    navigate(`/journal/pages/${activePage.id}/edit?view=1`, { replace: true })
   }
 
   if (!pageId) return <JournalCreationFlow />

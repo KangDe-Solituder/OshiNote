@@ -5,6 +5,7 @@ import { clampLayout, type JournalLayoutInput } from '../../../features/journal/
 import type { JournalPopoverAnchor } from './JournalCanvas'
 import { getJournalItemConstraints } from '../../../features/journal/journalItemSizing'
 import { journalItemToDraftItem } from '../../../features/journal/journalDraftAdapters'
+import { isItemLocked, moveDraftGroup } from '../../../features/journal/journalEditing'
 import { JournalDraftItemRenderer } from './JournalDraftItemRenderer'
 
 interface JournalStickerProps {
@@ -34,6 +35,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
   function handlePointerDown(e: PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0) return
     onSelect(item)
+    if (sharedDraftItem && isItemLocked(sharedDraftItem)) return
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = {
       pointerId: e.pointerId,
@@ -57,7 +59,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
     const dy = (e.clientY - drag.startClientY) / zoom
     if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true
 
-    const layout = clampLayout({
+    const layout = sharedDraftItem ? moveDraftGroup([{ ...sharedDraftItem, ...drag.startLayout }], dx, dy, orientation)[0] : clampLayout({
       ...drag.startLayout,
       x: drag.startLayout.x + dx,
       y: drag.startLayout.y + dy,
@@ -73,7 +75,7 @@ export function JournalSticker({ item, selected, zoom, orientation = 'portrait',
     e.currentTarget.releasePointerCapture(e.pointerId)
 
     if (!drag.moved) return
-    const layout = clampLayout({
+    const layout = sharedDraftItem ? moveDraftGroup([{ ...sharedDraftItem, ...drag.startLayout }], (e.clientX - drag.startClientX) / zoom, (e.clientY - drag.startClientY) / zoom, orientation)[0] : clampLayout({
       ...drag.startLayout,
       x: drag.startLayout.x + (e.clientX - drag.startClientX) / zoom,
       y: drag.startLayout.y + (e.clientY - drag.startClientY) / zoom,

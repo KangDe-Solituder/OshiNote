@@ -1,3 +1,4 @@
+import { isItemLocked, isAspectLocked } from '../../../features/journal/journalEditing'
 import clsx from 'clsx'
 import { useRef, type PointerEvent, type RefObject } from 'react'
 import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note } from '../../../types'
@@ -51,6 +52,7 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
       return
     }
     onSelect(item.draftId)
+    if (isItemLocked(item)) return
     movingGroup.current = mode === 'move' && Boolean(onGroupMoveStart?.(item.draftId))
     const center = getItemCenter(item)
     let startAngle = 0
@@ -70,6 +72,7 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
       startClientY: event.clientY,
       startLayout: getItemLayout(item),
       moved: false,
+      aspectLocked: isAspectLocked(item),
       startAngle,
       center,
     }
@@ -135,8 +138,8 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
       className={clsx('absolute cursor-default touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
       style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
     >
-      <JournalDraftItemRenderer item={item} note={note} illustration={illustration} journalImage={journalImage} />
-      {selected && showHandles && (
+      <JournalDraftItemRenderer item={item} note={note} illustration={illustration} journalImage={journalImage} editing />
+      {selected && showHandles && !isItemLocked(item) && (
         <>
           {RESIZE_HANDLES.map((handle) => (
             <button

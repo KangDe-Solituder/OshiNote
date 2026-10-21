@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
@@ -15,6 +15,7 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, contentClassName }: ModalProps) {
   const timing = useMotionTiming()
+  const titleId = useId()
 
   useEffect(() => {
     if (open) {
@@ -37,7 +38,7 @@ export function Modal({ open, onClose, title, children, contentClassName }: Moda
             exit={{ opacity: 0, transition: { duration: timing.viewExit, ease: MOTION_EASING.exit } }}
             onClick={onClose}
           />
-          <motion.div
+          <motion.div role="dialog" aria-modal="true" aria-labelledby={titleId}
             className={`relative mx-4 max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-6 shadow-e3 ${contentClassName || 'max-w-lg'}`}
             initial={{ opacity: 0, scale: timing.viewEnter === 0 ? 1 : 0.975, y: timing.viewEnter === 0 ? 0 : 8 }}
             animate={{
@@ -54,7 +55,7 @@ export function Modal({ open, onClose, title, children, contentClassName }: Moda
             }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
+              <h2 id={titleId} className="text-lg font-semibold text-text-primary">{title}</h2>
               <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors">
                 <X size={20} />
               </button>

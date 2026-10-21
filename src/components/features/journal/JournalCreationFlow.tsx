@@ -1,20 +1,25 @@
+import { captureJournalLayout, readReusableLayout } from '../../../features/journal/journalReusableLayouts'
+import { createResourceTemplate, fetchResourceTemplates } from '../../../features/templates/templateService'
+import { createCompositionDraft } from '../../../features/journal/journalDraftAdapters'
+import { useJournalHistory } from '../../../features/journal/useJournalHistory'
+import { useJournalDraftProtection } from '../../../features/journal/useJournalDraftProtection'
 import { reorderDraftLayer, type LayerAction } from '../../../features/journal/journalEditing'
-import { ArrowLeft, ImageIcon, Loader2, Sparkles } from 'lucide-react'
+import { ArrowLeft, ImageIcon, Loader2, Sparkles, Undo2, Redo2, Settings2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { Button } from '../../ui/Button'
 import { Modal } from '../../ui/Modal'
 import { MediaImage } from '../../ui/MediaImage'
 import { PAGE_HEADER_CLASS } from '../../layout/pageShell'
 import { useUiMotionSeconds } from '../../features/themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
-import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note, Oshi, Stamp, StampInput } from '../../../types'
+import type { Illustration, JournalPage, JournalDraftItem, JournalImage, JournalPageOrientation, Note, Oshi, Stamp, StampInput } from '../../../types'
 import { fetchAllOshis } from '../../../features/oshis/oshiService'
 import { fetchNotesByOshi } from '../../../features/notes/noteService'
 import { fetchIllustrationById, fetchIllustrations } from '../../../features/illustrations/illustrationService'
-import { createJournalPageFromDraft } from '../../../features/journal/journalService'
+import { createJournalPageFromDraft, fetchRecentJournalPages, fetchJournalItems } from '../../../features/journal/journalService'
 import {
   consumeWeeklyHandoff,
   type WeeklyRecapHandoff,
@@ -26,6 +31,8 @@ import { getJournalMaterialDefinition, getMaterialSnapshot, type JournalStickerG
 import { createImageStylePayload, createNoteCardStylePayload } from '../../../features/journal/journalItemStyles'
 import { getDefaultIllustrationItemSize } from '../../../features/journal/journalItemSizing'
 import {
+  registerJournalTemplate,
+  type JournalPageTemplateDefinition,
   applyJournalPageTemplate,
   getAvailableTemplateSlot,
   getJournalPageTemplateDefinition,
@@ -79,6 +86,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const motionSeconds = useUiMotionSeconds()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { pageId } = useParams()
   const editMode = mode === 'edit'
   const targetBookId = editMode ? null : searchParams.get('bookId')
   const queryOshiId = editMode ? '' : searchParams.get('oshiId') || ''
@@ -101,19 +109,21 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const [illustrations, setIllustrations] = useState<Illustration[]>([])
   const [journalImages, setJournalImages] = useState<JournalImage[]>([])
   const [importingImages, setImportingImages] = useState(false)
-  const [selectedOshiId, setSelectedOshiId] = useState(initialDraft?.oshiId || queryOshiId || weeklyHandoff?.oshiId || '')
-  const [title, setTitle] = useState(initialDraft?.title || weeklyHandoff?.title || '')
-  const [dateLabel, setDateLabel] = useState(initialDraft?.dateLabel || weeklyHandoff?.dateLabel || String(new Date().getFullYear()))
-  const [description, setDescription] = useState(initialDraft?.description || '')
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(queryTemplate?.id || null)
-  const [background, setBackground] = useState(initialDraft?.background || weeklyHandoff?.background || queryTemplate?.background || 'sakura')
-  const [orientation, setOrientation] = useState<JournalPageOrientation>(initialDraft?.orientation || weeklyHandoff?.orientation || queryTemplate?.preferredOrientation || 'portrait')
-  const [items, setItems] = useState<JournalDraftItem[]>(() => {
-    const initialItems = initialDraft?.items || weeklyHandoff?.items || []
-    return queryTemplate ? applyJournalPageTemplate(queryTemplate.id, initialItems).items : initialItems
-  })
+  const editor = useJournalHistory(() => ({
+    oshiId: initialDraft?.oshiId || queryOshiId || weeklyHandoff?.oshiId || '',
+    title: initialDraft?.title || weeklyHandoff?.title || '',
+    dateLabel: initialDraft?.dateLabel || weeklyHandoff?.dateLabel || String(new Date().getFullYear()),
+    description: initialDraft?.description || '',
+    templateId: queryTemplate?.id || null,
+    background: initialDraft?.background || weeklyHandoff?.background || queryTemplate?.background || 'sakura',
+    orientation: initialDraft?.orientation || weeklyHandoff?.orientation || queryTemplate?.preferredOrientation || 'landscape',
+    items: queryTemplate ? applyJournalPageTemplate(queryTemplate.id, initialDraft?.items || weeklyHandoff?.items || []).items : initialDraft?.items || weeklyHandoff?.items || [],
+    stamp: initialDraft?.stamp ? stampToInput(initialDraft.stamp) : null,
+  }))
+  const { document: editorDocument, change: changeDocument, setItems, setStampDraft, setSelectedOshiId, setTitle, setDateLabel, setDescription, setBackground, undo, redo } = editor
+  const { oshiId: selectedOshiId, title, dateLabel, description, templateId: selectedTemplateId, background, orientation, items, stamp: stampDraft } = editorDocument
+  const protection = useJournalDraftProtection('oshinote.journalDraft.' + (pageId || ('new.' + (targetBookId || queryOshiId || 'standalone'))), editorDocument)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-  const [stampDraft, setStampDraft] = useState<StampInput | null>(() => initialDraft?.stamp ? stampToInput(initialDraft.stamp) : null)
   const [stampPlacementDraft, setStampPlacementDraft] = useState<StampInput | null>(null)
   const [zoom, setZoom] = useState(0.72)
   const [drawerDock, setDrawerDock] = useState<JournalDrawerDock>(() => readStoredDrawerDock())
@@ -132,10 +142,60 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const [loadingResources, setLoadingResources] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
-  const [confirmBackOpen, setConfirmBackOpen] = useState(false)
-  const [draftBackSaved, setDraftBackSaved] = useState(false)
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null | undefined>(undefined)
   const [dragGhost, setDragGhost] = useState<DragGhost>(null)
+  const [reusableLayouts, setReusableLayouts] = useState<JournalPageTemplateDefinition[]>([])
+  const [recentPages, setRecentPages] = useState<JournalPage[]>([])
+  const [templateName, setTemplateName] = useState<string | null>(null)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateNotice, setTemplateNotice] = useState(false)
+  const [loadingLayout, setLoadingLayout] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    fetchResourceTemplates('journal_page').then(rows => {
+      if (!alive) return
+      const layouts = rows.filter(row => row.source === 'user').map(readReusableLayout).filter((layout): layout is JournalPageTemplateDefinition => !!layout)
+      setReusableLayouts(layouts)
+      const requested = searchParams.get('templateId')
+      if (!editMode && requested && layouts.some(layout => layout.id === requested)) {
+        const application = applyJournalPageTemplate(requested, [])
+        changeDocument(current => current.templateId || current.items.length ? current : { ...current, templateId: requested, background: application.background || current.background, orientation: application.orientation || current.orientation, items: application.items })
+      }
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [editMode, searchParams, changeDocument])
+  useEffect(() => {
+    let alive = true
+    setRecentPages([])
+    if (selectedOshiId) fetchRecentJournalPages(selectedOshiId).then(rows => { if (alive) setRecentPages(rows) }).catch(() => {})
+    return () => { alive = false }
+  }, [selectedOshiId])
+  useEffect(() => { if (!templateNotice) return; const timer = window.setTimeout(() => setTemplateNotice(false), 3500); return () => window.clearTimeout(timer) }, [templateNotice])
+
+  async function reusePage(id: string) {
+    const page = recentPages.find(row => row.id === id)
+    if (!page) return
+    setLoadingLayout(true)
+    try {
+      const sourceItems = await fetchJournalItems(id, true)
+      const layout = captureJournalLayout(createCompositionDraft(page, sourceItems, null), 'page-layout-' + id, page.title)
+      registerJournalTemplate(layout)
+      setReusableLayouts(current => [...current.filter(entry => entry.id !== layout.id), layout])
+      requestTemplateChange(layout.id)
+    } catch (err) { setError(String(err)) } finally { setLoadingLayout(false) }
+  }
+  async function saveTemplate() {
+    if (!templateName?.trim()) return
+    setSavingTemplate(true)
+    try {
+      const layout = captureJournalLayout(editorDocument, 'new', templateName.trim())
+      const resource = await createResourceTemplate({ type: 'journal_page', name: templateName.trim(), payload: JSON.stringify({ version: 1, layout }) })
+      const registered = readReusableLayout(resource)
+      if (registered) setReusableLayouts(current => [registered, ...current])
+      setTemplateName(null); setTemplateNotice(true)
+    } catch (err) { setError(String(err)) } finally { setSavingTemplate(false) }
+  }
 
   useEffect(() => {
     let alive = true
@@ -147,7 +207,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       })
       .catch(() => { if (alive) setOshis([]) })
     return () => { alive = false }
-  }, [selectedOshiId])
+  }, [selectedOshiId, setSelectedOshiId])
 
   useEffect(() => {
     let alive = true
@@ -162,8 +222,12 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     }
     setLoadingResources(true)
     Promise.all([
-      fetchNotesByOshi(selectedOshiId, { page: 1, pageSize: 200, archiveFilter: 'all' }),
-      fetchIllustrations({ oshiId: selectedOshiId, includeArchived: false, sort: 'newest' }),
+      fetchNotesByOshi(selectedOshiId, { page: 1, pageSize: 200, archiveFilter: 'all' }).then(async first => {
+        const pages = Math.ceil(first.total / 200)
+        const rest = await Promise.all(Array.from({ length: Math.max(0, pages - 1) }, (_, i) => fetchNotesByOshi(selectedOshiId, { page: i + 2, pageSize: 200, archiveFilter: 'all' })))
+        return { ...first, notes: [...first.notes, ...rest.flatMap(page => page.notes)] }
+      }),
+      fetchIllustrations({ oshiId: selectedOshiId, includeArchived: true, sort: 'newest' }),
       Promise.all(initialIllustrationIdsRef.current.map((id) => fetchIllustrationById(id).catch(() => null))),
       fetchJournalImages(selectedOshiId).catch(() => [] as JournalImage[]),
     ])
@@ -176,12 +240,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         setNotes(noteResult.notes)
         setIllustrations(Array.from(mergedIllustrations.values()))
         setJournalImages(journalImageRows)
-        if (editMode) return
-        setItems((current) => current.filter((item) => {
-          if (item.itemType === 'note') return noteResult.notes.some((note) => note.id === item.sourceId)
-          if (item.itemType === 'illustration') return illustrationRows.some((illustration) => illustration.id === item.sourceId)
-          return true
-        }))
+
       })
       .catch(() => {
         if (alive) {
@@ -191,13 +250,12 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       })
       .finally(() => { if (alive) setLoadingResources(false) })
     return () => { alive = false }
-  }, [editMode, selectedOshiId])
+  }, [editMode, selectedOshiId, setItems])
 
   useEffect(() => { setNotePage(1) }, [noteQuery, noteFilter])
   useEffect(() => { setImagePage(1) }, [imageQuery, imageFilter])
   useEffect(() => { setMaterialPage(1) }, [materialKind, materialGroup])
   useEffect(() => { setMaterialGroup('all') }, [materialKind])
-  useEffect(() => { setDraftBackSaved(false) }, [items, stampDraft])
   useEffect(() => { writeLocalStorage(DRAWER_DOCK_STORAGE_KEY, drawerDock) }, [drawerDock])
   useEffect(() => {
     function syncViewport() { setNarrowViewport(window.innerWidth < 768) }
@@ -220,6 +278,20 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const drawerOpen = drawerPinned || drawerHovered
   const effectiveDrawerDock: JournalDrawerDock = narrowViewport ? 'bottom' : drawerDock
 
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (creating) return
+      if (!(event.ctrlKey || event.metaKey)) return
+      if (window.document.querySelector('[role="dialog"]')) return
+      const target = event.target as HTMLElement
+      if (target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
+      if (event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo() }
+      if (event.key.toLowerCase() === 'y') { event.preventDefault(); redo() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo, creating])
+
   function setDrawerHoverOpen(value: boolean) {
     if (drawerHoverCloseTimerRef.current !== null) {
       window.clearTimeout(drawerHoverCloseTimerRef.current)
@@ -235,13 +307,6 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     }, 220)
   }
 
-  function handleBackStep() {
-    if (!draftBackSaved && (items.length > 0 || stampDraft)) {
-      setConfirmBackOpen(true)
-      return
-    }
-    setStepIndex(0)
-  }
 
   function requestTemplateChange(templateId: string | null) {
     if (templateId === selectedTemplateId) return
@@ -255,26 +320,20 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
 
   function applyTemplate(templateId: string | null) {
     const application = applyJournalPageTemplate(templateId, items)
-    setSelectedTemplateId(application.templateId)
-    if (application.background) setBackground(application.background)
-    if (application.orientation) setOrientation(application.orientation)
-    setItems(application.items)
+    changeDocument(current => ({ ...current, templateId: application.templateId, templateSnapshot: getJournalPageTemplateDefinition(application.templateId), background: application.background || current.background, orientation: application.orientation || current.orientation, items: application.items }))
     setSelectedItemId(null)
   }
 
   function handleOrientationChange(nextOrientation: JournalPageOrientation) {
     if (nextOrientation === orientation) return
-    if (selectedTemplateId) {
-      const application = applyJournalPageTemplate(selectedTemplateId, items, createDraftId, nextOrientation)
-      setItems(application.items)
-    }
-    setOrientation(nextOrientation)
+    changeDocument(current => ({ ...current, orientation: nextOrientation }))
     setSelectedItemId(null)
   }
 
   function startPointerResourceDrag(payload: DragPayload, event: PointerEvent<HTMLElement>) {
     if (event.button !== 0) return
     event.preventDefault()
+    const reserve = event.shiftKey
     const startX = event.clientX
     const startY = event.clientY
     setDragGhost({ payload, x: event.clientX, y: event.clientY })
@@ -286,6 +345,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     function handlePointerUp(nextEvent: globalThis.PointerEvent) {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerCancel)
       setDragGhost(null)
       const distance = Math.abs(nextEvent.clientX - startX) + Math.abs(nextEvent.clientY - startY)
       const overBoard = Boolean(document.elementFromPoint(nextEvent.clientX, nextEvent.clientY)?.closest('[data-journal-workboard="true"]'))
@@ -308,23 +368,31 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         return
       }
 
-      // Resources from drawers: drop on board to stage, click stages too, drop on page places directly
-      if (overBoard || distance < 8) {
+      // Click places directly; Shift-click or a drop on the board reserves the resource.
+      if (overBoard || (reserve && distance < 8)) {
         stageDraftItem(payload)
         return
       }
-      if (!pageElement || !rect) return
+      if (distance < 8) { addDraftItem(payload); return }
+      if (!overPage || !pageElement || !rect) return
       const x = Math.min(Math.max(nextEvent.clientX, rect.left), rect.right)
       const y = Math.min(Math.max(nextEvent.clientY, rect.top), rect.bottom)
       addDraftItem(payload, { x: (x - rect.left) / zoom, y: (y - rect.top) / zoom })
     }
 
+    function handlePointerCancel() {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerCancel)
+      setDragGhost(null)
+    }
+    window.addEventListener('pointercancel', handlePointerCancel, { once: true })
     window.addEventListener('pointermove', handlePointerMove)
     window.addEventListener('pointerup', handlePointerUp, { once: true })
   }
 
   function updateItem(itemId: string, change: Partial<Pick<JournalDraftItem, 'x' | 'y' | 'width' | 'height' | 'rotation' | 'zIndex' | 'stylePayload'>>) {
-    setItems((current) => current.map((item) => item.draftId === itemId ? { ...item, ...change } : item))
+    changeDocument(current => ({ ...current, items: current.items.map(item => item.draftId === itemId ? { ...item, ...change, templateGenerated: false } : item) }), change.stylePayload !== undefined ? 'style:' + itemId : undefined)
   }
 
   function removeItem(itemId: string) {
@@ -354,8 +422,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       y: Math.max(24, Math.min(y, pageSize.height - base.height - 24)),
       zIndex: Math.max(0, ...items.map((item) => item.zIndex)) + 1,
     }
-    if (payload.kind === 'note' || payload.kind === 'illustration') {
-      const templateSlot = getAvailableTemplateSlot(selectedTemplateId, items, payload.kind, orientation, point)
+    if (payload.kind === 'note' || payload.kind === 'illustration' || payload.kind === 'journal-image') {
+      const templateSlot = getAvailableTemplateSlot(selectedTemplateId, items, payload.kind === 'journal-image' ? 'illustration' : payload.kind, orientation, point)
       if (templateSlot && selectedTemplateId) {
         draftItem = placeDraftItemInTemplateSlot(draftItem, selectedTemplateId, templateSlot)
       }
@@ -389,8 +457,12 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       if (item.draftId !== draftId) return item
       const x = point ? point.x - item.width / 2 : pageSize.width / 2 - item.width / 2
       const y = point ? point.y - item.height / 2 : pageSize.height / 2 - item.height / 2
+      const kind = item.itemType === 'image' ? 'illustration' : item.itemType
+      const templateSlot = (kind === 'note' || kind === 'illustration') ? getAvailableTemplateSlot(selectedTemplateId, current.filter(entry => entry.draftId !== draftId), kind, orientation, point) : null
+      if (templateSlot && selectedTemplateId) return placeDraftItemInTemplateSlot({ ...item, staged: false }, selectedTemplateId, templateSlot)
       return {
         ...item,
+        templateSlotId: undefined,
         staged: false,
         x: Math.max(24, Math.min(x, pageSize.width - item.width - 24)),
         y: Math.max(24, Math.min(y, pageSize.height - item.height - 24)),
@@ -402,7 +474,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
 
   /** Return a canvas item to the work board. */
   function stageExistingItem(draftId: string) {
-    setItems((current) => current.map((item) => item.draftId === draftId ? { ...item, staged: true } : item))
+    setItems((current) => current.map((item) => item.draftId === draftId ? { ...item, staged: true, templateSlotId: undefined } : item))
     setSelectedItemId((current) => current === draftId ? null : current)
   }
 
@@ -492,6 +564,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     if (!selectedOshiId) return
     setCreating(true)
     setError('')
+    protection.startSave()
     try {
       const draft = {
         oshiId: selectedOshiId,
@@ -505,11 +578,15 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       }
       if (editMode) {
         await onSaveDraft?.(draft)
+        protection.saveSucceeded()
+        navigate(`/journal/pages/${pageId}/edit?view=1`, { replace: true })
         return
       }
       const page = await createJournalPageFromDraft({ ...draft, bookId: targetBookId, stamp: stampDraft })
+      protection.saveSucceeded()
       navigate(`/journal/pages/${page.id}/edit?view=1`, { replace: true })
     } catch (err) {
+      protection.saveFailed()
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setCreating(false)
@@ -517,18 +594,23 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg-primary">
+    <div className="relative flex h-full min-h-0 flex-col bg-bg-primary">
+      {creating && <div className="absolute inset-0 z-[100] cursor-wait bg-bg-primary/20" aria-label={t('journalEditor.setup.saving')} />}
       <header className={`${PAGE_HEADER_CLASS} gap-3`}>
         {editMode ? (
           <button type="button" onClick={onCancelEdit} className="rounded-lg p-2 text-text-muted transition-colors hover:bg-bg-secondary hover:text-text-primary" title={t('journalEditor.back')}><ArrowLeft size={22} /></button>
         ) : (
-          <Link to="/journal" className="rounded-lg p-2 text-text-muted transition-colors hover:bg-bg-secondary hover:text-text-primary" title={t('journalEditor.back')}><ArrowLeft size={22} /></Link>
+          <button type="button" onClick={() => navigate('/journal')} className="rounded-lg p-2 text-text-muted transition-colors hover:bg-bg-secondary hover:text-text-primary" title={t('journalEditor.back')}><ArrowLeft size={22} /></button>
         )}
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-text-muted">{t('nav.journalCreate')}</p>
           <h1 className="truncate text-2xl font-bold text-text-primary">{editMode ? t('journalCreate.editTitle') : t('journalCreate.title')}</h1>
         </div>
-        {error && <span className="hidden max-w-72 truncate text-xs text-red-400 md:inline">{error}</span>}
+        <span className="hidden text-xs text-text-muted lg:inline" role="status">{protection.storageFailed ? t('journalEdit.draftFailed') : protection.dirty && protection.savedAt ? t('journalEdit.draftSaved') : ''}</span>
+<button type="button" disabled={!editor.canUndo} onClick={undo} title={t('journalEdit.undo')} className="rounded-lg p-2 text-text-muted disabled:opacity-30"><Undo2 size={18} /></button>
+<button type="button" disabled={!editor.canRedo} onClick={redo} title={t('journalEdit.redo')} className="rounded-lg p-2 text-text-muted disabled:opacity-30"><Redo2 size={18} /></button>
+<button type="button" onClick={() => setStepIndex(stepIndex === 0 ? 1 : 0)} title={t('journalCreate.step.setup')} className="rounded-lg p-2 text-text-muted"><Settings2 size={18} /></button>
+{error && <span className="hidden max-w-72 truncate text-xs text-red-400 md:inline">{error}</span>}
         <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!canSubmit}>
           {creating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
           {creating ? (editMode ? t('journalEditor.setup.saving') : t('journalCreate.creating')) : (editMode ? t('journalEditor.setup.save') : t('journalCreate.create'))}
@@ -541,7 +623,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
             <JournalSetupStep
               oshis={oshis}
               selectedOshiId={selectedOshiId}
-              onOshiChange={setSelectedOshiId}
+              onOshiChange={id => { if (id === selectedOshiId) return; if (items.some(item => item.itemType !== 'material') && !window.confirm(t('journalEdit.changeOshi'))) return; changeDocument(current => ({ ...current, oshiId: id, items: current.items.filter(item => item.itemType === 'material') })) }}
               title={title}
               onTitleChange={setTitle}
               dateLabel={dateLabel}
@@ -554,6 +636,11 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               onOrientationChange={handleOrientationChange}
               templateId={selectedTemplateId}
               editMode={editMode}
+              reusableLayouts={reusableLayouts}
+              recentPages={recentPages}
+              loadingLayout={loadingLayout}
+              onReusePage={id => void reusePage(id)}
+              onSaveTemplate={() => setTemplateName(title || t('journalEdit.myTemplates'))}
               onTemplateChange={requestTemplateChange}
               onNext={() => setStepIndex(1)}
             />
@@ -583,6 +670,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
             </JournalEdgeDrawer>
 
             <JournalDraftCanvas
+              busy={creating}
               background={background}
               orientation={orientation}
               templateId={selectedTemplateId}
@@ -598,7 +686,10 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               onZoomChange={setZoom}
               onSelectItem={setSelectedItemId}
               onUpdateItem={updateItem}
+              onUpdateItems={changes => setItems(current => current.map(item => changes.find(change => change.draftId === item.draftId) || item))}
               onRemoveItem={removeItem}
+              onRemoveItems={ids => setItems(current => current.filter(item => !ids.includes(item.draftId)))}
+              onStageItems={ids => setItems(current => current.map(item => ids.includes(item.draftId) ? { ...item, staged: true, templateSlotId: undefined } : item))}
               onChangeLayer={changeLayer}
               onDropResource={addDraftItem}
               onStageItem={stageExistingItem}
@@ -610,24 +701,32 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               onStampPlacementCancel={() => setStampPlacementDraft(null)}
             />
 
-            <div className="absolute bottom-5 right-6 z-[75] flex gap-2">
-              <Button variant="secondary" size="sm" onClick={handleBackStep}>{t('journalCreate.back')}</Button>
-              <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!canSubmit}>{creating ? (editMode ? t('journalEditor.setup.saving') : t('journalCreate.creating')) : (editMode ? t('journalEditor.setup.save') : t('journalCreate.create'))}</Button>
-            </div>
+
           </motion.div>
         )}
       </AnimatePresence>
 
-      <Modal open={confirmBackOpen} onClose={() => setConfirmBackOpen(false)} title={t('journalCreate.backConfirm.title')}>
-        <div className="grid gap-4">
-          <p className="text-sm leading-relaxed text-text-secondary">{t('journalCreate.backConfirm.body')}</p>
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setConfirmBackOpen(false)}>{t('common.cancel')}</Button>
-            <Button variant="primary" size="sm" onClick={() => { setDraftBackSaved(true); setConfirmBackOpen(false); setStepIndex(0) }}>{t('journalCreate.backConfirm.save')}</Button>
-          </div>
+      <Modal open={templateName !== null} onClose={() => { if (!savingTemplate) setTemplateName(null) }} title={t('journalEdit.saveTemplate')}>
+        <label className="grid gap-2 text-sm text-text-secondary">{t('journalEdit.templateName')}<input autoFocus value={templateName || ''} onChange={event => setTemplateName(event.target.value)} className="rounded-lg border border-border-color bg-bg-primary p-3" /></label>
+        <div className="mt-4 flex justify-end"><Button variant="primary" disabled={savingTemplate || !templateName?.trim()} onClick={() => void saveTemplate()}>{t('journalEditor.setup.save')}</Button></div>
+      </Modal>
+      {templateNotice && <div role="status" className="absolute bottom-5 left-5 z-[90] rounded-xl bg-bg-card p-3 text-accent shadow-lg">{t('journalEdit.templateSaved')}</div>}
+      <Modal open={Boolean(protection.recovery)} onClose={() => {}} title={t('journalEdit.recoverTitle')}>
+        <p className="mb-4 text-sm text-text-secondary">{t('journalEdit.recoverBody')}</p>
+        <div className="flex justify-end gap-2">
+          <Button onClick={protection.resolveRecovery}>{t('journalEdit.discardDraft')}</Button>
+          <Button variant="primary" onClick={() => { if (protection.recovery) { if (protection.recovery.templateSnapshot) registerJournalTemplate(protection.recovery.templateSnapshot); changeDocument(protection.recovery); setStepIndex(1) }; protection.resolveRecovery() }}>{t('journalEdit.recover')}</Button>
         </div>
       </Modal>
-
+      <Modal open={protection.leaving} onClose={protection.cancelLeave} title={t('journalEdit.leaveTitle')}>
+        <p className="mb-4 text-sm text-text-secondary">{t('journalEdit.leaveBody')}</p>
+        {protection.storageFailed && <p role="alert" className="mb-3 text-red-400">{t('journalEdit.draftFailed')}</p>}
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button onClick={protection.cancelLeave}>{t('journalEdit.stay')}</Button>
+          <Button disabled={creating} onClick={() => void protection.leave(false)}>{t('journalEdit.discardLeave')}</Button>
+          <Button disabled={creating} variant="primary" onClick={() => void protection.leave(true)}>{t('journalEdit.keepLeave')}</Button>
+        </div>
+      </Modal>
       <Modal open={pendingTemplateId !== undefined} onClose={() => setPendingTemplateId(undefined)} title={t('journalTemplates.switchConfirm.title')}>
         <div className="grid gap-4">
           <p className="text-sm leading-relaxed text-text-secondary">{t('journalTemplates.switchConfirm.body')}</p>
