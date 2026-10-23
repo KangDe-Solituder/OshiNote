@@ -642,7 +642,129 @@ function WhiteDressArt() {
   )
 }
 
+function StageLightArt() {
+  return (
+    <>
+      <path d="M22 25 L34 21 L57 49 Q40 59 24 51 Z" fill={PALE} />
+      <path d="M27 27 L33 25 L48 50 Q39 53 32 51 Z" fill="#fff2b4" opacity={0.8} />
+      <ellipse cx={41} cy={51} rx={17} ry={4.5} fill={SOFT} />
+      <path d="M10 14 L7 24 Q7 28 11 30 L20 34" fill="none" stroke={DEEP} strokeWidth={3} strokeLinecap="round" />
+      <path d="M10 29 L10 49 M5 51 H20" stroke={DEEP} strokeWidth={3} strokeLinecap="round" />
+      <g transform="rotate(-28 24 21)">
+        <rect x={14} y={10} width={20} height={20} rx={5} fill="currentColor" />
+        <path d="M16 12 H32 V16 H16 Z" fill={SOFT} />
+        <path d="M14 26 H34 V30 H14 Z" fill={SHADE} />
+        <ellipse cx={24} cy={30} rx={10} ry={4} fill={DEEP} />
+        <ellipse cx={24} cy={30} rx={7} ry={2.5} fill="#ffe9a1" />
+        <path d="M19 19 H29 M19 22 H29" stroke={DEEP} strokeWidth={1.3} strokeLinecap="round" />
+      </g>
+      <path d="M48 13 L49 17 L53 18 L49 19 L48 23 L47 19 L43 18 L47 17 Z" fill="#edc773" />
+    </>
+  )
+}
+
+function KaraokeMicArt() {
+  return (
+    <>
+      <path d="M24 48 C17 57 38 60 38 51" stroke={DEEP} strokeWidth={2} strokeLinecap="round" />
+      <g transform="rotate(35 32 30)">
+        <path d="M25 27 H39 L36 50 Q32 54 28 50 Z" fill="currentColor" />
+        <path d="M34 30 H38 L35 49 Q34 51 32 51 Z" fill={SHADE} />
+        <rect x={29.5} y={34} width={5} height={8} rx={2} fill={DEEP} />
+        <path d="M31 36 H33" stroke={PALE} strokeWidth={1.5} strokeLinecap="round" />
+        <ellipse cx={32} cy={20} rx={11} ry={12} fill={SOFT} />
+        <path d="M23 16 H41 M22 20 H42 M23 24 H41 M27 10 V29 M32 9 V30 M37 10 V29" stroke={SHADE} strokeWidth={1} opacity={0.65} />
+        <rect x={23} y={27} width={18} height={4} rx={2} fill={DEEP} />
+        <path d="M25 14 Q27 11 30 11" stroke={WHITE} strokeWidth={1.8} strokeLinecap="round" />
+      </g>
+      <path d="M49 32 V44 M49 32 L56 30 V41" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" />
+      <ellipse cx={46.5} cy={44} rx={3.5} ry={2.5} fill="currentColor" />
+      <ellipse cx={53.5} cy={41} rx={3.5} ry={2.5} fill="currentColor" />
+      <path d="M10 17 L11 21 L15 22 L11 23 L10 27 L9 23 L5 22 L9 21 Z" fill="#efc977" />
+    </>
+  )
+}
+
+function FlowCatArt() {
+  return (
+    <>
+      <path d="M39 49 C56 56 59 39 53 35" fill="none" stroke="currentColor" strokeWidth={5} strokeLinecap="round" />
+      <path d="M23 30 Q17 40 19 53 Q29 58 42 53 C43 44 39 35 36 30 Z" fill="currentColor" />
+      <path d="M34 35 Q42 40 40 52 L34 54 Z" fill={SHADE} />
+      <path d="M24 42 L23 54 M31 43 L32 54" stroke={SOFT} strokeWidth={1.2} opacity={0.28} strokeLinecap="round" />
+      <path d="M14 23 L14 7 L25 15 Q31 13 36 15 L45 8 L43 25 C43 35 36 39 28 38 C19 37 13 32 14 23 Z" fill="currentColor" />
+      <path d="M17 12 L18 21 L23 18 Z M41 13 L36 18 L41 21 Z" fill="#626075" />
+      <path d="M17 24 Q22 19 27 25 Q23 33 17 27 Z M31 25 Q36 19 41 23 L41 27 Q36 32 31 25 Z" fill="#cecb7c" />
+      <ellipse cx={23} cy={25.5} rx={2.2} ry={3.3} fill="#252631" />
+      <ellipse cx={35.5} cy={25} rx={2.2} ry={3.3} fill="#252631" />
+      <circle cx={21.5} cy={24} r={1} fill={WHITE} /><circle cx={34} cy={23.5} r={1} fill={WHITE} />
+      <path d="M27 30 L31 30 L29 32 Z" fill="#89828c" />
+      <path d="M29 32 V34 M18 32 L11 31 M39 32 L46 30" stroke="#89828c" strokeWidth={0.9} strokeLinecap="round" />
+      <path d="M24 17 Q28 15 32 16" stroke={SOFT} strokeWidth={1.2} opacity={0.3} strokeLinecap="round" />
+    </>
+  )
+}
+
+function FlowBirdArt() {
+  return (
+    <>
+      {/* Swept wings with rounded, overlapping flight feathers. */}
+      {[false, true].map((mirror) => (
+        <g key={String(mirror)} transform={mirror ? 'translate(64 0) scale(-1 1)' : undefined}>
+          <path d="M30 29 C21 28 11 24 4 12 C3 19 4 28 5 34 Q3 40 7 39 Q6 45 10 42 Q10 49 14 45 Q15 51 18 47 Q20 52 23 47 L31 40 Z" fill="currentColor" stroke="#cbd9db" strokeWidth={0.8} strokeLinejoin="round" />
+          <path d="M6 26 Q12 35 26 36 L28 41 Q23 44 21 46 Q21 42 18 41 Q17 45 15 44 L14 39 Q10 41 11 36 Q8 36 6 32 Z" fill="#dce8e8" opacity={0.8} />
+          <path d="M7 29 Q9 33 9 37 M11 33 Q13 38 13 41 M16 36 L17 44 M21 38 L22 45" stroke="#c8d9db" strokeWidth={0.85} strokeLinecap="round" opacity={0.8} />
+          <path d="M8 23 C13 29 21 31 26 32" fill="none" stroke={WHITE} strokeWidth={2} strokeLinecap="round" opacity={0.8} />
+        </g>
+      ))}
+      {/* Long white tail and small golden feet. */}
+      <path d="M30 43 Q23 49 19 51 Q23 53 28 49 L23 57 Q28 56 31 51 L29 60 Q33 58 35 50 L38 54 L38 44 Z" fill="currentColor" stroke="#cbd9db" strokeWidth={0.8} strokeLinejoin="round" />
+      <path d="M34 51 L35 57 M39 50 L41 56" stroke="#d5aa48" strokeWidth={1.8} strokeLinecap="round" />
+      {/* Upright neck and softly feathered breast. */}
+      <path d="M34 14 C31 19 31 23 29 28 C26 35 27 44 31 49 L33 48 L35 52 L37 49 L39 50 C44 43 43 36 39 29 L37 18 Z" fill="currentColor" stroke="#cfddde" strokeWidth={0.8} strokeLinejoin="round" />
+      <path d="M36 22 C35 31 39 38 35 48 L37 49 L39 48 C42 40 40 32 38 27 Z" fill="#dce8e8" />
+      <path d="M31 33 Q30 40 32 44 M34 27 L33 31" stroke={WHITE} strokeWidth={1.5} strokeLinecap="round" />
+      {/* White crest, yellow eye patch and a short hooked bill. */}
+      <path d="M33 14 L25 11 L30 11 L24 8 L32 10 L28 5 L34 8 L35 6 L38 8 C43 8 44 14 40 17 L34 17 Z" fill="currentColor" stroke="#cbd9db" strokeWidth={0.8} strokeLinejoin="round" />
+      <path d="M32 13 L25 15 M33 15 L28 18" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <path d="M37 10 C40 9 42 12 41 15 L38 16 L35 13 Z" fill="#edbf4d" />
+      <circle cx={38.5} cy={12} r={1.5} fill="#514c40" />
+      <circle cx={38.9} cy={11.6} r={0.55} fill={WHITE} />
+      <path d="M41 13 L45 15 L42 17 L42 15 L40 15 Z" fill="#c9a24c" />
+    </>
+  )
+}
+
+function ArcaneBooksArt() {
+  return (
+    <>
+      <path d="M10 44 H52 V56 H10 Q6 50 10 44 Z" fill="currentColor" />
+      <path d="M14 47 H50 V53 H14 Q12 50 14 47 Z" fill="#fff0d4" />
+      <path d="M17 50 H48" stroke="#dcc7a4" strokeWidth={1} />
+      <g transform="rotate(-7 32 39)">
+        <path d="M12 32 H49 Q54 38 49 44 H12 Z" fill="#9bb7ac" />
+        <path d="M15 35 H47 Q50 38 47 41 H15 Z" fill="#fff0d4" />
+        <path d="M18 38 H45" stroke="#dcc7a4" strokeWidth={1} />
+        <path d="M37 34 H42 V46 L39.5 44 L37 46 Z" fill="#cf8783" />
+      </g>
+      <g transform="rotate(6 31 26)">
+        <rect x={15} y={19} width={34} height={12} rx={3} fill={SHADE} />
+        <path d="M21 19 V31 M43 19 V31" stroke="#e4c286" strokeWidth={1.5} />
+        <path d="M32 21 L35 25 L32 29 L29 25 Z" fill="#efd59a" />
+        <path d="M24 25 H26 M38 25 H40" stroke={PALE} strokeWidth={1.2} strokeLinecap="round" />
+      </g>
+      <path d="M20 6 L21.5 11 L26 12.5 L21.5 14 L20 19 L18.5 14 L14 12.5 L18.5 11 Z M45 5 L46 8 L49 9 L46 10 L45 13 L44 10 L41 9 L44 8 Z" fill="#dfba70" />
+      <circle cx={34} cy={10} r={1.5} fill={SOFT} />
+    </>
+  )
+}
+
 const STICKER_ART: Record<string, () => ReactElement> = {
+  'stage-light': StageLightArt,
+  'karaoke-mic': KaraokeMicArt,
+  'flow-cat': FlowCatArt,
+  'flow-bird': FlowBirdArt,
+  'arcane-books': ArcaneBooksArt,
   heart: HeartArt,
   star: StarArt,
   sparkle: SparkleArt,
