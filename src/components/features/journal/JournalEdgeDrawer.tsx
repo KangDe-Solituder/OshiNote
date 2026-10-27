@@ -73,7 +73,8 @@ export function JournalEdgeDrawer({
         animate={animated ? panelAnimate : open ? { opacity: 1, ...(horizontal ? { y: 0 } : { x: 0 }) } : { opacity: 0, ...(horizontal ? { y: closedOffset } : { x: closedOffset }) }}
         transition={panelTransition}
         className={clsx(
-          'pointer-events-auto isolate overflow-hidden border-border-color bg-bg-primary shadow-xl',
+          'isolate overflow-hidden border-border-color bg-bg-primary shadow-xl',
+          open ? 'pointer-events-auto' : 'pointer-events-none',
           getDrawerPanelPositionClass(dock),
           horizontal ? 'h-[300px] max-h-[45vh] w-full border-b' : 'h-full w-80 border-r',
           dock === 'right' && 'border-l border-r-0',
@@ -105,20 +106,7 @@ export function JournalEdgeDrawer({
         </div>
         <div className="h-[calc(100%-3.5rem)] min-w-0 overflow-x-hidden overflow-y-auto p-3">{children}</div>
       </motion.div>
-      <motion.button
-        type="button"
-        initial={false}
-        animate={animated ? { opacity: open ? 0 : 1, scale: open ? 0.9 : 1 } : { opacity: open ? 0 : 1, scale: 1 }}
-        transition={panelTransition}
-        onClick={() => onPinnedChange(!pinned)}
-        className={clsx(
-          'pointer-events-auto flex items-center justify-center border-border-color bg-bg-card text-xs font-semibold text-accent shadow-sm',
-          open && 'pointer-events-none',
-          getDrawerHandleClass(dock)
-        )}
-      >
-        <span className={horizontal ? '' : '[writing-mode:vertical-rl]'}>{label}</span>
-      </motion.button>
+      {!open && <button type="button" aria-label={label} onFocus={() => onHoverChange(true)} onMouseEnter={() => onHoverChange(true)} className={clsx('pointer-events-auto absolute opacity-0', horizontal ? 'left-0 right-0 h-2' : 'bottom-0 top-0 w-2', dock === 'right' ? 'right-0' : dock === 'bottom' ? 'bottom-0' : dock === 'top' ? 'top-0' : 'left-0')} />}
       {dockHint ? <div className={clsx('pointer-events-none absolute rounded-2xl border-2 border-accent/70 bg-accent-soft/25 transition-opacity', getDockHintClass(dockHint))} /> : null}
     </aside>
   )
@@ -136,13 +124,6 @@ function getDrawerPanelPositionClass(dock: JournalDrawerDock): string {
   if (dock === 'right') return 'absolute bottom-0 right-0 top-0'
   if (dock === 'top') return 'absolute left-0 right-0 top-0'
   return 'absolute bottom-0 left-0 right-0'
-}
-
-function getDrawerHandleClass(dock: JournalDrawerDock): string {
-  if (dock === 'left') return 'absolute left-0 top-20 h-28 w-8 rounded-r-xl border-y border-r'
-  if (dock === 'right') return 'absolute right-0 top-20 h-28 w-8 rounded-l-xl border-y border-l'
-  if (dock === 'top') return 'absolute left-1/2 top-0 h-8 w-28 -translate-x-1/2 rounded-b-xl border-x border-b'
-  return 'absolute bottom-0 left-1/2 h-8 w-28 -translate-x-1/2 rounded-t-xl border-x border-t'
 }
 
 function getDockHintClass(dock: JournalDrawerDock): string {

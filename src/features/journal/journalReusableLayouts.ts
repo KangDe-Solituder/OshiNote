@@ -4,6 +4,7 @@ import { getJournalPageSize } from './journalLayout'
 import { getJournalMaterialDefinition } from './journalMaterials'
 import { parseStylePayload } from './journalItemStyles'
 import { isRecord } from '../../utils/safeJson'
+import { readRegion } from './journalRegions'
 import { registerJournalTemplate, type JournalPageTemplateDefinition, type NormalizedJournalLayout } from './journalPageTemplates'
 import type { JournalBackgroundPresetId } from './journalBackgrounds'
 
@@ -13,6 +14,10 @@ export function captureJournalLayout(draft: JournalCompositionDraft, id: string,
   for (const item of draft.items.filter(item => !item.staged)) {
     const layout: NormalizedJournalLayout = { x: item.x / page.width, y: item.y / page.height, width: item.width / page.width, height: item.height / page.height, rotation: item.rotation, zIndex: item.zIndex }
     const style = parseStylePayload(item.stylePayload)
+    const region = readRegion(item.stylePayload)
+    if (region) style.region = { ...region, id: undefined, external: false, entries: [] }
+    if (typeof style.regionMember === 'string' || typeof style.regionSticker === 'string') continue
+    if (isRecord(style.regionPaper)) style.regionPaper = { ...style.regionPaper, entry: { id: '', kind: 'note', title: '', text: '', date: '' } }
     // Retain typography, but don't carry last week's words or source IDs forward.
     if (isRecord(style.noteCard)) { delete style.noteCard.titleText; delete style.noteCard.bodyText }
     delete style.text

@@ -14,6 +14,8 @@ import { getJournalMaterialDefinition } from '../../../features/journal/journalM
 import { Button } from '../../ui/Button'
 import { SelectMenu } from '../../ui/SelectMenu'
 import { getPageBackground } from './journalCanvasStyle'
+import { createTemplateDecorationItems } from '../../../features/journal/journalPageTemplates'
+import { JournalDraftItemRenderer } from './JournalDraftItemRenderer'
 
 interface JournalSetupStepProps {
   oshis: Oshi[]
@@ -254,6 +256,7 @@ export function TemplateMiniPreview({ template, className }: { template?: Journa
             />
           )
         })}
+        {template && <TemplateDecorationPreview template={template} width={orientation === 'landscape' ? 150 : 86} />}
       </span>
     </span>
   )
@@ -281,8 +284,16 @@ function EmptyPagePreview({ background, orientation, template }: { background: s
           }}
         />
       ))}
+      {template && <TemplateDecorationPreview template={template} width={width} />}
     </div>
   )
+}
+
+function TemplateDecorationPreview({ template, width }: { template: JournalPageTemplateDefinition; width: number }) {
+  const size = getJournalPageSize(template.preferredOrientation)
+  return <span className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: size.width, height: size.height, transform: `scale(${width / size.width})` }}>
+    {createTemplateDecorationItems(template, (() => { let i = 0; return () => `preview-${i++}` })()).map(item => <span key={item.draftId} className="absolute" style={{ left: item.x, top: item.y, width: item.width, height: item.height, transform: `rotate(${item.rotation}deg)`, zIndex: item.zIndex }}><JournalDraftItemRenderer item={item} /></span>)}
+  </span>
 }
 
 const fieldClassName = 'min-w-0 rounded-xl border border-border-color bg-bg-primary px-3 py-2 text-sm text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-50'

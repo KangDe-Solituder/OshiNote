@@ -54,7 +54,7 @@ export function createDefaultNoteCardStyle(note: Note | null | undefined, untitl
     titleVisible: true,
     titleText: note?.title || untitled,
     bodyText: (note?.plain_text || empty).slice(0, 200),
-    fontFamily: 'system',
+    fontFamily: 'casual',
     fontSize: 14,
     fontWeight: 500,
     lineHeight: 1.45,

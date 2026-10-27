@@ -10,6 +10,8 @@ import type { TranslationKey } from '../../../i18n/translations'
 import { getJournalMaterialDefinition, parseMaterialStyle } from '../../../features/journal/journalMaterials'
 import { journalItemToDraftItem } from '../../../features/journal/journalDraftAdapters'
 import { isItemLocked, resizeDraftItem } from '../../../features/journal/journalEditing'
+import { readRegion, writeRegion } from '../../../features/journal/journalRegions'
+import { JournalRegionControls } from './JournalRegionControls'
 
 interface JournalInspectorProps {
   oshiId: string
@@ -95,6 +97,13 @@ export function JournalInspector({
       </aside>
     )
   }
+
+  const region = readRegion(activeItem.style_payload)
+  if (region && draftItem) return <aside className="max-h-[560px] w-80 overflow-y-auto rounded-2xl border border-border-color bg-bg-primary p-4 shadow-xl">
+    <div className="mb-3 flex justify-between text-text-primary"><strong>{t('journalCreate.step.regions')}</strong><button onClick={onClose} aria-label={t('window.close')}><X size={16} /></button></div>
+    {!region.external && <JournalRegionControls region={region} onChange={next => onUpdateStyle(activeItem.id, { style_payload: writeRegion(draftItem, next).stylePayload })} />}
+    <Link to={`/journal/pages/${activeItem.page_id}/edit`} className="mt-4 block text-sm text-accent">{t('journalCreate.editPage')}</Link>
+  </aside>
 
   function patchLayout(change: Partial<Pick<JournalItemWithNote, 'width' | 'height' | 'rotation'>>) {
     if (draftItem) {

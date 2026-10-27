@@ -28,7 +28,7 @@ import { storeJournalImage, validateJournalImageFile } from '../../../features/j
 import { fetchJournalImages } from '../../../features/journal/journalImageService'
 import { getJournalPageSize } from '../../../features/journal/journalLayout'
 import { getJournalMaterialDefinition, getMaterialSnapshot, type JournalStickerGroup } from '../../../features/journal/journalMaterials'
-import { createImageStylePayload, createNoteCardStylePayload } from '../../../features/journal/journalItemStyles'
+import { createImageStylePayload, createNoteCardStylePayload, parseStylePayload } from '../../../features/journal/journalItemStyles'
 import { getDefaultIllustrationItemSize } from '../../../features/journal/journalItemSizing'
 import {
   registerJournalTemplate,
@@ -59,6 +59,10 @@ import type {
   JournalNoteFilter,
 } from './journalCreationTypes'
 import { readLocalStorage, writeLocalStorage } from '../../../utils/safeLocalStorage'
+import { JournalRegionsDrawer } from './JournalRegionsDrawer'
+import { createRegionItem, noteRegionEntry, readRegion, regionAtPoint, writeRegion, type RegionEntry } from '../../../features/journal/journalRegions'
+import { materializeRegions, arrangeRegionItems, collectRegionEntry, memberOf, paperEntry, regionForItem, updateRegionItems, removeRegionAware, finalizeStrips, detachRegionItem } from '../../../features/journal/journalRegionItems'
+import { isItemLocked } from '../../../features/journal/journalEditing'
 
 type DragGhost = { payload: DragPayload; x: number; y: number } | null
 
@@ -67,6 +71,7 @@ const STEPS: { id: JournalCreationStepId; labelKey: string }[] = [
   { id: 'notes', labelKey: 'journalCreate.step.notes' },
   { id: 'images', labelKey: 'journalCreate.step.images' },
   { id: 'materials', labelKey: 'journalCreate.step.decorations' },
+  { id: 'regions', labelKey: 'journalCreate.step.regions' },
   { id: 'stamp', labelKey: 'journalCreate.step.stamp' },
   { id: 'review', labelKey: 'journalCreate.step.review' },
 ]
@@ -117,7 +122,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     templateId: queryTemplate?.id || null,
     background: initialDraft?.background || weeklyHandoff?.background || queryTemplate?.background || 'sakura',
     orientation: initialDraft?.orientation || weeklyHandoff?.orientation || queryTemplate?.preferredOrientation || 'landscape',
-    items: queryTemplate ? applyJournalPageTemplate(queryTemplate.id, initialDraft?.items || weeklyHandoff?.items || []).items : initialDraft?.items || weeklyHandoff?.items || [],
+    items: materializeRegions(queryTemplate ? applyJournalPageTemplate(queryTemplate.id, initialDraft?.items || weeklyHandoff?.items || []).items : initialDraft?.items || weeklyHandoff?.items || []),
     stamp: initialDraft?.stamp ? stampToInput(initialDraft.stamp) : null,
   }))
   const { document: editorDocument, change: changeDocument, setItems, setStampDraft, setSelectedOshiId, setTitle, setDateLabel, setDescription, setBackground, undo, redo } = editor
@@ -160,7 +165,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       const requested = searchParams.get('templateId')
       if (!editMode && requested && layouts.some(layout => layout.id === requested)) {
         const application = applyJournalPageTemplate(requested, [])
-        changeDocument(current => current.templateId || current.items.length ? current : { ...current, templateId: requested, background: application.background || current.background, orientation: application.orientation || current.orientation, items: application.items })
+        changeDocument(current => current.templateId || current.items.length ? current : { ...current, templateId: requested, background: application.background || current.background, orientation: application.orientation || current.orientation, items: materializeRegions(application.items) })
       }
     }).catch(() => {})
     return () => { alive = false }
@@ -320,7 +325,9 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
 
   function applyTemplate(templateId: string | null) {
     const application = applyJournalPageTemplate(templateId, items)
-    changeDocument(current => ({ ...current, templateId: application.templateId, templateSnapshot: getJournalPageTemplateDefinition(application.templateId), background: application.background || current.background, orientation: application.orientation || current.orientation, items: application.items }))
+    let arranged = materializeRegions(application.items)
+    for (const item of arranged.filter(row => readRegion(row.stylePayload))) arranged = arrangeRegionItems(arranged, item.draftId)
+    changeDocument(current => ({ ...current, templateId: application.templateId, templateSnapshot: getJournalPageTemplateDefinition(application.templateId), background: application.background || current.background, orientation: application.orientation || current.orientation, items: arranged }))
     setSelectedItemId(null)
   }
 
@@ -392,11 +399,58 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   }
 
   function updateItem(itemId: string, change: Partial<Pick<JournalDraftItem, 'x' | 'y' | 'width' | 'height' | 'rotation' | 'zIndex' | 'stylePayload'>>) {
-    changeDocument(current => ({ ...current, items: current.items.map(item => item.draftId === itemId ? { ...item, ...change, templateGenerated: false } : item) }), change.stylePayload !== undefined ? 'style:' + itemId : undefined)
+    const source = items.find(item => item.draftId === itemId)
+    if (!source) return
+    const next = { ...source, ...change, templateGenerated: false }
+    const moved = source.x !== next.x || source.y !== next.y
+    if (moved && !isItemLocked(source) && !readRegion(source.stylePayload)) {
+      const target = regionForItem(items, next), entry = resourceEntry({ kind: 'staged', id: itemId })
+      if (target && entry && memberOf(source) !== readRegion(target.stylePayload)?.id) {
+        setItems(current => collectRegionEntry(current, target.draftId, entry, itemId))
+        return
+      }
+    }
+    changeDocument(current => ({ ...current, items: updateRegionItems(current.items, next) }), change.stylePayload !== undefined ? 'style:' + itemId : undefined)
+  }
+
+  function updateMany(changes: JournalDraftItem[]) {
+    setItems(current => {
+      let result = current
+      for (const next of changes) {
+        const parentChanged = changes.some(zone => readRegion(zone.stylePayload)?.id === memberOf(next) && memberOf(next))
+        if (!parentChanged) result = updateRegionItems(result, next)
+      }
+      return result
+    })
+  }
+
+  function resourceEntry(payload: DragPayload): RegionEntry | null {
+    if (payload.kind === 'staged') {
+      const item = items.find(entry => entry.draftId === payload.id)
+      if (!item || isItemLocked(item)) return null
+      const paper = paperEntry(item)
+      if (paper) return paper
+      if (!item.sourceId) return null
+      const entry = resourceEntry({ kind: item.itemType === 'image' ? 'journal-image' : item.itemType as 'note' | 'illustration', id: item.sourceId })
+      const card = parseStylePayload(item.stylePayload).noteCard as { titleText?: unknown; bodyText?: unknown } | undefined
+      return entry && card ? { ...entry, title: typeof card.titleText === 'string' ? card.titleText : entry.title, text: typeof card.bodyText === 'string' ? card.bodyText : entry.text } : entry
+    }
+    if (payload.kind === 'material' && getJournalMaterialDefinition(payload.id)?.kind === 'paper') return { id: createDraftId(), kind: 'note', title: '', text: '', date: '' }
+    if (payload.kind === 'note') { const note = notesById.get(payload.id); return note ? noteRegionEntry(note) : null }
+    if (payload.kind === 'illustration') { const image = illustrationsById.get(payload.id); return image ? { id: image.id, kind: 'image', title: image.title, text: '', date: image.date || image.created_at, path: image.original_path } : null }
+    if (payload.kind === 'journal-image') { const image = journalImagesById.get(payload.id); return image ? { id: image.id, kind: 'image', title: image.original_filename, text: '', date: image.created_at, path: image.file_path } : null }
+    return null
+  }
+
+  function collectResource(payload: DragPayload, point: { x: number; y: number }): boolean {
+    const target = regionAtPoint(items, point), entry = resourceEntry(payload)
+    if (!target || !entry) return false
+    setItems(current => collectRegionEntry(current, target.draftId, entry, payload.kind === 'staged' ? payload.id : undefined))
+    return true
   }
 
   function removeItem(itemId: string) {
-    setItems((current) => current.filter((item) => item.draftId !== itemId))
+    setItems(current => removeRegionAware(current, [itemId]))
     setSelectedItemId((current) => current === itemId ? null : current)
   }
 
@@ -405,6 +459,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   }
 
   function addDraftItem(payload: DragPayload, point?: { x: number; y: number }) {
+    if (point && collectResource(payload, point)) return
     if (payload.kind === 'staged') {
       placeStagedItem(payload.id, point)
       return
@@ -428,7 +483,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         draftItem = placeDraftItemInTemplateSlot(draftItem, selectedTemplateId, templateSlot)
       }
     }
-    setItems((current) => [...current, draftItem])
+    setItems((current) => materializeRegions([...current, draftItem]))
     setSelectedItemId(draftItem.draftId)
   }
 
@@ -446,14 +501,14 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       y: 0,
       zIndex: Math.max(0, ...items.map((item) => item.zIndex)) + 1,
     }
-    setItems((current) => [...current, draftItem])
+    setItems((current) => materializeRegions([...current, draftItem]))
   }
 
   /** Move a staged chip onto the page (drop point or center). */
   function placeStagedItem(draftId: string, point?: { x: number; y: number }) {
     const pageSize = getJournalPageSize(orientation)
     const nextZ = Math.max(0, ...items.map((item) => item.zIndex)) + 1
-    setItems((current) => current.map((item) => {
+    setItems((current) => materializeRegions(current.map((item) => {
       if (item.draftId !== draftId) return item
       const x = point ? point.x - item.width / 2 : pageSize.width / 2 - item.width / 2
       const y = point ? point.y - item.height / 2 : pageSize.height / 2 - item.height / 2
@@ -468,17 +523,18 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         y: Math.max(24, Math.min(y, pageSize.height - item.height - 24)),
         zIndex: nextZ,
       }
-    }))
+    })))
     setSelectedItemId(draftId)
   }
 
   /** Return a canvas item to the work board. */
   function stageExistingItem(draftId: string) {
-    setItems((current) => current.map((item) => item.draftId === draftId ? { ...item, staged: true, templateSlotId: undefined } : item))
+    setItems(current => updateRegionItems(current, { ...detachRegionItem(items.find(item => item.draftId === draftId)!), staged: true, templateSlotId: undefined }))
     setSelectedItemId((current) => current === draftId ? null : current)
   }
 
   function getDraftItemBase(payload: DragPayload): Omit<JournalDraftItem, 'draftId' | 'x' | 'y' | 'zIndex'> | null {
+    if (payload.kind === 'region') return createRegionItem(payload.id === 'strips' ? 'strips' : 'notes', '')
     if (payload.kind === 'note') {
       const note = notesById.get(payload.id)
       return {
@@ -594,7 +650,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-bg-primary">
+    <div className="relative flex h-full w-full min-h-0 min-w-0 flex-col bg-bg-primary">
       {creating && <div className="absolute inset-0 z-[100] cursor-wait bg-bg-primary/20" aria-label={t('journalEditor.setup.saving')} />}
       <header className={`${PAGE_HEADER_CLASS} gap-3`}>
         {editMode ? (
@@ -623,7 +679,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
             <JournalSetupStep
               oshis={oshis}
               selectedOshiId={selectedOshiId}
-              onOshiChange={id => { if (id === selectedOshiId) return; if (items.some(item => item.itemType !== 'material') && !window.confirm(t('journalEdit.changeOshi'))) return; changeDocument(current => ({ ...current, oshiId: id, items: current.items.filter(item => item.itemType === 'material') })) }}
+              onOshiChange={id => { if (id === selectedOshiId) return; if (items.some(item => item.itemType !== 'material' || readRegion(item.stylePayload)?.entries.length) && !window.confirm(t('journalEdit.changeOshi'))) return; changeDocument(current => ({ ...current, oshiId: id, items: current.items.filter(item => item.itemType === 'material').map(item => { const region = readRegion(item.stylePayload); return region ? writeRegion(item, { ...region, entries: [] }) : item }) })) }}
               title={title}
               onTitleChange={setTitle}
               dateLabel={dateLabel}
@@ -646,7 +702,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
             />
           </motion.div>
         ) : (
-          <motion.div key="draft" className="relative flex min-h-0 flex-1 overflow-hidden" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: motionSeconds, ease: 'easeOut' }}>
+          <motion.div key="draft" className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: motionSeconds, ease: 'easeOut' }}>
             <JournalStepRail stepId={step.id} onStepChange={(nextStep) => setStepIndex(STEPS.findIndex((item) => item.id === nextStep))} onHoverChange={setDrawerHoverOpen} />
             <JournalEdgeDrawer
               open={drawerOpen}
@@ -663,6 +719,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
                   {step.id === 'notes' && <JournalNotesDrawer notes={notes} loading={loadingResources} query={noteQuery} filter={noteFilter} page={notePage} placedIds={placedNoteIds} onQueryChange={setNoteQuery} onFilterChange={setNoteFilter} onPageChange={setNotePage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'images' && <JournalImagesDrawer illustrations={selectableIllustrations} journalImages={journalImages} placedJournalImageIds={placedJournalImageIds} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'materials' && <JournalMaterialsDrawer kind={materialKind} group={materialGroup} page={materialPage} onKindChange={setMaterialKind} onGroupChange={setMaterialGroup} onPageChange={setMaterialPage} onPointerPlace={startPointerResourceDrag} />}
+                  {step.id === 'regions' && <JournalRegionsDrawer items={items} selectedId={selectedItemId} onSelect={setSelectedItemId} onRemove={removeItem} onPointerPlace={startPointerResourceDrag} onAdd={kind => addDraftItem({ kind: 'region', id: kind })} />}
                   {step.id === 'stamp' && <JournalStampDrawer value={stampDraft} placing={Boolean(stampPlacementDraft)} onClear={() => { setStampDraft(null); setStampPlacementDraft(null) }} onStartPlacement={setStampPlacementDraft} onCancelPlacement={() => setStampPlacementDraft(null)} />}
                   {step.id === 'review' && <JournalReviewDrawer title={title} dateLabel={dateLabel} description={description} background={background} orientation={orientation} templateId={selectedTemplateId} itemCount={items.length} stamp={stampDraft} creating={creating} canCreate={canSubmit} onCreate={handleSubmit} submitLabel={editMode ? t('journalEditor.setup.save') : t('journalCreate.create')} submittingLabel={editMode ? t('journalEditor.setup.saving') : t('journalCreate.creating')} />}
                 </motion.div>
@@ -686,10 +743,11 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               onZoomChange={setZoom}
               onSelectItem={setSelectedItemId}
               onUpdateItem={updateItem}
-              onUpdateItems={changes => setItems(current => current.map(item => changes.find(change => change.draftId === item.draftId) || item))}
+              onUpdateItems={updateMany}
+              onFinalizeRegion={id => { setItems(current => finalizeStrips(current, id)); setSelectedItemId(null) }}
               onRemoveItem={removeItem}
-              onRemoveItems={ids => setItems(current => current.filter(item => !ids.includes(item.draftId)))}
-              onStageItems={ids => setItems(current => current.map(item => ids.includes(item.draftId) ? { ...item, staged: true, templateSlotId: undefined } : item))}
+              onRemoveItems={ids => setItems(current => removeRegionAware(current, ids))}
+              onStageItems={ids => updateMany(items.filter(item => ids.includes(item.draftId)).map(item => ({ ...item, staged: true, templateSlotId: undefined })))}
               onChangeLayer={changeLayer}
               onDropResource={addDraftItem}
               onStageItem={stageExistingItem}
@@ -715,7 +773,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
         <p className="mb-4 text-sm text-text-secondary">{t('journalEdit.recoverBody')}</p>
         <div className="flex justify-end gap-2">
           <Button onClick={protection.resolveRecovery}>{t('journalEdit.discardDraft')}</Button>
-          <Button variant="primary" onClick={() => { if (protection.recovery) { if (protection.recovery.templateSnapshot) registerJournalTemplate(protection.recovery.templateSnapshot); changeDocument(protection.recovery); setStepIndex(1) }; protection.resolveRecovery() }}>{t('journalEdit.recover')}</Button>
+          <Button variant="primary" onClick={() => { if (protection.recovery) { if (protection.recovery.templateSnapshot) registerJournalTemplate(protection.recovery.templateSnapshot); changeDocument({ ...protection.recovery, items: materializeRegions(protection.recovery.items) }); setStepIndex(1) }; protection.resolveRecovery() }}>{t('journalEdit.recover')}</Button>
         </div>
       </Modal>
       <Modal open={protection.leaving} onClose={protection.cancelLeave} title={t('journalEdit.leaveTitle')}>
@@ -755,6 +813,7 @@ function DragGhostPreview({ ghost, items, notesById, illustrationsById, journalI
         : { kind: stagedItem.itemType, id: stagedItem.sourceId || '' } as DragPayload
   }
   const style = { left: ghost.x, top: ghost.y }
+  if (payload.kind === 'region') return createPortal(<div className="pointer-events-none fixed z-[120] rounded-xl border border-border-color bg-bg-card p-5 text-accent shadow-xl" style={style}>{t(payload.id === 'strips' ? 'journalRegions.strips' : 'journalRegions.notes')}</div>, document.body)
   if (payload.kind === 'material') {
     const material = getJournalMaterialDefinition(payload.id)
     if (!material) return null

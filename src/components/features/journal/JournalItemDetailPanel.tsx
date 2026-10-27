@@ -19,6 +19,8 @@ import {
 import { asNumber, asString, isRecord, safeJsonParse } from '../../../utils/safeJson'
 import { Button } from '../../ui/Button'
 import { getItemLayout } from './journalDraftCanvasGeometry'
+import { readRegion, writeRegion } from '../../../features/journal/journalRegions'
+import { JournalRegionControls } from './JournalRegionControls'
 
 export interface JournalItemDetailPanelProps {
   layer: number
@@ -29,12 +31,21 @@ export interface JournalItemDetailPanelProps {
   orientation: JournalPageOrientation
   onUpdateItem: (itemId: string, layout: JournalLayoutInput & { zIndex?: number; stylePayload?: string }) => void
   onRemoveItem: (itemId: string) => void
+  onFinalizeRegion: (id: string) => void
   onFitHeight: () => void
   onClose: () => void
 }
 
-export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illustration, orientation, onUpdateItem, onRemoveItem, onFitHeight, onClose }: JournalItemDetailPanelProps) {
+export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illustration, orientation, onUpdateItem, onRemoveItem, onFitHeight, onClose, onFinalizeRegion }: JournalItemDetailPanelProps) {
   const { t } = useI18n()
+  const region = readRegion(item.stylePayload)
+  if (region) return <aside data-journal-detail-panel="true" data-region-controls="true" className="absolute left-3 top-16 z-[85] max-h-[70%] w-64 overflow-y-auto rounded-2xl border border-border-color bg-bg-card/95 p-4 shadow-2xl backdrop-blur">
+    <div className="mb-3 flex items-center justify-between text-sm font-bold text-text-primary"><span>{t(`journalRegions.${region.kind}`)}</span><button onClick={onClose} title={t('common.cancel')}><X size={16} /></button></div>
+    <fieldset disabled={isItemLocked(item)} className="grid gap-3 disabled:opacity-40">
+      {region.kind === 'strips' && <Button variant="primary" size="sm" onClick={() => onFinalizeRegion(item.draftId)}>{t('journalRegions.confirmStrips')}</Button>}
+      <JournalRegionControls region={region} onChange={next => onUpdateItem(item.draftId, { ...getItemLayout(item), stylePayload: writeRegion(item, next).stylePayload })} />
+    </fieldset>
+  </aside>
   return (
     <aside data-journal-detail-panel="true" className="absolute bottom-20 right-3 top-16 z-[85] w-72 max-w-[85vw] overflow-y-auto rounded-2xl border border-border-color bg-bg-card/95 p-4 shadow-2xl backdrop-blur">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -48,7 +59,7 @@ export function JournalItemDetailPanel({ layer, onChangeLayer, item, note, illus
         <ToggleField label={t('journalEdit.lock')} checked={isItemLocked(item)} onChange={locked => updateStylePayload(item, { locked }, onUpdateItem)} />
         <fieldset disabled={isItemLocked(item)} className="grid gap-4 disabled:opacity-50">
         <JournalLayerControls layer={layer} onChange={onChangeLayer} />
-        {(item.itemType === 'note' || getJournalMaterialDefinition(item.materialId)?.kind === 'paper') && <Button size="sm" onClick={onFitHeight}>{t('journalEdit.fitHeight')}</Button>}
+        {!region && (item.itemType === 'note' || getJournalMaterialDefinition(item.materialId)?.kind === 'paper') && <Button size="sm" onClick={onFitHeight}>{t('journalEdit.fitHeight')}</Button>}
         <LayoutNumberControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />
         {item.itemType === 'note' && <NoteDetailControls item={item} note={note} onUpdateItem={onUpdateItem} />}
         {(item.itemType === 'illustration' || item.itemType === 'image') && <ImageDetailControls item={item} orientation={orientation} onUpdateItem={onUpdateItem} />}
@@ -71,7 +82,7 @@ function NoteDetailControls({ item, note, onUpdateItem }: { item: JournalDraftIt
     <>
       <ToggleField label={t('journalCreate.detail.titleVisible')} checked={noteCard.titleVisible} onChange={(value) => update({ titleVisible: value })} />
       <TextField label={t('journalCreate.detail.titleText')} value={noteCard.titleText} onChange={(value) => update({ titleText: value })} />
-      <TextAreaField label={t('journalCreate.detail.bodyText')} value={noteCard.bodyText} onChange={(value) => update({ bodyText: value.slice(0, 200) })} rows={5} />
+      <TextAreaField label={t('journalCreate.detail.bodyText')} value={noteCard.bodyText} onChange={(value) => update({ bodyText: value })} rows={5} />
       <SelectField label={t('journalCreate.detail.fontFamily')} value={noteCard.fontFamily} options={FONT_OPTIONS} onChange={(value) => update({ fontFamily: value })} />
       <RangeField label={t('journalCreate.detail.fontSize')} value={noteCard.fontSize} min={10} max={28} step={1} onChange={(value) => update({ fontSize: value })} />
       <RangeField label={t('journalCreate.detail.fontWeight')} value={noteCard.fontWeight} min={300} max={800} step={100} onChange={(value) => update({ fontWeight: value })} />
@@ -133,7 +144,7 @@ function MaterialDetailControls({ item, onUpdateItem }: { item: JournalDraftItem
         <>
           <TextField label={t('journalCreate.detail.paperTitle')} value={noteCardRaw ? asString(noteCardRaw.titleText) || '' : ''} onChange={(value) => updateText('title', value)} />
           <TextAreaField label={t('journalCreate.detail.paperBody')} value={noteCardRaw ? asString(noteCardRaw.bodyText) || '' : ''} rows={4} onChange={(value) => updateText('body', value)} />
-          <SelectField label={t('journalCreate.detail.fontFamily')} value={asString(noteCardRaw?.fontFamily) || 'sans'} options={FONT_OPTIONS} onChange={(value) => updateNoteCard('fontFamily', value)} />
+          <SelectField label={t('journalCreate.detail.fontFamily')} value={asString(noteCardRaw?.fontFamily) || 'casual'} options={FONT_OPTIONS} onChange={(value) => updateNoteCard('fontFamily', value)} />
           <RangeField label={t('journalCreate.detail.fontSize')} value={asNumber(noteCardRaw?.fontSize, 13)} min={9} max={26} step={1} onChange={(value) => updateNoteCard('fontSize', value)} />
           <RangeField label={t('journalCreate.detail.fontWeight')} value={asNumber(noteCardRaw?.fontWeight, 400)} min={300} max={800} step={100} onChange={(value) => updateNoteCard('fontWeight', value)} />
           <RangeField label={t('journalCreate.detail.lineHeight')} value={asNumber(noteCardRaw?.lineHeight, 1.5)} min={1.1} max={1.9} step={0.05} onChange={(value) => updateNoteCard('lineHeight', value)} />

@@ -39,12 +39,12 @@ export function ScheduleManager({ open, oshi, schedules, initialEditId, onClose,
   const [tab, setTab] = useState<'schedules' | 'anniversaries'>('schedules')
   const [archives, setArchives] = useState<Archive[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState<ScheduleInput>({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
+  const [draft, setDraft] = useState<ScheduleInput>({ title: '', archive_id: '', kind: 'once', weekday: 2, date: null, time: null })
   const [calendarNotes, setCalendarNotes] = useState<CalendarNote[]>([])
   const [weekOverrides, setWeekOverrides] = useState<OshiScheduleOverride[]>([])
 
   function resetDraft() {
-    setDraft({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
+    setDraft({ title: '', archive_id: '', kind: 'once', weekday: 2, date: null, time: null })
   }
 
   function startEdit(schedule: OshiSchedule) {
@@ -111,7 +111,7 @@ export function ScheduleManager({ open, oshi, schedules, initialEditId, onClose,
       await createSchedule(oshi.id, payload)
     }
     setEditingId(null)
-    setDraft({ title: '', archive_id: '', kind: 'weekly', weekday: 2, date: null, time: null })
+    setDraft({ title: '', archive_id: '', kind: 'once', weekday: 2, date: null, time: null })
     onChanged()
   }
 

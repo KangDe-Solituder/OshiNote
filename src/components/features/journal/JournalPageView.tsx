@@ -1,3 +1,5 @@
+import { journalItemToDraftItem } from '../../../features/journal/journalDraftAdapters'
+import { updateRegionItems, removeRegionAware } from '../../../features/journal/journalRegionItems'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -174,15 +176,21 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
   async function handleCommitLayout(itemId: string, layout: JournalLayoutInput) {
     const item = items.find((candidate) => candidate.id === itemId)
     if (parseStylePayload(item?.style_payload).locked === true) return
-    await updateItemLayout(itemId, {
-      ...layout,
-      z_index: item?.z_index,
-    })
+    if (item) await handleInspectorLayout(item, layout)
   }
 
   async function handleInspectorLayout(item: JournalItemWithNote, layout: JournalLayoutInput & { z_index?: number }) {
     if (parseStylePayload(item.style_payload).locked === true) return
-    await updateItemLayout(item.id, layout)
+    const drafts = items.flatMap(journalItemToDraftItem)
+    const draft = drafts.find(row => row.originItemId === item.id)
+    if (!draft) { await updateItemLayout(item.id, layout); return }
+    const next = updateRegionItems(drafts, { ...draft, ...layout, zIndex: layout.z_index ?? draft.zIndex })
+    await Promise.all(next.map(async row => {
+      const previous = drafts.find(old => old.draftId === row.draftId)
+      if (!row.originItemId || JSON.stringify(previous) === JSON.stringify(row)) return
+      await updateItemLayout(row.originItemId, { x: row.x, y: row.y, width: row.width, height: row.height, rotation: row.rotation, z_index: row.zIndex })
+      if (row.stylePayload !== previous?.stylePayload) await updateItemStyle(row.originItemId, { style_payload: row.stylePayload })
+    }))
   }
 
   async function handleAutoArrange() {
@@ -211,6 +219,11 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
   }
 
   async function handleRemove(itemId: string) {
+    const drafts = items.flatMap(journalItemToDraftItem)
+    const next = removeRegionAware(drafts, [`existing-${itemId}`])
+    await Promise.all(next.map(async row => {
+      if (row.originItemId && row.stylePayload !== drafts.find(old => old.draftId === row.draftId)?.stylePayload) await updateItemStyle(row.originItemId, { style_payload: row.stylePayload })
+    }))
     await removeItem(itemId)
     if (selectedItemId === itemId) setSelectedItemId(null)
     if (popoverItemId === itemId) setPopoverItemId(null)
@@ -329,6 +342,9 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
               </Button>
             )
           )}
+          {showPageCanvas && standalonePostcard && <Button variant="secondary" size="sm" onClick={() => void handleExportImage()} disabled={exporting || items.length === 0}>
+            {exporting ? <Loader2 size={15} className="animate-spin" /> : <ImageDown size={15} />}{t('journal.exportImage')}
+          </Button>}
           {showPageCanvas && !standalonePostcard && bookId && (
             <div className="relative">
               <Button variant="secondary" size="sm" onClick={() => setShowPageActions(!showPageActions)}>

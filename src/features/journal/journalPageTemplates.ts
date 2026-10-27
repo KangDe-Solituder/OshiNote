@@ -5,6 +5,7 @@ import type { JournalBackgroundPresetId } from './journalBackgrounds'
 import { getJournalPageSize } from './journalLayout'
 import { getJournalMaterialDefinition, getMaterialSnapshot } from './journalMaterials'
 import { parseStylePayload, serializeStylePayload } from './journalItemStyles'
+import { newRegion, readRegion, writeRegion } from './journalRegions'
 
 export interface NormalizedJournalLayout {
   x: number
@@ -76,7 +77,7 @@ export const JOURNAL_PAGE_TEMPLATES: JournalPageTemplateDefinition[] = [
     preferredOrientation: 'portrait',
     background: 'envelope',
     slots: [
-      slot('letter-note', 'note', 0.12, 0.16, 0.72, 0.42, -1, 20, { noteCard: { backgroundColor: '#fffaf0', fontFamily: 'serif', radius: 10 } }),
+      slot('letter-note', 'note', 0.12, 0.16, 0.72, 0.42, -1, 20, { noteCard: { backgroundColor: '#fffaf0', fontFamily: 'casual', radius: 10 } }),
       slot('letter-image', 'illustration', 0.49, 0.63, 0.36, 0.25, 3, 22, { imageStyle: { frame: 'polaroid', radius: 8, shadow: 18 } }),
     ],
     decorations: [
@@ -199,7 +200,7 @@ export function applyJournalPageTemplate(
   createId: () => string = createTemplateDraftId,
   orientationOverride?: JournalPageOrientation
 ): JournalTemplateApplication {
-  const userItems = currentItems.filter((item) => !item.templateGenerated)
+  const userItems = currentItems.filter((item) => !item.templateGenerated || (readRegion(item.stylePayload)?.entries.length ?? 0) > 0)
   if (!templateId) {
     return {
       templateId: null,
@@ -228,11 +229,25 @@ export function applyJournalPageTemplate(
     })
   })
 
+  const decorations = createTemplateDecorationItems(template, createId, targetOrientation)
+  // Changing a weekly row count retains the populated containers and their rules.
+  const regionItems = template.id.startsWith('weekly-reflections-') ? reassignedItems.filter(item => readRegion(item.stylePayload)) : []
+  const migrated = new Set<string>()
+  for (let i = 0; i < decorations.length; i++) {
+    const next = readRegion(decorations[i].stylePayload)
+    if (!next) continue
+    const previous = regionItems.find(item => !migrated.has(item.draftId) && readRegion(item.stylePayload)?.kind === next.kind)
+    if (previous) {
+      const previousRegion = readRegion(previous.stylePayload)!
+      decorations[i] = writeRegion({ ...previous, ...decorations[i], draftId: previous.draftId, originItemId: previous.originItemId }, { ...previousRegion, count: Math.max(next.count, previousRegion.entries.length) })
+      migrated.add(previous.draftId)
+    }
+  }
   return {
     templateId: template.id,
     background: template.background,
     orientation: targetOrientation,
-    items: [...reassignedItems, ...createTemplateDecorationItems(template, createId, targetOrientation)],
+    items: [...reassignedItems.filter(item => !migrated.has(item.draftId)), ...decorations],
   }
 }
 
@@ -341,17 +356,14 @@ export function registerJournalTemplate(template: JournalPageTemplateDefinition)
 
 export function createWeeklyTemplate(count: number): JournalPageTemplateDefinition {
   const rows = Math.max(2, Math.min(6, Math.round(count)))
-  const height = (0.88 - (rows - 1) * 0.035) / rows
   return {
     id: `weekly-reflections-${rows}`, nameKey: 'journalEdit.weeklyName', descriptionKey: 'journalEdit.weeklyDescription',
     preferredOrientation: 'landscape', background: 'sakura',
-    slots: [
-      ...Array.from({ length: rows }, (_, i) => slot(`week-note-${i}`, 'note', 0.64 + (i % 2) * 0.07, 0.065 + i * 0.035, 0.25, 0.24, i % 2 ? -2 : 2, 10 + i)),
-      slot('week-image', 'illustration', 0.65, 0.55, 0.28, 0.38, 0, 20),
+    slots: [],
+    decorations: [
+      decoration('memo-cream', 0.025, 0.055, 0.565, 0.91, 0, 1, { region: { ...newRegion('strips'), count: rows } }),
+      decoration('memo-cream', 0.61, 0.055, 0.365, 0.595, 0, 2, { region: newRegion('notes') }),
+      decoration('memo-pink', 0.61, 0.675, 0.365, 0.29, 0, 0, { color: '#f8e9ef', line: false, noteCard: { titleText: '', bodyText: '', fontSize: 22, textColor: '#885b7c' } }),
     ],
-    decorations: Array.from({ length: rows }, (_, i) => decoration(
-      ['memo-cream', 'memo-pink', 'memo-blue'][i % 3], 0.035, 0.06 + i * (height + 0.035), 0.53, height, 0, i + 1,
-      { line: false, noteCard: { titleText: '', bodyText: '', fontSize: 17, fontWeight: 600, lineHeight: 1.5 } }
-    )),
   }
 }

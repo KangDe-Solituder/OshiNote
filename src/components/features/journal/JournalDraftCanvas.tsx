@@ -1,7 +1,8 @@
+import { JournalRegionPockets } from './JournalRegionPockets'
 import { moveDraftGroup, isItemLocked, resizeDraftItem, arrangeDraftItems, type ArrangeAction, type LayerAction } from '../../../features/journal/journalEditing'
-import { ImageIcon, Inbox, Minus, Plus, RotateCcw, StickyNote, Trash2, SlidersHorizontal, Lock, Unlock } from 'lucide-react'
+import { ImageIcon, Inbox, Minus, Plus, RotateCcw, StickyNote, Trash2, SlidersHorizontal, Scan, Lock, Unlock } from 'lucide-react'
 import clsx from 'clsx'
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { getJournalPageSize, type JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { getMaterializedTemplateSlots } from '../../../features/journal/journalPageTemplates'
@@ -38,6 +39,7 @@ interface JournalDraftCanvasProps {
   onUpdateItems: (items: JournalDraftItem[]) => void
   onRemoveItems: (ids: string[]) => void
   onStageItems: (ids: string[]) => void
+  onFinalizeRegion: (itemId: string) => void
   onRemoveItem: (itemId: string) => void
   onChangeLayer: (itemId: string, action: LayerAction) => void
   onDropResource: (payload: DragPayload, point: { x: number; y: number }) => void
@@ -51,6 +53,7 @@ interface JournalDraftCanvasProps {
 }
 
 export type DragPayload =
+  | { kind: 'region'; id: string }
   | { kind: 'note'; id: string }
   | { kind: 'illustration'; id: string }
   | { kind: 'material'; id: string }
@@ -78,6 +81,7 @@ export function JournalDraftCanvas({
   onRemoveItems,
   onStageItems,
   onRemoveItem,
+  onFinalizeRegion,
   onChangeLayer,
   onDropResource,
   onStageItem,
@@ -91,6 +95,40 @@ export function JournalDraftCanvas({
   const { t } = useI18n()
   const pageSize = getJournalPageSize(orientation)
   const viewportRef = useJournalWheelZoom(zoom, onZoomChange)
+  const previousZoom = useRef(zoom)
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    let width = viewport.clientWidth, height = viewport.clientHeight, remainderX = 0, remainderY = 0
+    const observer = new ResizeObserver(() => {
+      const nextWidth = viewport.clientWidth, nextHeight = viewport.clientHeight
+      const x = viewport.scrollLeft + (width - nextWidth) / 2 + remainderX
+      const y = viewport.scrollTop + (height - nextHeight) / 2 + remainderY
+      viewport.scrollLeft = x; viewport.scrollTop = y
+      remainderX = x - viewport.scrollLeft; remainderY = y - viewport.scrollTop
+      width = nextWidth; height = nextHeight
+    })
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [viewportRef])
+  function centerPage() {
+    const viewport = viewportRef.current
+    if (viewport) { viewport.scrollLeft = 600 + pageSize.width * zoom / 2 - viewport.clientWidth / 2; viewport.scrollTop = 600 + pageSize.height * zoom / 2 - viewport.clientHeight / 2 }
+  }
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const oldZoom = previousZoom.current
+    viewport.scrollLeft = 600 + (viewport.scrollLeft + viewport.clientWidth / 2 - 600) * zoom / oldZoom - viewport.clientWidth / 2
+    viewport.scrollTop = 600 + (viewport.scrollTop + viewport.clientHeight / 2 - 600) * zoom / oldZoom - viewport.clientHeight / 2
+    previousZoom.current = zoom
+  }, [zoom, viewportRef])
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    viewport.scrollLeft = 600 + pageSize.width * previousZoom.current / 2 - viewport.clientWidth / 2
+    viewport.scrollTop = 600 + pageSize.height * previousZoom.current / 2 - viewport.clientHeight / 2
+  }, [orientation, pageSize.width, pageSize.height, viewportRef])
   const pageRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const [inspectorOpen, setInspectorOpen] = useState(true)
@@ -202,7 +240,7 @@ export function JournalDraftCanvas({
         ? event.clientX >= boardRect.left && event.clientX <= boardRect.right
           && event.clientY >= boardRect.top - 8 && event.clientY <= boardRect.bottom + 8
         : false
-      const nearTop = withinCanvasX && dy >= 0 && dy <= 32
+      const nearTop = withinCanvasX && dy >= 0 && dy <= 32 && !(event.target instanceof Element && event.target.closest('[data-journal-canvas-ui]'))
 
       if (nearTop || insideBoard) {
         if (boardCloseTimer.current !== null) {
@@ -260,7 +298,7 @@ export function JournalDraftCanvas({
       />
       <div
         ref={viewportRef}
-        className={clsx('journal-canvas-viewport relative flex min-h-0 min-w-0 flex-1 items-start justify-center overflow-auto p-6', inspectorOpen && 'xl:pr-80', panning && 'cursor-grabbing')}
+        className={clsx('journal-canvas-viewport relative min-h-0 min-w-0 flex-1 overflow-auto', panning && 'cursor-grabbing')}
         {...panHandlers}
         onClick={(event) => {
           if (stampPlacementDraft) return
@@ -270,14 +308,8 @@ export function JournalDraftCanvas({
           onSelectItem(null)
         }}
       >
-      <div data-journal-canvas-ui="true" className="absolute right-3 top-3 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
-        <button type="button" onClick={() => setInspectorOpen(value => !value)} title={t('journalEdit.properties')} className="rounded-xl p-2 text-accent"><SlidersHorizontal size={15} /></button>
-        <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
-        <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>
-        <button type="button" onClick={() => onZoomChange(Math.min(1.25, zoom + 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomIn')}><Plus size={15} /></button>
-      </div>
-
-      <div className="shrink-0" style={{ width: pageSize.width * zoom, height: pageSize.height * zoom }}>
+      <div data-journal-workspace="true" style={{ width: pageSize.width * zoom + 1200, height: pageSize.height * zoom + 1200, padding: 600 }}>
+      <div style={{ width: pageSize.width * zoom, height: pageSize.height * zoom }}>
         <div
           ref={pageRef}
           data-journal-draft-page="true"
@@ -324,11 +356,22 @@ export function JournalDraftCanvas({
             />
           ))}
 
+          <JournalRegionPockets items={canvasItems} />
           <div className="pointer-events-none absolute inset-0" style={{ zIndex: Math.max(0, ...canvasItems.map((item) => item.zIndex)) + 1 }}>
             <StampOverlay stamp={stamp} />
             <StampPlacementLayer active={Boolean(stampPlacementDraft)} stamp={stampPlacementDraft} soundEnabled={stampSoundEnabled} onPlace={onStampPlace} onComplete={onStampPlacementComplete} onCancel={onStampPlacementCancel} />
           </div>
         </div>
+      </div>
+
+      </div>
+      </div>
+      <div data-journal-canvas-ui="true" className="absolute right-3 top-3 z-[70] flex h-10 items-center gap-1 rounded-2xl border border-border-color bg-bg-card/90 p-1 shadow-sm backdrop-blur">
+        <button type="button" title={t('journalRegions.centerPage')} onClick={centerPage} className="rounded-xl p-2 text-text-muted"><Scan size={15} /></button>
+        <button type="button" onClick={() => setInspectorOpen(value => !value)} title={t('journalEdit.properties')} className="rounded-xl p-2 text-accent"><SlidersHorizontal size={15} /></button>
+        <button type="button" onClick={() => onZoomChange(Math.max(0.45, zoom - 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomOut')}><Minus size={15} /></button>
+        <span className="min-w-12 text-center text-xs font-semibold text-text-secondary">{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => onZoomChange(Math.min(1.25, zoom + 0.1))} className="rounded-xl p-2 text-text-muted hover:bg-bg-secondary hover:text-accent" title={t('journalEditor.zoomIn')}><Plus size={15} /></button>
       </div>
 
       {selectedItem && (
@@ -357,6 +400,7 @@ export function JournalDraftCanvas({
         <JournalItemDetailPanel
           key={detailItem.draftId}
           onFitHeight={() => fitHeight(detailItem)}
+          onFinalizeRegion={onFinalizeRegion}
           item={detailItem}
           layer={layerOf(detailItem.draftId)}
           onChangeLayer={(action) => onChangeLayer(detailItem.draftId, action)}
@@ -368,7 +412,6 @@ export function JournalDraftCanvas({
           onClose={() => setInspectorOpen(false)}
         />
       )}
-      </div>
     </div>
   )
 }
@@ -383,7 +426,7 @@ function rotateSelected(item: JournalDraftItem, delta: number, onUpdateItem: Jou
 
 function isDragPayload(value: unknown): value is DragPayload {
   if (!isRecord(value) || typeof value.id !== 'string') return false
-  return value.kind === 'note' || value.kind === 'illustration' || value.kind === 'material'
+  return ['note', 'illustration', 'material', 'journal-image', 'staged', 'region'].includes(String(value.kind))
 }
 
 const toolButtonClass = 'flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-xs font-semibold text-text-muted transition-colors hover:bg-bg-secondary hover:text-accent'

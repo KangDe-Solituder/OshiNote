@@ -1,6 +1,8 @@
+import { readRegionPaper } from './journalRegionItems'
 import type { Illustration, JournalDraftItem, JournalItemWithNote } from '../../types'
 import type { JournalLayoutInput } from './journalLayout'
 import { getJournalMaterialDefinition } from './journalMaterials'
+import { readRegion } from './journalRegions'
 
 export interface JournalItemSize {
   width: number
@@ -23,6 +25,8 @@ export function getDefaultIllustrationItemSize(
 }
 
 export function getDraftItemConstraints(item: JournalDraftItem): { minWidth?: number; minHeight?: number } | undefined {
+  if (readRegionPaper(item)) return { minWidth: 80, minHeight: 24 }
+  if (readRegion(item.stylePayload)) return { minWidth: 260, minHeight: 220 }
   const materialKind = getJournalMaterialDefinition(item.materialId)?.kind
   if (materialKind === 'paper') return { minWidth: 120, minHeight: 60 }
   if (materialKind === 'tape') return { minWidth: 90, minHeight: 18 }
@@ -33,6 +37,7 @@ export function getDraftItemConstraints(item: JournalDraftItem): { minWidth?: nu
 }
 
 export function getJournalItemConstraints(item: JournalItemWithNote): { minWidth?: number; minHeight?: number } | undefined {
+  if (readRegion(item.style_payload)) return { minWidth: 260, minHeight: 220 }
   const materialKind = getJournalMaterialDefinition(item.material_id)?.kind
   if (item.item_type === 'tape' || materialKind === 'tape') return { minWidth: 90, minHeight: 18 }
   if (materialKind === 'sticker') return { minWidth: 42, minHeight: 42 }

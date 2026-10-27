@@ -1,6 +1,10 @@
+import { parseStylePayload, patchStylePayload } from '../../../features/journal/journalItemStyles'
+import { readRegion } from '../../../features/journal/journalRegions'
+import { isRecord } from '../../../utils/safeJson'
+import { useI18n } from '../../../i18n/useI18n'
 import { isItemLocked, isAspectLocked } from '../../../features/journal/journalEditing'
 import clsx from 'clsx'
-import { useRef, type PointerEvent, type RefObject } from 'react'
+import { useRef, useState, type PointerEvent, type RefObject } from 'react'
 import type { Illustration, JournalDraftItem, JournalImage, JournalPageOrientation, Note } from '../../../types'
 import type { JournalLayoutInput } from '../../../features/journal/journalLayout'
 import { getJournalMaterialDefinition } from '../../../features/journal/journalMaterials'
@@ -38,13 +42,27 @@ export interface CanvasItemFrameProps {
 }
 
 export function CanvasItemFrame({ item, note, illustration, journalImage, selected, showHandles = true, onGroupMoveStart, onGroupMove, orientation, zoom, pageRef, onSelect, onOpenDetail, onUpdateItem, onStageItem }: CanvasItemFrameProps) {
+  const { t } = useI18n()
+  const [textEdit, setTextEdit] = useState<{ title: string; body: string } | null>(null)
+  function beginTextEdit() {
+    if (isItemLocked(item) || readRegion(item.stylePayload) || !(item.itemType === 'note' || getJournalMaterialDefinition(item.materialId)?.kind === 'paper')) return
+    const raw = parseStylePayload(item.stylePayload).noteCard
+    const card = isRecord(raw) ? raw : {}
+    setTextEdit({ title: typeof card.titleText === 'string' ? card.titleText : note?.title || '', body: typeof card.bodyText === 'string' ? card.bodyText : note?.plain_text || '' })
+  }
+  function saveText() {
+    if (!textEdit) return
+    const raw = parseStylePayload(item.stylePayload).noteCard
+    onUpdateItem(item.draftId, { ...getItemLayout(item), stylePayload: patchStylePayload(item.stylePayload, { noteCard: { ...(isRecord(raw) ? raw : {}), titleText: textEdit.title, bodyText: textEdit.body } }) })
+    setTextEdit(null)
+  }
   const movingGroup = useRef(false)
   const dragRef = useRef<FrameDragState | null>(null)
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
   const constraints = getDraftItemConstraints(item)
 
   function startDrag(event: PointerEvent<HTMLDivElement>, mode: FrameDragMode, handle?: ResizeHandle) {
-    if (event.button !== 0) return
+    if (event.button !== 0 || textEdit) return
     event.preventDefault()
     event.stopPropagation()
     if (mode === 'move' && (event.ctrlKey || event.metaKey)) {
@@ -121,6 +139,7 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
       data-journal-item-frame="true"
       data-draft-id={item.draftId}
       onClick={(event) => event.stopPropagation()}
+      onDoubleClick={event => { event.stopPropagation(); beginTextEdit() }}
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onOpenDetail(item.draftId) }}
       onPointerDown={(event) => startDrag(event, 'move')}
       onPointerMove={handlePointerMove}
@@ -136,10 +155,15 @@ export function CanvasItemFrame({ item, note, illustration, journalImage, select
         event.currentTarget.style.cursor = ''
       }}
       className={clsx('absolute cursor-default touch-none text-left focus:outline-none', selected && 'outline outline-2 outline-accent/90', selected && material?.kind !== 'tape' && 'shadow-[0_10px_26px_rgba(45,108,223,0.12)]')}
-      style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
+      style={{ left: item.x, top: item.y, width: item.width, height: item.height, zIndex: textEdit ? 100000 : item.zIndex, transform: `rotate(${item.rotation}deg) translateZ(0)` }}
     >
       <JournalDraftItemRenderer item={item} note={note} illustration={illustration} journalImage={journalImage} editing />
-      {selected && showHandles && !isItemLocked(item) && (
+      {textEdit && <div data-journal-canvas-ui="true" className="absolute inset-0 z-30 flex min-h-28 flex-col gap-1 rounded-lg border-2 border-accent bg-bg-card p-2 shadow-xl" onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) saveText() }} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); setTextEdit(null) } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); saveText() } }}>
+        <input autoFocus aria-label={t('journalCreate.detail.paperTitle')} value={textEdit.title} onChange={event => setTextEdit({ ...textEdit, title: event.target.value })} className="min-w-0 rounded bg-bg-primary p-1 text-sm text-text-primary" />
+        <textarea aria-label={t('journalCreate.detail.paperBody')} value={textEdit.body} onChange={event => setTextEdit({ ...textEdit, body: event.target.value })} className="min-h-8 flex-1 resize-none rounded bg-bg-primary p-1 text-sm text-text-primary" />
+        <div className="flex justify-end gap-3 text-xs text-accent"><button onClick={() => setTextEdit(null)}>{t('common.cancel')}</button><button onClick={saveText}>{t('journalEditor.setup.save')}</button></div>
+      </div>}
+      {selected && showHandles && !textEdit && !isItemLocked(item) && (
         <>
           {RESIZE_HANDLES.map((handle) => (
             <button

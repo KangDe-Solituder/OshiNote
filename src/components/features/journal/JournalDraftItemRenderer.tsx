@@ -1,3 +1,5 @@
+import { readRegionPaper } from '../../../features/journal/journalRegionItems'
+import { JournalRegionPaper } from './JournalRegionPaper'
 import { ImageIcon } from 'lucide-react'
 import { useEffect, useState, type CSSProperties } from 'react'
 import clsx from 'clsx'
@@ -18,11 +20,17 @@ import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/
 import { asNumber, asString, isRecord } from '../../../utils/safeJson'
 import { MediaImage } from '../../ui/MediaImage'
 import { JournalStickerArt } from './JournalStickerArt'
+import { readRegion } from '../../../features/journal/journalRegions'
+import { JournalRegionView } from './JournalRegionView'
 
 export function JournalDraftItemRenderer({ item, note, illustration, journalImage, editing = false }: { item: JournalDraftItem; note?: Note; illustration?: Illustration; journalImage?: JournalImage; editing?: boolean }) {
   const { t } = useI18n()
   const material = item.itemType === 'material' ? getJournalMaterialDefinition(item.materialId) : null
   const stylePayload = getMaterialStylePayload(item.stylePayload, material?.id)
+  const region = item.itemType === 'material' ? readRegion(item.stylePayload) : null
+  if (region) return <JournalRegionView item={item} region={region} editing={editing} />
+  const paper = readRegionPaper(item)
+  if (paper) return <JournalRegionPaper item={item} paper={paper} />
   if (item.itemType === 'note') return <DraftNoteBody item={item} note={note} />
   if (item.itemType === 'illustration') return <DraftIllustrationBody item={item} illustration={illustration} />
   if (item.itemType === 'image') return <DraftJournalImageBody item={item} journalImage={journalImage} />
@@ -148,7 +156,7 @@ function DraftMaterialBody({ materialId, stylePayload, emptyText }: { materialId
     const title = (noteCard ? asString(noteCard.titleText) : '') || (legacyText ? asString(legacyText.title) : '') || ''
     const body = (noteCard ? asString(noteCard.bodyText) : '') || (legacyText ? asString(legacyText.body) : '') || ''
     const hasText = Boolean(title || body)
-    const fontFamily = getFontFamily((noteCard && asString(noteCard.fontFamily)) || 'sans')
+    const fontFamily = getFontFamily((noteCard && asString(noteCard.fontFamily)) || 'casual')
     const fontSize = noteCard ? asNumber(noteCard.fontSize, 13) : 13
     const fontWeight = noteCard ? asNumber(noteCard.fontWeight, 400) : 400
     const lineHeight = noteCard ? asNumber(noteCard.lineHeight, 1.5) : 1.5

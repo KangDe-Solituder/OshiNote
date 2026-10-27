@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ImageIcon, PackageOpen, Sparkles, Stamp as StampIcon, StickyNote } from 'lucide-react'
+import { ImageIcon, PackageOpen, Sparkles, Stamp as StampIcon, StickyNote, PanelsTopLeft } from 'lucide-react'
 import { useI18n } from '../../../i18n/useI18n'
 import type { JournalCreationStepId } from './journalCreationTypes'
 
@@ -7,6 +7,7 @@ const DRAFT_STEPS = [
   { id: 'notes', icon: StickyNote, labelKey: 'journalCreate.step.notes' },
   { id: 'images', icon: ImageIcon, labelKey: 'journalCreate.step.images' },
   { id: 'materials', icon: PackageOpen, labelKey: 'journalCreate.step.decorations' },
+  { id: 'regions', icon: PanelsTopLeft, labelKey: 'journalCreate.step.regions' },
   { id: 'stamp', icon: StampIcon, labelKey: 'journalCreate.step.stamp' },
   { id: 'review', icon: Sparkles, labelKey: 'journalCreate.step.review' },
 ] as const

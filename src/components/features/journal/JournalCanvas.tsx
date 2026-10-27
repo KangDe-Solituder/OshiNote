@@ -1,3 +1,5 @@
+import { journalItemToDraftItem } from '../../../features/journal/journalDraftAdapters'
+import { JournalRegionPockets } from './JournalRegionPockets'
 import { Minus, Plus, StickyNote } from 'lucide-react'
 import clsx from 'clsx'
 import type { JournalItemWithNote, JournalPage } from '../../../types'
@@ -130,6 +132,7 @@ export function JournalCanvas({
             />
           ))}
 
+          <JournalRegionPockets items={items.flatMap(journalItemToDraftItem)} />
           <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ zIndex: Math.max(0, ...items.map((item) => item.z_index)) + 1 }}>
             <StampOverlay stamp={stamp} />
             <StampPlacementLayer

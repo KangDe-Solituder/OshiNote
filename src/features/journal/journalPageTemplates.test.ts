@@ -80,7 +80,7 @@ describe('journalPageTemplates', () => {
 
     expect(placed.templateSlotId).toBe('letter-note')
     expect(placed.x).toBe(slot.layout.x)
-    expect(JSON.parse(placed.stylePayload || '{}').noteCard).toMatchObject({ fontSize: 14, backgroundColor: '#fffaf0', fontFamily: 'serif' })
+    expect(JSON.parse(placed.stylePayload || '{}').noteCard).toMatchObject({ fontSize: 14, backgroundColor: '#fffaf0', fontFamily: 'casual' })
   })
 
   it('switches templates while preserving user materials and excess resources', () => {
