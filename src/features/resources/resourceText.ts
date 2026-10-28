@@ -6,7 +6,7 @@ const en = {
   upload: 'Imported image', dimensions: 'Dimensions', size: 'File size', created: 'Imported',
   choose: 'Select a resource to preview it and find where it is used.', empty: 'No matching resources', all: 'All',
   retained: 'Archived uploads are retained for existing pages.', unavailable: 'Could not load resources.',
-  open: 'Open library', templates: 'Templates', retired: 'Archived', active: 'Available', images: 'Images', notes: 'Notes', tags: 'Tags',
+  open: 'Manage', templates: 'Templates', retired: 'Archived', active: 'Available', images: 'Images', notes: 'Notes', tags: 'Tags',
 }
 type Labels = typeof en
 const zh: Labels = {
@@ -16,7 +16,7 @@ const zh: Labels = {
   upload: '导入图像', dimensions: '图像尺寸', size: '文件大小', created: '导入时间',
   choose: '选择素材，预览并查看它用在哪些手账或模板中。', empty: '没有符合条件的资源', all: '全部',
   retained: '已收起的上传内容仍为原有手账保留。', unavailable: '资源加载失败。',
-  open: '打开资源库', templates: '模板', retired: '已收起', active: '可用', images: '图像', notes: '笔记', tags: '标签',
+  open: '管理', templates: '模板', retired: '已收起', active: '可用', images: '图像', notes: '笔记', tags: '标签',
 }
 const ja: Labels = {
   materialDescription: 'シール、テープ、紙、装飾ラベル。', uploadDescription: '読み込んだ画像と、その使用先を確認。', records: '推し活の記録', tools: '手帳ツール', materials: '手帳素材', uploads: 'アップロード',
@@ -25,7 +25,7 @@ const ja: Labels = {
   upload: '読み込んだ画像', dimensions: '画像サイズ', size: 'ファイルサイズ', created: '読み込み日時',
   choose: '素材を選択してプレビューと使用先を確認できます。', empty: '該当する素材はありません', all: 'すべて',
   retained: '非表示の画像も既存の手帳のために保持されます。', unavailable: '素材を読み込めませんでした。',
-  open: 'ライブラリを開く', templates: 'テンプレート', retired: '非表示', active: '使用可能', images: '画像', notes: 'ノート', tags: 'タグ',
+  open: '管理', templates: 'テンプレート', retired: '非表示', active: '使用可能', images: '画像', notes: 'ノート', tags: 'タグ',
 }
 export function useResourceText(): Labels {
   const { locale } = useI18n()
