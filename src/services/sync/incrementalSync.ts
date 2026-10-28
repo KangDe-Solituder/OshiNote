@@ -1,3 +1,4 @@
+import { withResourceFiles } from '../../features/resources/resourceFileLock'
 import { BaseDirectory, exists, readFile } from '@tauri-apps/plugin-fs'
 import { getDb } from '../../database'
 import {
@@ -101,7 +102,7 @@ export async function inspectIncrementalSync(config: WebDavConfig): Promise<WebD
   return testWebDavConnection(config)
 }
 
-export async function runIncrementalSync(
+async function runIncrementalSyncUnlocked(
   config: WebDavConfig,
   mode: SyncMode = 'sync'
 ): Promise<IncrementalSyncSummary> {
@@ -650,4 +651,8 @@ function summary(
   remoteUpdatedAt: string | null
 ): IncrementalSyncSummary {
   return { mode, status, head, uploadedRecords, downloadedRecords, transferredBytes, conflicts, remoteUpdatedAt }
+}
+
+export function runIncrementalSync(config: WebDavConfig, mode: SyncMode = 'sync'): Promise<IncrementalSyncSummary> {
+  return withResourceFiles(() => runIncrementalSyncUnlocked(config, mode))
 }

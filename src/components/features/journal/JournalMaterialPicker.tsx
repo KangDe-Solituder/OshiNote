@@ -1,8 +1,9 @@
+import { useMaterialLibrary } from '../../../features/resources/useMaterialLibrary'
 import { PackageOpen, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '../../ui/Button'
-import { JOURNAL_MATERIAL_KINDS, JOURNAL_MATERIALS } from '../../../features/journal/journalMaterials'
+import { JOURNAL_MATERIAL_KINDS } from '../../../features/journal/journalMaterials'
 import type { JournalMaterialKind } from '../../../types'
 import { usePopoverTransition } from '../themes/uiMotion'
 import { useI18n } from '../../../i18n/useI18n'
@@ -18,9 +19,10 @@ export function JournalMaterialPicker({ onPlaceMaterial, onClose }: JournalMater
   const { t } = useI18n()
   const popoverTransition = usePopoverTransition()
   const [kind, setKind] = useState<'all' | JournalMaterialKind>('all')
+  const { materials: library } = useMaterialLibrary()
   const materials = useMemo(
-    () => kind === 'all' ? JOURNAL_MATERIALS : JOURNAL_MATERIALS.filter((material) => material.kind === kind),
-    [kind]
+    () => library.filter(material => !material.archived && (kind === 'all' || material.kind === kind)),
+    [kind, library]
   )
 
   return (
@@ -70,7 +72,7 @@ export function JournalMaterialPicker({ onPlaceMaterial, onClose }: JournalMater
             className="rounded-xl border border-border-color bg-bg-secondary/60 p-2 text-left transition-colors hover:border-accent hover:bg-accent-soft/30"
           >
             <JournalMaterialTile material={material} compact />
-            <p className="mt-2 truncate text-xs font-semibold text-text-primary">{t(material.nameKey)}</p>
+            <p className="mt-2 truncate text-xs font-semibold text-text-primary">{material.displayName || t(material.nameKey)}</p>
           </button>
         ))}
       </div>

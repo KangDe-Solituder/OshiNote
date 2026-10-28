@@ -31,6 +31,7 @@ import type { Stamp, StampInput, StampMaterialId, StampSnapshotV2, StampTemplate
 import { StampOverlay } from './StampOverlay'
 import { isStampMaterialFontReady, type StampFontId } from '../../../features/stamps/stampFonts'
 import { useStampFontStore } from '../../../stores/stampFontStore'
+import { ResourceStampPresets } from './ResourceStampPresets'
 
 const INK_SWATCHES = ['#8B5CF6', '#EC4899', '#2563EB', '#F59E0B', '#10B981']
 const BG_SWATCHES = ['#fffdf6', '#ffffff', '#2f2a3a', '#f6e7ee']
@@ -163,6 +164,7 @@ export function StampControl({
         title={t('stamps.modalTitle')}
         contentClassName="max-w-5xl p-5"
       >
+        <ResourceStampPresets stamp={preview} onSelect={updateDraft} />
         <StampSettingsForm
           preview={preview}
           currentTemplateId={currentTemplateId}

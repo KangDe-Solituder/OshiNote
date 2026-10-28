@@ -1,10 +1,11 @@
+import { useMaterialLibrary } from '../../../features/resources/useMaterialLibrary'
 import clsx from 'clsx'
 import { Check, ChevronLeft, ChevronRight, ImageIcon, Loader2, Search, Sparkles, StickyNote } from 'lucide-react'
 import { useMemo, useState, type PointerEvent, type ReactNode } from 'react'
 import type { Illustration, JournalImage, JournalMaterialKind, JournalPageOrientation, Note, StampInput } from '../../../types'
 import { useI18n } from '../../../i18n/useI18n'
 import { JOURNAL_BACKGROUND_PRESETS } from '../../../features/journal/journalBackgrounds'
-import { JOURNAL_MATERIAL_KINDS, JOURNAL_MATERIALS, JOURNAL_STICKER_GROUPS, type JournalStickerGroup } from '../../../features/journal/journalMaterials'
+import { JOURNAL_MATERIAL_KINDS, JOURNAL_STICKER_GROUPS, type JournalStickerGroup } from '../../../features/journal/journalMaterials'
 import { getJournalPageTemplateDefinition } from '../../../features/journal/journalPageTemplates'
 import { Button } from '../../ui/Button'
 import { StampControl } from '../stamps/StampControl'
@@ -181,7 +182,9 @@ export function JournalMaterialsDrawer({ kind, group, page, onKindChange, onGrou
   onPointerPlace: (payload: DragPayload, event: PointerEvent<HTMLElement>) => void
 }) {
   const { t } = useI18n()
-  const filtered = JOURNAL_MATERIALS.filter((material) => {
+  const { materials } = useMaterialLibrary()
+  const filtered = materials.filter((material) => {
+    if (material.archived) return false
     if (kind !== 'all' && material.kind !== kind) return false
     if (kind === 'sticker' && group !== 'all' && material.group !== group) return false
     return true
@@ -228,7 +231,7 @@ export function JournalMaterialsDrawer({ kind, group, page, onKindChange, onGrou
             className="cursor-grab rounded-xl border border-border-color bg-bg-secondary p-1.5 text-left transition-colors hover:border-border-hover active:cursor-grabbing"
           >
             <JournalMaterialTile material={material} compact />
-            <span className="mt-1 block truncate text-[11px] font-semibold text-text-primary">{t(material.nameKey)}</span>
+            <span className="mt-1 block truncate text-[11px] font-semibold text-text-primary">{material.displayName || t(material.nameKey)}</span>
           </div>
         ))}
       </div>

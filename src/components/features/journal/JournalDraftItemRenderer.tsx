@@ -32,6 +32,7 @@ export function JournalDraftItemRenderer({ item, note, illustration, journalImag
   if (item.itemType === 'note') return <DraftNoteBody item={item} note={note} />
   if (item.itemType === 'illustration') return <DraftIllustrationBody item={item} illustration={illustration} />
   if (item.itemType === 'image') return <DraftJournalImageBody item={item} journalImage={journalImage} />
+  if (material?.imagePath) return <MediaImage path={material.imagePath} alt={material.displayName || ''} className="pointer-events-none h-full w-full !bg-transparent object-contain" reserveHeight={false} eager />
   if (material) return <DraftMaterialBody material={material} stylePayload={stylePayload} emptyText={editing ? t('journalEdit.emptyText') : ''} />
   return null
 }

@@ -35,6 +35,12 @@ beforeEach(async () => {
 afterEach(() => sqlite.close())
 
 describe('resource migration and retention', () => {
+  it('allows concurrent reconciliation without overwriting immutable versions', async () => {
+    await Promise.all([reconcileResourceLibrary(db), reconcileResourceLibrary(db)])
+    const versions = sqlite.prepare('SELECT id FROM resource_versions').all()
+    expect(versions.length).toBeGreaterThan(0)
+    expect(new Set(versions.map(row => row.id)).size).toBe(versions.length)
+  })
   it('migrates legacy definitions without changing appearance and is restart-safe', async () => {
     await reconcileResourceLibrary(db)
     const first = sqlite.prepare('SELECT * FROM resource_versions ORDER BY id').all()

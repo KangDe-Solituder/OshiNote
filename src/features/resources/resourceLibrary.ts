@@ -24,8 +24,14 @@ export async function registerVersion(db: Database, version: ResourceVersion, na
     }
     return
   }
-  await db.execute(`INSERT INTO resource_versions (id, asset_id, renderer, payload, file_path, content_hash) VALUES (?, ?, ?, ?, ?, ?)`,
+  await db.execute(`INSERT OR IGNORE INTO resource_versions (id, asset_id, renderer, payload, file_path, content_hash) VALUES (?, ?, ?, ?, ?, ?)`,
     [version.id, version.asset_id, version.renderer, version.payload, version.file_path, version.content_hash])
+  // Reconciliation can be requested by both a picker and a sync/backup operation.
+  // A concurrent insert is idempotent only if its immutable definition is identical.
+  const [stored] = await db.select<ResourceVersion[]>('SELECT * FROM resource_versions WHERE id = ?', [version.id])
+  for (const key of ['asset_id', 'renderer', 'payload', 'file_path', 'content_hash'] as const) {
+    if (!stored || stored[key] !== version[key]) throw new Error(`Resource version collision: ${version.id}`)
+  }
 }
 
 /** Idempotent migration, also run before sync/backup to capture newly placed resources. */

@@ -33,7 +33,7 @@ export function captureJournalLayout(draft: JournalCompositionDraft, id: string,
   return template
 }
 
-export function readReusableLayout(resource: ResourceTemplate): JournalPageTemplateDefinition | null {
+export function readReusableLayout(resource: ResourceTemplate, register = true): JournalPageTemplateDefinition | null {
   try {
     const value: unknown = JSON.parse(resource.payload)
     if (!isRecord(value) || value.version !== 1 || !isRecord(value.layout)) return null
@@ -45,6 +45,7 @@ export function readReusableLayout(resource: ResourceTemplate): JournalPageTempl
     }
     if (!layout.slots.every(item => validGeometry(item) && isRecord(item) && typeof item.id === 'string' && (item.kind === 'note' || item.kind === 'illustration'))
       || !layout.decorations.every(item => validGeometry(item) && isRecord(item) && typeof item.materialId === 'string')) return null
-    return registerJournalTemplate({ ...layout, id: resource.id, name: resource.name, nameKey: 'journalEdit.myTemplates', descriptionKey: 'journalEdit.reuseHint' } as unknown as JournalPageTemplateDefinition)
+    const definition = { ...layout, id: resource.id, name: resource.name, nameKey: 'journalEdit.myTemplates', descriptionKey: 'journalEdit.reuseHint' } as unknown as JournalPageTemplateDefinition
+    return register ? registerJournalTemplate(definition) : definition
   } catch { return null }
 }

@@ -2,6 +2,7 @@ import Database from '@tauri-apps/plugin-sql'
 import { MIGRATIONS } from './migrations'
 import { ensureResourceSchema } from '../features/resources/resourceSchema'
 import { reconcileResourceLibrary } from '../features/resources/resourceLibrary'
+import { loadMaterialLibrary } from '../features/resources/resourceManagement'
 
 let db: Database | null = null
 let dbPromise: Promise<Database> | null = null
@@ -52,6 +53,7 @@ async function runMigrations(db: Database): Promise<void> {
   await ensureScheduleTables(db)
   await ensureResourceSchema(db)
   await reconcileResourceLibrary(db)
+  await loadMaterialLibrary(db)
   await rebuildNoteSearchIndex(db)
 }
 

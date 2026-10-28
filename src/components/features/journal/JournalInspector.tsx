@@ -246,7 +246,7 @@ export function JournalInspector({
             <div className="min-w-0 flex-1">
               <p className="text-xs uppercase tracking-wide text-text-muted">{t('journalInspector.selectedMaterial')}</p>
               <h3 className="mt-1 text-base font-semibold text-text-primary">
-                {material ? t(material.nameKey) : t('journalInspector.selectedMaterial')}
+                {material ? (material.displayName || t(material.nameKey)) : t('journalInspector.selectedMaterial')}
               </h3>
             </div>
             {variant === 'popover' && onClose && (

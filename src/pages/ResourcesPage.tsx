@@ -1,3 +1,4 @@
+import { useMaterialLibrary } from '../features/resources/useMaterialLibrary'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, ImageIcon, Layers3, PackageOpen, Upload, Tag } from 'lucide-react'
@@ -15,11 +16,13 @@ import { fetchResourceTemplates } from '../features/templates/templateService'
 import { JOURNAL_PAGE_TEMPLATES } from '../features/journal/journalPageTemplates'
 import { TemplateMiniPreview } from '../components/features/journal/JournalSetupStep'
 
-const featuredMaterial = JOURNAL_MATERIALS.find(material => material.id === 'flow-cat') || JOURNAL_MATERIALS[0]
+const defaultMaterial = JOURNAL_MATERIALS.find(material => material.id === 'flow-cat') || JOURNAL_MATERIALS[0]
 
 export function ResourcesPage() {
   const { t } = useI18n()
   const text = useResourceText()
+  const { materials } = useMaterialLibrary()
+  const featuredMaterial = materials.find(material => !material.archived) || defaultMaterial
   const [uploads, setUploads] = useState<JournalImage[]>([])
   const [illustration, setIllustration] = useState<Illustration>()
   const [error, setError] = useState(false)
@@ -73,7 +76,7 @@ export function ResourcesPage() {
         </div>
         <h2 className="mb-3 mt-8 text-sm font-semibold text-text-muted">{text.tools}</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          <ResourceCard icon={PackageOpen} title={text.materials} count={JOURNAL_MATERIALS.length} to="/resources/materials" action={text.open}>
+          <ResourceCard icon={PackageOpen} title={text.materials} count={materials.filter(material => !material.archived).length} to="/resources/materials" action={text.open}>
             <div className="h-36 w-36"><JournalMaterialTile material={featuredMaterial} fill /></div>
           </ResourceCard>
           <ResourceCard icon={Upload} title={text.uploads} count={uploads.length} to="/resources/uploads" action={text.open}>

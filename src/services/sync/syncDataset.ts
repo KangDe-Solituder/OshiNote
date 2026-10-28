@@ -2,6 +2,7 @@ import { BaseDirectory, exists, mkdir, readFile, rename, writeFile } from '@taur
 import { invoke } from '@tauri-apps/api/core'
 import type Database from '@tauri-apps/plugin-sql'
 import { reconcileResourceLibrary } from '../../features/resources/resourceLibrary'
+import { loadMaterialLibrary, notifyResourcesChanged } from '../../features/resources/resourceManagement'
 import { validateResourceGraph } from '../../features/resources/resourceIntegrity'
 import { getDb } from '../../database'
 import {
@@ -170,6 +171,8 @@ export async function applySyncOperations(operations: SyncOperation[]): Promise<
   for (const operation of upserts) statements.push(await buildUpsertStatement(operation))
 
   await invoke('execute_sync_transaction', { statements })
+  await loadMaterialLibrary(db)
+  notifyResourcesChanged()
   await quarantineSupersededMedia(supersededMedia)
 }
 

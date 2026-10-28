@@ -224,7 +224,7 @@ fn restore_backup_archive(
     let mut archive = ZipArchive::new(archive_file)
         .map_err(|error| format!("Invalid backup archive: {error}"))?;
     let manifest = read_manifest(&mut archive)?;
-    if manifest.schema_version.unwrap_or(1) > 3 {
+    if manifest.schema_version.unwrap_or(1) > 4 {
         return Err("This backup requires a newer OshiNote data schema.".into());
     }
     let staging = app_data_dir.join(format!(".restore-staging-{}", timestamp_id()));

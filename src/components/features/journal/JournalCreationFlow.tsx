@@ -149,6 +149,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
   const [error, setError] = useState('')
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null | undefined>(undefined)
   const [dragGhost, setDragGhost] = useState<DragGhost>(null)
+  const [availableTemplateIds, setAvailableTemplateIds] = useState<string[]>([])
   const [reusableLayouts, setReusableLayouts] = useState<JournalPageTemplateDefinition[]>([])
   const [recentPages, setRecentPages] = useState<JournalPage[]>([])
   const [templateName, setTemplateName] = useState<string | null>(null)
@@ -160,7 +161,8 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
     let alive = true
     fetchResourceTemplates('journal_page').then(rows => {
       if (!alive) return
-      const layouts = rows.filter(row => row.source === 'user').map(readReusableLayout).filter((layout): layout is JournalPageTemplateDefinition => !!layout)
+      setAvailableTemplateIds(rows.map(row => row.id))
+      const layouts = rows.filter(row => row.source === 'user').map(row => readReusableLayout(row)).filter((layout): layout is JournalPageTemplateDefinition => !!layout)
       setReusableLayouts(layouts)
       const requested = searchParams.get('templateId')
       if (!editMode && requested && layouts.some(layout => layout.id === requested)) {
@@ -693,6 +695,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               templateId={selectedTemplateId}
               editMode={editMode}
               reusableLayouts={reusableLayouts}
+              availableTemplateIds={availableTemplateIds}
               recentPages={recentPages}
               loadingLayout={loadingLayout}
               onReusePage={id => void reusePage(id)}

@@ -6,6 +6,9 @@ export type JournalStickerGroup = 'live' | 'nature' | 'cosmos' | 'misc'
 
 export interface JournalMaterialDefinition {
   id: string
+  displayName?: string
+  resourceVersionId?: string
+  imagePath?: string
   kind: JournalMaterialKind
   nameKey: TranslationKey
   categoryKey: TranslationKey
@@ -85,12 +88,20 @@ export const JOURNAL_STICKER_GROUPS: { id: 'all' | JournalStickerGroup; labelKey
 ]
 
 export function getJournalMaterialDefinition(id: string | null | undefined): JournalMaterialDefinition | null {
-  return JOURNAL_MATERIALS.find((material) => material.id === id) || null
+  return libraryMaterials.get(id || '') || JOURNAL_MATERIALS.find((material) => material.id === id) || null
+}
+
+const libraryMaterials = new Map<string, JournalMaterialDefinition>()
+export function registerLibraryMaterials(materials: JournalMaterialDefinition[]) {
+  libraryMaterials.clear()
+  materials.forEach(material => libraryMaterials.set(material.id, material))
 }
 
 export function getMaterialSnapshot(material: JournalMaterialDefinition): string {
   return JSON.stringify({
-    resourceVersionId: `builtin:${material.id}:1`,
+    resourceVersionId: material.resourceVersionId || `builtin:${material.id}:1`,
+    displayName: material.displayName,
+    imagePath: material.imagePath,
     rendererVersion: 1,
     id: material.id,
     kind: material.kind,

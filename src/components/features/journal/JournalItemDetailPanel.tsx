@@ -191,7 +191,7 @@ function getDetailTitle(item: JournalDraftItem, note: Note | undefined, illustra
   if (item.itemType === 'note') return note?.title || t('journalEditor.addNote')
   if (item.itemType === 'illustration') return illustration?.title || illustration?.original_filename || t('journalEditor.addIllustration')
   const material = getJournalMaterialDefinition(item.materialId)
-  return material ? t(material.nameKey) : t('journalEditor.addMaterials')
+  return material ? (material.displayName || t(material.nameKey)) : t('journalEditor.addMaterials')
 }
 
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

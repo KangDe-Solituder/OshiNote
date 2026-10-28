@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import type { CSSProperties } from 'react'
 import type { JournalMaterialDefinition } from '../../../features/journal/journalMaterials'
 import { JournalStickerArt } from './JournalStickerArt'
+import { MediaImage } from '../../ui/MediaImage'
 
 interface JournalMaterialTileProps {
   material: JournalMaterialDefinition
@@ -15,6 +16,7 @@ export function JournalMaterialTile({ material, compact = false, fill = false, s
   const color = typeof style.color === 'string' ? style.color : '#d9c4ff'
   const glassStrength = clampNumber(style.glassStrength, 0, 100)
   const glassStyle = fill ? getGlassStyle(glassStrength, color) : undefined
+  if (material.imagePath) return <MediaImage path={material.imagePath} alt={material.displayName || ''} reserveHeight={false} className={clsx('w-full !bg-transparent object-contain', fill ? 'h-full' : compact ? 'h-16' : 'h-32')} />
 
   return (
     <span
