@@ -90,6 +90,8 @@ export function getJournalMaterialDefinition(id: string | null | undefined): Jou
 
 export function getMaterialSnapshot(material: JournalMaterialDefinition): string {
   return JSON.stringify({
+    resourceVersionId: `builtin:${material.id}:1`,
+    rendererVersion: 1,
     id: material.id,
     kind: material.kind,
     nameKey: material.nameKey,
@@ -100,6 +102,15 @@ export function getMaterialSnapshot(material: JournalMaterialDefinition): string
     defaultRotation: material.defaultRotation,
     defaultStyle: material.defaultStyle,
   })
+}
+
+/** Saved definitions take precedence over the mutable library catalogue. */
+export function resolveMaterialSnapshot(snapshot: string | null | undefined, id?: string | null): JournalMaterialDefinition | null {
+  const value = safeJsonParse<Record<string, unknown>>(snapshot, {}, isRecord)
+  if (typeof value.id === 'string' && ['sticker', 'paper', 'tape', 'label'].includes(String(value.kind)) && isRecord(value.defaultStyle)) {
+    return value as unknown as JournalMaterialDefinition
+  }
+  return getJournalMaterialDefinition(id)
 }
 
 export function parseMaterialStyle(value: string | null | undefined): Record<string, unknown> {

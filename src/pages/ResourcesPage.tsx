@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, ImageIcon, Layers3, PackageOpen, Shapes, Tag } from 'lucide-react'
+import { FileText, ImageIcon, Layers3, PackageOpen, Upload, Tag } from 'lucide-react'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { Button } from '../components/ui/Button'
 import { useI18n } from '../i18n/useI18n'
 import { getAllTags, getTotalNoteCount } from '../features/notes/noteService'
 import { getTotalIllustrationCount } from '../features/illustrations/illustrationService'
+import { useResourceText } from '../features/resources/resourceText'
+import { JOURNAL_MATERIALS } from '../features/journal/journalMaterials'
+import { JournalMaterialTile } from '../components/features/journal/JournalMaterialTile'
+import { MediaImage } from '../components/ui/MediaImage'
+import { fetchJournalImages } from '../features/journal/journalImageService'
+import type { JournalImage } from '../types'
 import { fetchResourceTemplates } from '../features/templates/templateService'
 
 export function ResourcesPage() {
   const { t } = useI18n()
+  const text = useResourceText()
+  const [uploads, setUploads] = useState<JournalImage[]>([])
+  const [error, setError] = useState(false)
   const [counts, setCounts] = useState({ notes: 0, illustrations: 0, tags: 0, templates: 0 })
 
   useEffect(() => {
@@ -19,12 +28,14 @@ export function ResourcesPage() {
       getTotalIllustrationCount(),
       getAllTags(),
       fetchResourceTemplates(),
+      fetchJournalImages(),
     ])
-      .then(([notes, illustrations, tags, templates]) => {
+      .then(([notes, illustrations, tags, templates, images]) => {
+        if (alive) setUploads(images)
         if (alive) setCounts({ notes, illustrations, tags: tags.length, templates: templates.length })
       })
       .catch(() => {
-        if (alive) setCounts({ notes: 0, illustrations: 0, tags: 0, templates: 0 })
+        if (alive) setError(true)
       })
     return () => { alive = false }
   }, [])
@@ -35,29 +46,25 @@ export function ResourcesPage() {
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-text-muted">{t('resources.eyebrow')}</p>
           <h1 className="text-3xl font-bold text-text-primary">{t('resources.title')}</h1>
-          <p className="mt-1 text-text-secondary">{t('resources.subtitle')}</p>
+          <p className="mt-1 text-text-secondary">{text.subtitle}</p>
         </div>
       </header>
 
       <main className={PAGE_CONTENT_CLASS}>
         <div className={PAGE_WIDE_FRAME_CLASS}>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <ResourceCard icon={FileText} title={t('nav.allNotes')} description={t('resources.notes.description')} count={counts.notes} to="/notes" action={t('common.viewAll')} />
-          <ResourceCard icon={ImageIcon} title={t('nav.illustrations')} description={t('resources.illustrations.description')} count={counts.illustrations} to="/illustrations" action={t('common.viewAll')} />
-          <ResourceCard icon={Layers3} title={t('nav.templates')} description={t('resources.templates.description')} count={counts.templates} to="/resources/templates" action={t('resources.openTemplates')} />
-          <ResourceCard icon={PackageOpen} title={t('nav.materials')} description={t('resources.materials.description')} count={0} to="/resources/materials" action={t('resources.openMaterials')} />
-          <ResourceCard icon={Tag} title={t('nav.tags')} description={t('resources.tags.description')} count={counts.tags} to="/tags" action={t('common.viewAll')} />
+        {error && <p role="alert" className="mb-4 text-red-400">{text.unavailable}</p>}
+        <h2 className="mb-3 text-sm font-semibold text-text-muted">{text.records}</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <ResourceCard icon={FileText} title={text.notes} description={t('resources.notes.description')} count={counts.notes} to="/notes" action={text.open} />
+          <ResourceCard icon={ImageIcon} title={text.images} description={t('resources.illustrations.description')} count={counts.illustrations} to="/illustrations" action={text.open} />
+          <ResourceCard icon={Tag} title={text.tags} description={t('resources.tags.description')} count={counts.tags} to="/tags" action={text.open} />
         </div>
-
-        <section className="mt-8 rounded-lg border border-border-color bg-bg-card p-5">
-          <div className="flex items-start gap-3">
-            <Shapes size={20} className="mt-0.5 text-accent" />
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base font-semibold text-text-primary">{t('resources.next.title')}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-text-secondary">{t('resources.next.body')}</p>
-            </div>
-          </div>
-        </section>
+        <h2 className="mb-3 mt-8 text-sm font-semibold text-text-muted">{text.tools}</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div><div className="mb-3 grid grid-cols-3 gap-2">{JOURNAL_MATERIALS.filter(m => ['flow-cat', 'hannya-mask', 'karaoke-mic'].includes(m.id)).map(material => <JournalMaterialTile key={material.id} material={material} compact />)}</div><ResourceCard icon={PackageOpen} title={text.materials} description={text.materialDescription} count={JOURNAL_MATERIALS.length} to="/resources/materials" action={text.open} /></div>
+          <div><div className="mb-3 grid h-16 grid-cols-3 gap-2 overflow-hidden rounded-lg bg-bg-card">{uploads.slice(0, 3).map(image => <MediaImage key={image.id} path={image.file_path} alt={image.original_filename} className="h-16 w-full object-contain" />)}{!uploads.length && <Upload className="m-auto text-text-muted" />}</div><ResourceCard icon={Upload} title={text.uploads} description={text.uploadDescription} count={uploads.length} to="/resources/uploads" action={text.open} /></div>
+          <div><div className="mb-3 flex h-16 items-center justify-center rounded-lg bg-bg-card"><Layers3 className="text-accent" /></div><ResourceCard icon={Layers3} title={text.templates} description={t('resources.templates.description')} count={counts.templates} to="/resources/templates" action={text.open} /></div>
+        </div>
         </div>
       </main>
     </div>

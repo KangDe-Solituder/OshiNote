@@ -472,6 +472,7 @@ async fn read_text_object(
 }
 
 fn webdav_client(config: &WebDavDataConfig) -> Result<Client, String> {
+    crate::validate_test_webdav_path(&config.base_url, &config.remote_path)?;
     Client::builder()
         .danger_accept_invalid_certs(config.allow_invalid_cert)
         .build()

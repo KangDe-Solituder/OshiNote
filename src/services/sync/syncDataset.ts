@@ -1,6 +1,8 @@
 import { BaseDirectory, exists, mkdir, readFile, rename, writeFile } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
 import type Database from '@tauri-apps/plugin-sql'
+import { reconcileResourceLibrary } from '../../features/resources/resourceLibrary'
+import { validateResourceGraph } from '../../features/resources/resourceIntegrity'
 import { getDb } from '../../database'
 import {
   canonicalJson,
@@ -27,6 +29,8 @@ interface SyncDatabaseStatement {
 }
 
 const TABLES: readonly TableDefinition[] = [
+  { name: 'resource_assets', primaryKey: 'id', columns: ['id', 'kind', 'name', 'source', 'current_version_id', 'metadata', 'archived'] },
+  { name: 'resource_versions', primaryKey: 'id', columns: ['id', 'asset_id', 'renderer', 'payload', 'file_path', 'content_hash'] },
   { name: 'oshis', primaryKey: 'id', columns: ['id', 'name', 'avatar', 'color', 'description', 'activity_links', 'anniversaries', 'created_at'] },
   { name: 'archives', primaryKey: 'id', columns: ['id', 'oshi_id', 'name', 'sort_order', 'created_at'] },
   { name: 'notes', primaryKey: 'id', columns: ['id', 'oshi_id', 'archive_id', 'title', 'content', 'plain_text', 'source_url', 'tags', 'favorite', 'created_at', 'updated_at'] },
@@ -34,7 +38,7 @@ const TABLES: readonly TableDefinition[] = [
   { name: 'journal_books', primaryKey: 'id', columns: ['id', 'oshi_id', 'title', 'description', 'cover_style', 'cover_color', 'cover_decoration', 'date_label', 'sort_order', 'created_at', 'updated_at'] },
   { name: 'journal_pages', primaryKey: 'id', columns: ['id', 'book_id', 'oshi_id', 'page_type', 'title', 'description', 'date_label', 'standalone', 'page_index', 'background', 'orientation', 'created_at', 'updated_at'] },
   { name: 'note_images', primaryKey: 'id', columns: ['id', 'note_id', 'data_url', 'sort_order', 'created_at'] },
-  { name: 'journal_images', primaryKey: 'id', columns: ['id', 'oshi_id', 'file_path', 'original_filename', 'mime_type', 'file_size', 'width', 'height', 'created_at'] },
+  { name: 'journal_images', primaryKey: 'id', columns: ['id', 'oshi_id', 'file_path', 'original_filename', 'mime_type', 'file_size', 'width', 'height', 'created_at', 'archived'] },
   { name: 'journal_items', primaryKey: 'id', columns: ['id', 'page_id', 'note_id', 'illustration_id', 'journal_image_id', 'item_type', 'x', 'y', 'width', 'height', 'rotation', 'z_index', 'staged', 'sticker_style', 'color', 'border_style', 'material_id', 'material_snapshot', 'style_payload', 'created_at', 'updated_at'] },
   { name: 'stamps', primaryKey: 'id', columns: ['id', 'target_type', 'target_id', 'template_id', 'template_snapshot', 'label', 'color', 'position', 'x', 'y', 'rotation', 'size', 'opacity', 'created_at', 'updated_at'] },
   { name: 'templates', primaryKey: 'id', columns: ['id', 'type', 'name', 'description', 'source', 'payload', 'hidden', 'deleted', 'created_at', 'updated_at'] },
@@ -71,6 +75,7 @@ export interface LocalSyncDataset {
 
 export async function buildLocalSyncDataset(): Promise<LocalSyncDataset> {
   const db = await getDb()
+  await reconcileResourceLibrary(db)
   const records = new Map<string, SyncRecord>()
   const mediaJobs = new Map<string, SyncMediaJob>()
   const recordHashes: Record<string, string> = {}
@@ -118,19 +123,21 @@ export async function buildLocalSyncDataset(): Promise<LocalSyncDataset> {
         mediaJobs.set(localPath, { logicalPath: localPath, localPath, hash })
       }
 
-      if (table.name === 'journal_images' && typeof row.file_path === 'string' && row.file_path) {
+      if ((table.name === 'journal_images' || table.name === 'resource_versions') && typeof row.file_path === 'string' && row.file_path) {
         const localPath = normalizeManagedMediaPath(row.file_path)
         if (!(await exists(localPath, { baseDir: BaseDirectory.AppData }))) {
           throw new Error(`Missing journal image media: ${localPath}`)
         }
         const bytes = new Uint8Array(await readFile(localPath, { baseDir: BaseDirectory.AppData }))
         const hash = await sha256Bytes(bytes)
+        if (typeof row.content_hash === 'string' && row.content_hash !== hash) throw new Error(`Resource integrity check failed: ${localPath}`)
         mediaHashes[localPath] = hash
         mediaJobs.set(localPath, { logicalPath: localPath, localPath, hash })
       }
     }
   }
 
+  validateResourceGraph(records.values())
   return {
     records,
     snapshot: { record_hashes: recordHashes, media_hashes: mediaHashes },
@@ -141,6 +148,16 @@ export async function buildLocalSyncDataset(): Promise<LocalSyncDataset> {
 export async function applySyncOperations(operations: SyncOperation[]): Promise<void> {
   if (operations.length === 0) return
   const db = await getDb()
+  const projected = new Map<string, SyncRecord>()
+  for (const name of ['resource_assets', 'resource_versions', 'journal_items', 'templates']) {
+    const rows = await db.select<Record<string, unknown>[]>(`SELECT * FROM ${name}`)
+    for (const row of rows) projected.set(`${name}:${row.id}`, { key: `${name}:${row.id}`, id: String(row.id), table: name, value: row })
+  }
+  for (const operation of operations) {
+    if (operation.operation === 'upsert') projected.set(operation.key, { ...operation, value: operation.value || {} })
+    else if (operation.table !== 'resource_assets') projected.delete(operation.key)
+  }
+  validateResourceGraph(projected.values())
   const supersededMedia = await findSupersededIllustrationMedia(db, operations)
   const deletes = operations
     .filter((operation) => operation.operation === 'delete')
@@ -207,6 +224,9 @@ async function quarantineSupersededMedia(paths: string[]): Promise<void> {
   const batch = `${Date.now()}-${crypto.randomUUID()}`
   for (const value of paths) {
     try {
+      const db = await getDb()
+      const retained = await db.select<{ id: string }[]>('SELECT id FROM resource_versions WHERE file_path = ? LIMIT 1', [value])
+      if (retained.length) continue
       const path = normalizeManagedMediaPath(value)
       if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) continue
       const destination = `sync-cache/orphans/${batch}/${path}`
@@ -275,12 +295,17 @@ export function normalizeLegacySyncRecord(table: string, value: Record<string, u
   if (table === 'journal_items' && typeof normalized.staged !== 'number') {
     normalized.staged = 0
   }
+  if (table === 'journal_images' && typeof normalized.archived !== 'number') normalized.archived = 0
   return normalized
 }
 
 function buildDeleteStatement(operation: SyncOperation): SyncDatabaseStatement {
   const table = TABLE_BY_NAME.get(operation.table)
   if (!table) throw new Error(`Unsupported sync table: ${operation.table}`)
+  if (table.name === 'resource_versions') throw new Error('Referenced resource history cannot be deleted by sync.')
+  if (table.name === 'journal_images' || table.name === 'resource_assets') {
+    return { query: `UPDATE ${table.name} SET archived = 1 WHERE id = ?`, values: [operation.id] }
+  }
   return {
     query: `DELETE FROM ${table.name} WHERE ${table.primaryKey} = ?`,
     values: [operation.id],
@@ -320,7 +345,7 @@ function bytesToDataUrl(bytes: Uint8Array, mimeType: string): string {
 
 function normalizeManagedMediaPath(value: string): string {
   const normalized = value.replace(/\\/g, '/')
-  const managed = normalized.startsWith('media/illustrations/') || normalized.startsWith('media/journal/')
+  const managed = normalized.startsWith('media/illustrations/') || normalized.startsWith('media/journal/') || normalized.startsWith('media/resources/')
   if (!managed || normalized.includes('../') || normalized.includes(':')) {
     throw new Error(`Invalid managed media path: ${value}`)
   }

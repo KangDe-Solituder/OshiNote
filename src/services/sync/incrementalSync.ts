@@ -469,6 +469,17 @@ async function prepareRemoteFiles(
     requested.set(`${path}:${hash}`, { hash, localPath: incomingBlobCachePath(hash), targetPath: path.startsWith('media/') ? path : null })
   }
   for (const operation of operations) {
+    // A newly referenced immutable version may use a blob already present in
+    // the base snapshot. Repair a missing local file even without a media diff.
+    if (operation.operation === 'upsert' && operation.table === 'resource_versions' && typeof operation.value?.file_path === 'string') {
+      const path = operation.value.file_path
+      const hash = remoteSnapshot.media_hashes[path]
+      if (!hash) throw new Error(`Missing resource dependency in remote snapshot: ${path}`)
+      if (typeof operation.value.content_hash === 'string' && operation.value.content_hash !== hash) {
+        throw new Error(`Resource version hash does not match its media: ${path}`)
+      }
+      requested.set(`${path}:${hash}`, { hash, localPath: incomingBlobCachePath(hash), targetPath: path })
+    }
     const blob = noteImageBlobFromOperation(operation)
     if (blob) requested.set(`note-images/${operation.id}:${blob.hash}`, { hash: blob.hash, localPath: incomingBlobCachePath(blob.hash), targetPath: null })
   }
@@ -481,6 +492,11 @@ async function prepareRemoteFiles(
       bytes += file.byteLength
     }
     if (targetPath && !(await fileMatchesHash(targetPath, hash))) {
+      const db = await getDb()
+      const retained = await db.select<{ content_hash: string | null }[]>('SELECT content_hash FROM resource_versions WHERE file_path = ?', [targetPath])
+      if (retained.some(version => version.content_hash && version.content_hash !== hash)) {
+        throw new Error(`Sync cannot overwrite retained resource media: ${targetPath}`)
+      }
       await activateSyncCacheFile(localPath, targetPath)
     }
   }

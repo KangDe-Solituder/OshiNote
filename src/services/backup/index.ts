@@ -1,3 +1,5 @@
+import { reconcileResourceLibrary } from '../../features/resources/resourceLibrary'
+import { SYNC_SCHEMA_VERSION } from '../sync/syncModel'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { closeDb, getDb } from '../../database'
@@ -53,15 +55,16 @@ export async function importBackup(): Promise<BackupSummary | null> {
 async function readBackupSyncMetadata() {
   const db = await getDb()
   const rows = await db.select<{ value: string }[]>("SELECT value FROM sync_state WHERE key = 'repository'")
-  if (!rows[0]?.value) return null
+  await reconcileResourceLibrary(db)
+  if (!rows[0]?.value) return { repository_id: null, head_commit: null, schema_version: SYNC_SCHEMA_VERSION }
   try {
     const state = JSON.parse(rows[0].value) as { repository_id?: string; head?: string | null }
     return {
       repository_id: state.repository_id || null,
       head_commit: null,
-      schema_version: 1,
+      schema_version: SYNC_SCHEMA_VERSION,
     }
   } catch {
-    return null
+    return { repository_id: null, head_commit: null, schema_version: SYNC_SCHEMA_VERSION }
   }
 }

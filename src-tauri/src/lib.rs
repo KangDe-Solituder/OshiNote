@@ -224,6 +224,9 @@ fn restore_backup_archive(
     let mut archive = ZipArchive::new(archive_file)
         .map_err(|error| format!("Invalid backup archive: {error}"))?;
     let manifest = read_manifest(&mut archive)?;
+    if manifest.schema_version.unwrap_or(1) > 3 {
+        return Err("This backup requires a newer OshiNote data schema.".into());
+    }
     let staging = app_data_dir.join(format!(".restore-staging-{}", timestamp_id()));
     fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
 
@@ -244,6 +247,7 @@ fn restore_backup_archive(
                     )?;
                 }
             }
+            validate_backup_media(&staging.join("oshinote.db"), &staging)?;
         }
 
         let database_path = app_config_dir.join("oshinote.db");
@@ -432,6 +436,7 @@ fn create_backup_archive(
     if !database_path.exists() {
         return Err("The OshiNote database does not exist yet.".to_string());
     }
+    if include_media { validate_backup_media(&database_path, &app_data_dir)?; }
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
@@ -600,6 +605,30 @@ fn safe_relative_path(value: &str) -> Result<PathBuf, String> {
     Ok(path.to_path_buf())
 }
 
+// Check dependencies before replacing the active database or publishing a backup.
+fn validate_backup_media(database: &Path, root: &Path) -> Result<(), String> {
+    use sqlx::Connection;
+    tauri::async_runtime::block_on(async {
+        let options = sqlx::sqlite::SqliteConnectOptions::new().filename(database).read_only(true);
+        let mut connection = sqlx::SqliteConnection::connect_with(&options).await.map_err(|e| e.to_string())?;
+        for (table, column) in [("illustrations", "original_path"), ("journal_images", "file_path"), ("resource_versions", "file_path")] {
+            let present: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?")
+                .bind(table).fetch_one(&mut connection).await.map_err(|e| e.to_string())?;
+            if present == 0 { continue; }
+            let paths: Vec<String> = sqlx::query_scalar(&format!("SELECT DISTINCT {column} FROM {table} WHERE {column} IS NOT NULL AND {column} != ''"))
+                .fetch_all(&mut connection).await.map_err(|e| e.to_string())?;
+            for path in paths {
+                let relative = safe_relative_path(&path)?;
+                if !path.replace('\\', "/").starts_with("media/") || !root.join(relative).is_file() {
+                    return Err(format!("Backup is missing required media: {path}"));
+                }
+            }
+        }
+        connection.close().await.map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
 fn activate_restored_trees(
     staging: &Path,
     app_data_dir: &Path,
@@ -675,10 +704,56 @@ fn append_restore_log(app_data_dir: &Path, message: &str) {
 }
 
 fn webdav_client(config: &WebDavConfig) -> Result<Client, String> {
+    validate_test_webdav_path(&config.base_url, &config.remote_path)?;
     Client::builder()
         .danger_accept_invalid_certs(config.allow_invalid_cert)
         .build()
         .map_err(|error| error.to_string())
+}
+
+pub(crate) fn validate_test_webdav_path(base_url: &str, remote_path: &str) -> Result<(), String> {
+    validate_test_webdav_target(base_url, remote_path, option_env!("OSHINOTE_RESOURCE_TEST") == Some("1"))
+}
+
+fn validate_test_webdav_target(base_url: &str, remote_path: &str, isolated: bool) -> Result<(), String> {
+    if !isolated { return Ok(()); }
+    let url = Url::parse(base_url).map_err(|error| error.to_string())?;
+    if url.path().trim_matches('/') != "" || remote_path.trim_matches('/') != "BackUp/OshiNote-ResourceTest" {
+        return Err("Resource test builds only use BackUp/OshiNote-ResourceTest at the WebDAV root.".into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod resource_backup_tests {
+    use super::*;
+    use sqlx::{Connection, Executor};
+
+    #[test]
+    fn test_build_rejects_production_and_embedded_remote_paths() {
+        assert!(validate_test_webdav_target("https://nas:5006", "BackUp/OshiNote", true).is_err());
+        assert!(validate_test_webdav_target("https://nas:5006/BackUp/OshiNote", "BackUp/OshiNote-ResourceTest", true).is_err());
+        assert!(validate_test_webdav_target("https://nas:5006", "BackUp/OshiNote-ResourceTest/../OshiNote", true).is_err());
+        assert!(validate_test_webdav_target("https://nas:5006", "BackUp/OshiNote-ResourceTest", true).is_ok());
+    }
+
+    #[test]
+    fn complete_backup_requires_retained_version_files() {
+        let root = std::env::temp_dir().join(format!("oshinote-resource-backup-test-{}", timestamp_id()));
+        fs::create_dir_all(root.join("media/resources")).unwrap();
+        let database = root.join("oshinote.db");
+        tauri::async_runtime::block_on(async {
+            let options = sqlx::sqlite::SqliteConnectOptions::new().filename(&database).create_if_missing(true);
+            let mut connection = sqlx::SqliteConnection::connect_with(&options).await.unwrap();
+            connection.execute("CREATE TABLE resource_versions (file_path TEXT)").await.unwrap();
+            connection.execute("INSERT INTO resource_versions VALUES ('media/resources/retained.png')").await.unwrap();
+            connection.close().await.unwrap();
+        });
+        assert!(validate_backup_media(&database, &root).unwrap_err().contains("retained.png"));
+        fs::write(root.join("media/resources/retained.png"), b"retained-version").unwrap();
+        assert!(validate_backup_media(&database, &root).is_ok());
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 fn webdav_directory_url(config: &WebDavConfig) -> Result<Url, String> {

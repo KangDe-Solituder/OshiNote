@@ -368,6 +368,7 @@ export type JournalDraftItemType = 'note' | 'illustration' | 'material' | 'image
 
 export interface JournalImage {
   id: string
+  archived?: number
   oshi_id: string | null
   file_path: string
   original_filename: string

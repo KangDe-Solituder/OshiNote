@@ -1,0 +1,11 @@
+{
+  "productName": "OshiNote Resource Test",
+  "identifier": "com.oshinote.resource-test",
+  "build": {
+    "beforeDevCommand": "pnpm dev --mode resource-test",
+    "beforeBuildCommand": "pnpm exec tsc -b && pnpm exec vite build --mode resource-test"
+  },
+  "app": { "windows": [{ "title": "OshiNote · Resource Test", "width": 1200, "height": 800, "minWidth": 900, "minHeight": 600, "decorations": false }] },
+  "bundle": { "active": false },
+  "plugins": { "updater": { "endpoints": [] } }
+}

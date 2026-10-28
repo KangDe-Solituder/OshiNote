@@ -93,7 +93,7 @@ function JournalEditorSession() {
         const created = await createJournalItemForImage(activePage.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'material' && item.materialId) {
-        await createJournalItemForMaterial(activePage.id, item.materialId, layout, item.stylePayload, staged)
+        await createJournalItemForMaterial(activePage.id, item.materialId, layout, item.stylePayload, staged, item.materialSnapshot)
       }
     }))
 

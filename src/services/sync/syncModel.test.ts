@@ -3,7 +3,7 @@ import { canonicalJson, diffSnapshot, emptySnapshot, mergeSnapshots, SYNC_SCHEMA
 
 describe('syncModel', () => {
   it('advertises the schema used by schedules and journal images', () => {
-    expect(SYNC_SCHEMA_VERSION).toBe(2)
+    expect(SYNC_SCHEMA_VERSION).toBe(3)
   })
 
   it('serializes object keys deterministically', () => {

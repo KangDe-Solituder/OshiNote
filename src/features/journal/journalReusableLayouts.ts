@@ -1,7 +1,7 @@
 import type { JournalCompositionDraft } from './journalDraftAdapters'
 import type { ResourceTemplate } from '../../types'
 import { getJournalPageSize } from './journalLayout'
-import { getJournalMaterialDefinition } from './journalMaterials'
+import { getJournalMaterialDefinition, getMaterialSnapshot } from './journalMaterials'
 import { parseStylePayload } from './journalItemStyles'
 import { isRecord } from '../../utils/safeJson'
 import { readRegion } from './journalRegions'
@@ -23,7 +23,8 @@ export function captureJournalLayout(draft: JournalCompositionDraft, id: string,
     delete style.text
     if (item.itemType === 'material' && item.materialId) {
       if (getJournalMaterialDefinition(item.materialId)?.kind === 'paper') { style.noteCard = { ...(isRecord(style.noteCard) ? style.noteCard : {}), titleText: '', bodyText: '' }; style.locked = false }
-      template.decorations.push({ materialId: item.materialId, layout, styleOverrides: style })
+      const material = getJournalMaterialDefinition(item.materialId)
+      template.decorations.push({ materialId: item.materialId, materialSnapshot: item.materialSnapshot || (material ? getMaterialSnapshot(material) : undefined), layout, styleOverrides: style })
     } else if (item.itemType !== 'material') {
       style.locked = false
       template.slots.push({ id: `slot-${template.slots.length}`, kind: item.itemType === 'note' ? 'note' : 'illustration', layout, styleOverrides: style })

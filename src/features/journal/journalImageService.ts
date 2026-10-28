@@ -1,7 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { BaseDirectory, exists, mkdir, remove, writeFile } from '@tauri-apps/plugin-fs'
 import { getDb, generateId } from '../../database'
-import { discardCachedMediaPath } from '../../services/media/illustrationMedia'
 import type { JournalImage, JournalImageRow } from '../../types'
 
 const JOURNAL_IMAGE_ROOT = 'media/journal'
@@ -17,11 +16,18 @@ function deserializeImage(row: JournalImageRow): JournalImage {
   return { ...row, oshi_id: row.oshi_id || null }
 }
 
-export async function fetchJournalImages(oshiId?: string): Promise<JournalImage[]> {
+export async function fetchJournalImages(oshiId?: string, pageId?: string): Promise<JournalImage[]> {
   const db = await getDb()
+  if (pageId) {
+    const rows = await db.select<JournalImageRow[]>(`SELECT * FROM journal_images
+      WHERE (archived = 0 AND (oshi_id = ? OR oshi_id IS NULL))
+        OR id IN (SELECT journal_image_id FROM journal_items WHERE page_id = ?)
+      ORDER BY created_at DESC`, [oshiId || null, pageId])
+    return rows.map(deserializeImage)
+  }
   const rows = oshiId
-    ? await db.select<JournalImageRow[]>('SELECT * FROM journal_images WHERE oshi_id = ? OR oshi_id IS NULL ORDER BY created_at DESC', [oshiId])
-    : await db.select<JournalImageRow[]>('SELECT * FROM journal_images ORDER BY created_at DESC')
+    ? await db.select<JournalImageRow[]>('SELECT * FROM journal_images WHERE archived = 0 AND (oshi_id = ? OR oshi_id IS NULL) ORDER BY created_at DESC', [oshiId])
+    : await db.select<JournalImageRow[]>('SELECT * FROM journal_images WHERE archived = 0 ORDER BY created_at DESC')
   return rows.map(deserializeImage)
 }
 
@@ -65,22 +71,11 @@ export async function storeJournalImage(file: File, oshiId: string | null): Prom
   return (await getJournalImageById(id))!
 }
 
-/** Remove a library image, any journal items referencing it, and the backing file. */
+/** Retire from the picker; retained pages and immutable versions keep the file. */
 export async function deleteJournalImage(id: string): Promise<void> {
   const db = await getDb()
-  const rows = await db.select<JournalImageRow[]>('SELECT * FROM journal_images WHERE id = ?', [id])
-  const image = rows[0] ? deserializeImage(rows[0]) : null
-  await db.execute('DELETE FROM journal_items WHERE journal_image_id = ?', [id])
-  await db.execute('DELETE FROM journal_images WHERE id = ?', [id])
-  if (!image) return
-  discardCachedMediaPath(image.file_path)
-  try {
-    if (await exists(image.file_path, { baseDir: BaseDirectory.AppData })) {
-      await remove(image.file_path, { baseDir: BaseDirectory.AppData })
-    }
-  } catch {
-    // A missing file is fine — the row is already gone.
-  }
+  await db.execute('UPDATE journal_images SET archived = 1 WHERE id = ?', [id])
+  await db.execute('UPDATE resource_assets SET archived = 1 WHERE id = ?', [`upload:${id}`])
 }
 
 export function validateJournalImageFile(file: File): string | null {

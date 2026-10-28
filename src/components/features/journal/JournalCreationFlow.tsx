@@ -234,7 +234,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       }),
       fetchIllustrations({ oshiId: selectedOshiId, includeArchived: true, sort: 'newest' }),
       Promise.all(initialIllustrationIdsRef.current.map((id) => fetchIllustrationById(id).catch(() => null))),
-      fetchJournalImages(selectedOshiId).catch(() => [] as JournalImage[]),
+      fetchJournalImages(selectedOshiId, pageId).catch(() => [] as JournalImage[]),
     ])
       .then(([noteResult, illustrationRows, referencedIllustrations, journalImageRows]) => {
         if (!alive) return
@@ -255,7 +255,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
       })
       .finally(() => { if (alive) setLoadingResources(false) })
     return () => { alive = false }
-  }, [editMode, selectedOshiId, setItems])
+  }, [editMode, selectedOshiId, setItems, pageId])
 
   useEffect(() => { setNotePage(1) }, [noteQuery, noteFilter])
   useEffect(() => { setImagePage(1) }, [imageQuery, imageFilter])
@@ -717,7 +717,7 @@ export function JournalCreationFlow({ mode = 'create', initialStep = 'draft', in
               <AnimatePresence mode="wait">
                 <motion.div key={step.id} initial={{ opacity: 0, x: effectiveDrawerDock === 'right' ? 10 : -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: effectiveDrawerDock === 'right' ? -10 : 10 }} transition={{ duration: motionSeconds, ease: 'easeOut' }}>
                   {step.id === 'notes' && <JournalNotesDrawer notes={notes} loading={loadingResources} query={noteQuery} filter={noteFilter} page={notePage} placedIds={placedNoteIds} onQueryChange={setNoteQuery} onFilterChange={setNoteFilter} onPageChange={setNotePage} onPointerPlace={startPointerResourceDrag} />}
-                  {step.id === 'images' && <JournalImagesDrawer illustrations={selectableIllustrations} journalImages={journalImages} placedJournalImageIds={placedJournalImageIds} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
+                  {step.id === 'images' && <JournalImagesDrawer illustrations={selectableIllustrations} journalImages={journalImages.filter(image => !image.archived)} placedJournalImageIds={placedJournalImageIds} loading={loadingResources} query={imageQuery} filter={imageFilter} page={imagePage} placedIds={placedIllustrationIds} onQueryChange={setImageQuery} onFilterChange={setImageFilter} onPageChange={setImagePage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'materials' && <JournalMaterialsDrawer kind={materialKind} group={materialGroup} page={materialPage} onKindChange={setMaterialKind} onGroupChange={setMaterialGroup} onPageChange={setMaterialPage} onPointerPlace={startPointerResourceDrag} />}
                   {step.id === 'regions' && <JournalRegionsDrawer items={items} selectedId={selectedItemId} onSelect={setSelectedItemId} onRemove={removeItem} onPointerPlace={startPointerResourceDrag} onAdd={kind => addDraftItem({ kind: 'region', id: kind })} />}
                   {step.id === 'stamp' && <JournalStampDrawer value={stampDraft} placing={Boolean(stampPlacementDraft)} onClear={() => { setStampDraft(null); setStampPlacementDraft(null) }} onStartPlacement={setStampPlacementDraft} onCancelPlacement={() => setStampPlacementDraft(null)} />}

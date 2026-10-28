@@ -3,7 +3,7 @@ import type { JournalDraftItem, JournalDraftItemType, JournalPageOrientation, Re
 import { isRecord } from '../../utils/safeJson'
 import type { JournalBackgroundPresetId } from './journalBackgrounds'
 import { getJournalPageSize } from './journalLayout'
-import { getJournalMaterialDefinition, getMaterialSnapshot } from './journalMaterials'
+import { getMaterialSnapshot, resolveMaterialSnapshot } from './journalMaterials'
 import { parseStylePayload, serializeStylePayload } from './journalItemStyles'
 import { newRegion, readRegion, writeRegion } from './journalRegions'
 
@@ -25,6 +25,7 @@ export interface JournalTemplateSlot {
 
 export interface JournalTemplateDecoration {
   materialId: string
+  materialSnapshot?: string
   layout: NormalizedJournalLayout
   styleOverrides?: Record<string, unknown>
 }
@@ -257,14 +258,14 @@ export function createTemplateDecorationItems(
   orientation: JournalPageOrientation = template.preferredOrientation
 ): JournalDraftItem[] {
   return template.decorations.flatMap((templateDecoration) => {
-    const material = getJournalMaterialDefinition(templateDecoration.materialId)
+    const material = resolveMaterialSnapshot(templateDecoration.materialSnapshot, templateDecoration.materialId)
     if (!material) return []
     const layout = materializeTemplateLayout(templateDecoration.layout, orientation)
     return [{
       draftId: createId(),
       itemType: 'material' as const,
       materialId: material.id,
-      materialSnapshot: getMaterialSnapshot(material),
+      materialSnapshot: templateDecoration.materialSnapshot || getMaterialSnapshot(material),
       stylePayload: mergeTemplateStylePayload(serializeStylePayload(material.defaultStyle), templateDecoration.styleOverrides),
       ...layout,
       templateSourceId: template.id,

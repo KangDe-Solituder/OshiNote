@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { PageLoadingState } from './components/ui/PageLoadingState'
 import { MainLayout } from './components/layout/MainLayout'
 import { UpdateNotifier } from './components/features/update/UpdateNotifier'
+import { isResourceTest } from './services/sync/testIsolation'
 
 const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })))
 const OshiListPage = lazy(() => import('./pages/OshiListPage').then((module) => ({ default: module.OshiListPage })))
@@ -25,6 +26,7 @@ const IllustrationsPage = lazy(() => import('./pages/IllustrationsPage').then((m
 const ResourcesPage = lazy(() => import('./pages/ResourcesPage').then((module) => ({ default: module.ResourcesPage })))
 const ResourceTemplatesPage = lazy(() => import('./pages/ResourceTemplatesPage').then((module) => ({ default: module.ResourceTemplatesPage })))
 const ResourceMaterialsPage = lazy(() => import('./pages/ResourceMaterialsPage').then((module) => ({ default: module.ResourceMaterialsPage })))
+const ResourceUploadsPage = lazy(() => import('./pages/ResourceUploadsPage').then((module) => ({ default: module.ResourceUploadsPage })))
 
 const router = createBrowserRouter(createRoutesFromElements(
   <Route element={<MainLayout />}>
@@ -47,6 +49,7 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route path="resources" element={<ResourcesPage />} />
     <Route path="resources/templates" element={<ResourceTemplatesPage />} />
     <Route path="resources/materials" element={<ResourceMaterialsPage />} />
+    <Route path="resources/uploads" element={<ResourceUploadsPage />} />
     <Route path="illustrations" element={<IllustrationsPage />} />
     <Route path="tags" element={<TagsPage />} />
     <Route path="tags/:tagName" element={<TagDetailPage />} />
@@ -61,7 +64,7 @@ export default function App() {
       <MotionProvider>
         <ErrorBoundary>
           <Suspense fallback={<PageLoadingState label="Loading page" layout="detail" className="p-6" />}>
-            <UpdateNotifier />
+            {!isResourceTest && <UpdateNotifier />}
             <RouterProvider router={router} />
           </Suspense>
         </ErrorBoundary>

@@ -22,7 +22,7 @@ import type {
 } from '../../types'
 import { createInitialLayout } from './journalLayout'
 import { deleteStampForTarget, persistStampForTarget } from '../stamps/stampService'
-import { getJournalMaterialDefinition, getMaterialSnapshot } from './journalMaterials'
+import { getJournalMaterialDefinition, getMaterialSnapshot, resolveMaterialSnapshot } from './journalMaterials'
 import { draftItemToLayout } from './journalItemSizing'
 import { safeJsonParse, isStringArray, isRecord } from '../../utils/safeJson'
 
@@ -299,7 +299,7 @@ export async function createJournalPageFromDraft(input: CreateJournalPageDraftIn
         const created = await createJournalItemForImage(page.id, item.sourceId, layout, staged)
         if (item.stylePayload !== undefined) await updateJournalItemStyle(created.id, { style_payload: item.stylePayload })
       } else if (item.itemType === 'material' && item.materialId) {
-        await createJournalItemForMaterial(page.id, item.materialId, layout, item.stylePayload, staged)
+        await createJournalItemForMaterial(page.id, item.materialId, layout, item.stylePayload, staged, item.materialSnapshot)
       }
     }
   } else {
@@ -529,8 +529,8 @@ export async function createJournalItemForIllustration(pageId: string, illustrat
   return (await fetchJournalItemById(id))!
 }
 
-export async function createJournalItemForMaterial(pageId: string, materialId: string, initialLayout?: JournalLayoutUpdate, stylePayloadOverride?: string, staged = false): Promise<JournalItem> {
-  const material = getJournalMaterialDefinition(materialId)
+export async function createJournalItemForMaterial(pageId: string, materialId: string, initialLayout?: JournalLayoutUpdate, stylePayloadOverride?: string, staged = false, materialSnapshot?: string): Promise<JournalItem> {
+  const material = resolveMaterialSnapshot(materialSnapshot, materialId)
   if (!material) throw new Error(`Unknown journal material: ${materialId}`)
 
   const db = await getDb()
@@ -567,7 +567,7 @@ export async function createJournalItemForMaterial(pageId: string, materialId: s
       layout.z_index,
       styleColor,
       material.id,
-      getMaterialSnapshot(material),
+      materialSnapshot || getMaterialSnapshot(material),
       stylePayload,
       staged ? 1 : 0,
     ]

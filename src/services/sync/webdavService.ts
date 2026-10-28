@@ -1,7 +1,10 @@
+import { reconcileResourceLibrary } from '../../features/resources/resourceLibrary'
+import { SYNC_SCHEMA_VERSION } from './syncModel'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { closeDb, getDb } from '../../database'
 import { isRecord, safeJsonParse, asString } from '../../utils/safeJson'
 import { readLocalStorage, writeLocalStorage } from '../../utils/safeLocalStorage'
+import { assertTestRemotePath, isResourceTest, RESOURCE_TEST_PATH } from './testIsolation'
 
 const WEBDAV_CONFIG_KEY = 'oshinote.webdav.config'
 
@@ -65,7 +68,7 @@ export function readWebDavConfig(): WebDavConfig {
     baseUrl: asString(parsed.baseUrl, DEFAULT_CONFIG.baseUrl),
     username: asString(parsed.username, DEFAULT_CONFIG.username),
     password: asString(parsed.password),
-    remotePath: asString(parsed.remotePath, DEFAULT_CONFIG.remotePath),
+    remotePath: isResourceTest ? RESOURCE_TEST_PATH : asString(parsed.remotePath, DEFAULT_CONFIG.remotePath),
     allowInvalidCert: parsed.allowInvalidCert === true,
   }
 }
@@ -79,6 +82,7 @@ function requireTauri(): void {
 }
 
 function toCommandConfig(config: WebDavConfig) {
+  assertTestRemotePath(config.remotePath)
   return {
     base_url: config.baseUrl.trim(),
     username: config.username.trim(),
@@ -187,15 +191,16 @@ export async function clearSyncCache(): Promise<SyncCacheSummary> {
 async function readBackupSyncMetadata() {
   const db = await getDb()
   const rows = await db.select<{ value: string }[]>("SELECT value FROM sync_state WHERE key = 'repository'")
-  if (!rows[0]?.value) return null
+  await reconcileResourceLibrary(db)
+  if (!rows[0]?.value) return { repository_id: null, head_commit: null, schema_version: SYNC_SCHEMA_VERSION }
   try {
     const state = JSON.parse(rows[0].value) as { repository_id?: string; head?: string | null }
     return {
       repository_id: state.repository_id || null,
       head_commit: state.head || null,
-      schema_version: 1,
+      schema_version: SYNC_SCHEMA_VERSION,
     }
   } catch {
-    return null
+    return { repository_id: null, head_commit: null, schema_version: SYNC_SCHEMA_VERSION }
   }
 }
