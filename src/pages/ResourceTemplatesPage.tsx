@@ -1,4 +1,6 @@
 import { UiHint } from '../components/ui/UiHint'
+import { AnimatedCollapse } from '../components/ui/AnimatedCollapse'
+import { ContentTransition } from '../components/ui/ContentTransition'
 import { instantiateMaterialTemplate } from '../features/resources/resourceManagement'
 import { readReusableLayout } from '../features/journal/journalReusableLayouts'
 import { useEffect, useRef, useState } from 'react'
@@ -62,7 +64,7 @@ export function ResourceTemplatesPage() {
       {trash ? <p className="mb-5 text-sm text-text-muted">{text.deletedHint}</p> : <UiHint className="mb-5 text-sm text-text-muted">{text.templateHint}</UiHint>}
       {error&&<p role="alert" className="mb-4 text-red-400">{error}</p>}
       {!filtered.length&&<div className="py-16 text-center text-text-muted"><Layers3 className="mx-auto mb-3"/>{t('templates.empty.title')}</div>}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{pagination.visible.map(template=>{
+      <ContentTransition changeKey={pagination.visible.map(item => item.id).join(',')} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{pagination.visible.map(template=>{
         const Icon=TYPE_ICONS[template.type]
         const layout=template.type==='journal_page'?getJournalPageTemplateDefinition(template.id):null
         const name=title(template)
@@ -77,10 +79,10 @@ export function ResourceTemplatesPage() {
               {!trash&&template.source==='user'&&<Button disabled={busy} size="sm" variant="ghost" onClick={()=>setSelected(selected===template.id?null:template.id)}>{text.rename}</Button>}
               <Button disabled={busy} size="sm" variant="ghost" onClick={()=>void run(()=>updateResourceTemplate(template,{deleted:!template.deleted}))}>{trash?text.restore:text.remove}</Button>
             </div>
-            {selected===template.id&&template.source==='user'&&!trash&&<form key={`${template.id}:${template.updated_at}`} className="mt-4 space-y-3 border-t border-border-color pt-3" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void run(()=>updateResourceTemplate(template,{name:String(data.get('name')),description:String(data.get('description'))}))}}><label className="block text-xs text-text-muted">{text.rename}<input required maxLength={160} name="name" aria-label={text.rename} defaultValue={template.name} className={`${fieldClass} mt-1`} /></label><label className="block text-xs text-text-muted">{text.description}<textarea name="description" aria-label={text.description} maxLength={1000} defaultValue={template.description} className={`${fieldClass} mt-1`} /></label><Button disabled={busy} size="sm" type="submit">{text.save}</Button></form>}
+            <AnimatedCollapse open={selected===template.id&&template.source==='user'&&!trash}><form key={`${template.id}:${template.updated_at}`} className="mt-4 space-y-3 border-t border-border-color pt-3" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void run(()=>updateResourceTemplate(template,{name:String(data.get('name')),description:String(data.get('description'))}))}}><label className="block text-xs text-text-muted">{text.rename}<input required maxLength={160} name="name" aria-label={text.rename} defaultValue={template.name} className={`${fieldClass} mt-1`} /></label><label className="block text-xs text-text-muted">{text.description}<textarea name="description" aria-label={text.description} maxLength={1000} defaultValue={template.description} className={`${fieldClass} mt-1`} /></label><Button disabled={busy} size="sm" type="submit">{text.save}</Button></form></AnimatedCollapse>
           </div>
         </section>
-      })}</div>
+      })}</ContentTransition>
       <ResourcePagination {...pagination} />
       </div>
     </div></main>

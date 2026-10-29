@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams } from 'react-router-dom'
 import { invoke } from '@tauri-apps/api/core'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion'
 import clsx from 'clsx'
 import {
   Calendar,
@@ -273,7 +273,7 @@ export function OshiIllustrationsPage() {
         </div>
       </main>
 
-      {showCreate && (
+      <AnimatePresence>{showCreate && (
         <IllustrationCreateModal
           oshiId={oshiId}
           oshis={oshis}
@@ -284,7 +284,7 @@ export function OshiIllustrationsPage() {
             setSelectedId(created.id)
           }}
         />
-      )}
+      )}</AnimatePresence>
 
       <AnimatePresence initial={false}>
         {selected && (
@@ -543,6 +543,8 @@ export function IllustrationCreateModal({
 }) {
   const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const timing = useMotionTiming()
+  const present = useIsPresent()
   const [file, setFile] = useState<File | null>(null)
   const [selectedOshiId, setSelectedOshiId] = useState(oshiId)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -613,8 +615,8 @@ export function IllustrationCreateModal({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-bg-primary/70 p-4 backdrop-blur-sm sm:p-6" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
-      <div className="grid h-[calc(100vh-48px)] max-h-[780px] w-[min(920px,calc(100vw-32px))] min-h-0 overflow-hidden rounded-3xl border border-border-color bg-bg-primary shadow-glass md:grid-cols-[minmax(0,1fr)_360px]">
+    <motion.div inert={!present} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, pointerEvents: 'none' }} transition={{ duration: present ? timing.viewEnter : timing.viewExit }} className="fixed inset-0 flex items-center justify-center bg-bg-primary/70 p-4 backdrop-blur-sm sm:p-6" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
+      <motion.div initial={{ scale: timing.viewEnter ? 0.975 : 1, y: timing.viewEnter ? 8 : 0 }} animate={{ scale: 1, y: 0 }} exit={{ scale: timing.viewExit ? 0.99 : 1, y: timing.viewExit ? 4 : 0 }} transition={{ duration: present ? timing.viewEnter : timing.viewExit, ease: MOTION_EASING.enter }} className="grid h-[calc(100vh-48px)] max-h-[780px] w-[min(920px,calc(100vw-32px))] min-h-0 overflow-hidden rounded-3xl border border-border-color bg-bg-primary shadow-glass md:grid-cols-[minmax(0,1fr)_360px]">
         <div className="hidden min-h-0 bg-bg-secondary/40 p-4 md:block">
           {previewUrl ? (
             <img src={previewUrl} alt="" className="h-full w-full rounded-2xl object-contain" />
@@ -709,8 +711,8 @@ export function IllustrationCreateModal({
             <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -731,6 +733,7 @@ export function IllustrationDetailDrawer({
 }) {
   const { t } = useI18n()
   const drawer = useRef<HTMLElement>(null)
+  const present = useIsPresent()
   usePreviewDismiss(drawer, onClose)
   const motionSeconds = useUiMotionSeconds()
   const [editing, setEditing] = useState(false)
@@ -839,9 +842,10 @@ export function IllustrationDetailDrawer({
   return (
     <motion.aside
       ref={drawer}
+      inert={!present}
       initial={{ opacity: 0, x: motionSeconds === 0 ? 0 : 28 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: motionSeconds === 0 ? 0 : 28 }}
+      exit={{ opacity: 0, x: motionSeconds === 0 ? 0 : 28, pointerEvents: 'none' }}
       transition={{ duration: motionSeconds, ease: 'easeOut' }}
       className="illustration-detail-drawer absolute right-0 top-0 flex h-full w-[min(440px,100%)] flex-col border-l border-border-color bg-bg-primary shadow-2xl transform-gpu will-change-[transform,opacity]"
       style={{ zIndex: OVERLAY_Z_INDEX.drawer }}

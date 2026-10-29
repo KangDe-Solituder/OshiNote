@@ -6,6 +6,8 @@ import { Card } from '../components/ui/Card'
 import { Modal } from '../components/ui/Modal'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { UiHint } from '../components/ui/UiHint'
+import { AnimatePresence } from 'framer-motion'
+import { AnimatedCollapse, AnimatedDisclosure } from '../components/ui/AnimatedCollapse'
 import { PAGE_CONTENT_CLASS, PAGE_FORM_FRAME_CLASS } from '../components/layout/pageShell'
 import { useI18n } from '../i18n/useI18n'
 import { useDataText } from './dataText'
@@ -23,7 +25,7 @@ type FeedbackArea = 'locations' | 'sync' | 'backup' | 'restore'
 type Feedback = { message: string; error?: boolean }
 
 function OperationFeedback({ value }: { value?: Feedback }) {
-  return value ? <p role={value.error ? 'alert' : 'status'} className={`min-w-0 break-words text-sm ${value.error ? 'text-red-400' : 'text-accent'}`}>{value.message}</p> : null
+  return <AnimatedCollapse open={Boolean(value)}>{value && <p role={value.error ? 'alert' : 'status'} className={`min-w-0 break-words text-sm ${value.error ? 'text-red-400' : 'text-accent'}`}>{value.message}</p>}</AnimatedCollapse>
 }
 
 export function ExportPage() {
@@ -126,10 +128,10 @@ export function ExportPage() {
           <UiHint className="mt-3 text-sm text-text-muted">{text.syncHint}</UiHint>
           <p className="mt-3 text-sm text-text-secondary">{inspection?.connected ? t('export.sync.connected') : t('export.sync.notChecked')}{inspection?.remote_updated_at ? ` · ${formatRemoteTime(inspection.remote_updated_at, locale)}` : ''}</p>
           {inspection && !inspection.supports_etag && <p className="mt-3 text-sm text-amber-500">{t('export.sync.noEtagWarning')}</p>}
-          <details className="mt-4 border-t border-border-color pt-4"><summary className="cursor-pointer text-sm text-text-secondary">{text.advanced}</summary><div className="mt-3 flex flex-wrap gap-2">
+          <AnimatedDisclosure title={text.advanced} className="mt-4 border-t border-border-color pt-4"><div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" disabled={busy || !cloud} onClick={() => void sync('pull')}>{spinner('pull')}{t('export.sync.onlyPull')}</Button><Button size="sm" variant="secondary" disabled={busy || !cloud} onClick={() => void sync('push')}>{spinner('push')}{t('export.sync.onlyPush')}</Button>
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => { if (window.confirm(t('export.sync.resetConfirm'))) void run('sync', 'reset-sync', async () => { await resetIncrementalSyncState(); setConflicts([]); setInspection(null); report('sync', t('export.sync.resetDone')) }) }}>{spinner('reset-sync')}{t('export.sync.resetLink')}</Button>
-          </div></details>
+          </div></AnimatedDisclosure>
           {conflicts.length > 0 && <div className="mt-4 space-y-3 border-t border-border-color pt-4"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{t('export.sync.status.conflicts', { count: unresolved })}</h3><Button size="sm" disabled={busy || unresolved > 0 || cloud?.kind !== 'webdav'} onClick={() => void run('sync', 'merge', async () => { if (cloud?.kind !== 'webdav') return; const result = await finishPendingMerge(cloud.config); report('sync', formatSyncResult(result, t)); setConflicts(await listSyncConflicts()) })}>{spinner('merge')}{t('export.sync.finishMerge')}</Button></div>
             {conflicts.map(conflict => <div key={conflict.id}><p className="mb-2 text-sm">{shortEntityKey(conflict.entity_key)}</p><div className="grid gap-3 sm:grid-cols-2">{(['local', 'remote'] as const).map(side => <ConflictChoice key={side} label={t(side === 'local' ? 'export.sync.localVersion' : 'export.sync.remoteVersion')} preview={conflictPreview(side === 'local' ? conflict.local_value : conflict.remote_value)} selected={conflict.resolution === side} action={t(side === 'local' ? 'export.sync.keepLocal' : 'export.sync.keepRemote')} disabled={busy} onClick={() => void run('sync', `conflict-${conflict.id}`, async () => { await resolveSyncConflict(conflict.id, side); setConflicts(await listSyncConflicts()) })} />)}</div></div>)}
           </div>}
@@ -151,7 +153,7 @@ export function ExportPage() {
         </Card>
       </section>
     </div>
-    {editor && <DataLocationEditor location={editor === 'new' ? null : editor} onClose={() => setEditor(null)} onSave={async value => {
+    <AnimatePresence>{editor && <DataLocationEditor key={editor === 'new' ? 'new' : editor.id} location={editor === 'new' ? null : editor} onClose={() => setEditor(null)} onSave={async value => {
       const previous = settings.locations.find(x => x.id === value.id)
       if (previous?.kind === 'webdav' && value.kind === 'webdav' && previous.id === settings.syncId && (previous.config.baseUrl !== value.config.baseUrl || previous.config.remotePath !== value.config.remotePath)) {
         await persist({ ...settings, locations: settings.locations.map(x => x.id === value.id ? value : x), syncId: '' }); setInspection(null)
@@ -160,7 +162,7 @@ export function ExportPage() {
         setInspection(null)
       }
       clearList(); setEditor(null)
-    }} />}
+    }} />}</AnimatePresence>
     <Modal open={Boolean(prepared)} onClose={() => void cancelRestore()} title={text.ready}>
       {prepared && <div className="space-y-4"><p className="text-sm text-accent">{text.validated}</p><dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"><dt>{text.created}</dt><dd>{/^\d+$/.test(prepared.created_at) ? new Date(Number(prepared.created_at)).toLocaleString() : prepared.created_at}</dd><dt>{text.appVersion}</dt><dd>{prepared.app_version || text.unknown}</dd><dt>{text.schema}</dt><dd>{prepared.database_schema_version} → {DATABASE_SCHEMA_VERSION}</dd></dl><p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-text-primary">{text.replaceWarning}</p><OperationFeedback value={feedback.restore?.error || busy ? feedback.restore : undefined} /><div className="flex justify-end gap-3"><Button disabled={busy} variant="secondary" onClick={() => void cancelRestore()}>{spinner('cancel-restore')}{text.cancel}</Button><Button disabled={busy} variant="danger" onClick={() => void run('restore', 'activate-restore', async () => { await activateRestore(prepared); pendingRestore.current = null })}>{spinner('activate-restore')}{text.confirmRestore}</Button></div></div>}
     </Modal>

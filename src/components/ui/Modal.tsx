@@ -49,7 +49,7 @@ export function Modal({ open, onClose, title, children, contentClassName }: Moda
   }, [open, titleId])
 
   const modal = (
-    <AnimatePresence>
+    <AnimatePresence propagate={open}>
       {open && (
         <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: OVERLAY_Z_INDEX.modal }}>
           <motion.div

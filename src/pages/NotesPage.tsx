@@ -10,6 +10,7 @@ import type { Archive, NoteLibraryItem, NoteOwnershipFilter, NoteSort, Oshi } fr
 import { useI18n } from '../i18n/useI18n'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
+import { ContentTransition } from '../components/ui/ContentTransition'
 
 const PAGE_SIZE = 20
 
@@ -179,6 +180,7 @@ export function NotesPage() {
         </div>
       </div>
 
+      <ContentTransition changeKey={`${loading}:${viewMode}:${notes.map(note => note.id).join(',')}`}>
       {loading ? (
         <PageLoadingState label={t('common.loading')} layout={viewMode === 'list' ? 'rows' : 'cards'} />
       ) : notes.length === 0 ? (
@@ -197,6 +199,7 @@ export function NotesPage() {
         </div>
       )}
 
+      </ContentTransition>
       {totalPages > 1 && (
         <div className="mt-6 flex items-center justify-center gap-3">
           <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t('common.previous')}</Button>

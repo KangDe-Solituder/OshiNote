@@ -1,5 +1,6 @@
 import { useThemeStore } from '../../../stores/themeStore'
 import type { UiMotionDuration } from '../../../types'
+import { useReducedMotion } from 'framer-motion'
 
 export const MOTION_EASING = {
   enter: [0.16, 1, 0.3, 1] as const,
@@ -32,12 +33,14 @@ export const UI_MOTION_SECONDS: Record<UiMotionDuration, number> = {
 
 export function useUiMotionSeconds(): number {
   const uiMotionDuration = useThemeStore((s) => s.uiMotionDuration)
-  return UI_MOTION_SECONDS[uiMotionDuration]
+  const reducedMotion = useReducedMotion()
+  return reducedMotion ? 0 : UI_MOTION_SECONDS[uiMotionDuration]
 }
 
 export function useMotionTiming(): MotionTiming {
   const uiMotionDuration = useThemeStore((s) => s.uiMotionDuration)
-  return MOTION_TIMING[uiMotionDuration]
+  const reducedMotion = useReducedMotion()
+  return MOTION_TIMING[reducedMotion ? 'off' : uiMotionDuration]
 }
 
 export function usePageTransition() {

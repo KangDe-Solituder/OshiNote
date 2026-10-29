@@ -3,8 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useLocation, useNavigationType, useOutlet, type Location } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
-import { useThemeStore } from '../../stores/themeStore'
-import { MOTION_EASING, MOTION_TIMING } from '../features/themes/uiMotion'
+import { MOTION_EASING, MOTION_TIMING, useMotionTiming } from '../features/themes/uiMotion'
 import { markStartup } from '../../services/startup'
 
 const MAX_REMEMBERED_SCROLL_POSITIONS = 60
@@ -42,8 +41,7 @@ export function MainLayout() {
   const location = useLocation()
   const navigationType = useNavigationType()
   const outlet = useOutlet()
-  const uiMotionDuration = useThemeStore((s) => s.uiMotionDuration)
-  const timing = MOTION_TIMING[uiMotionDuration]
+  const timing = useMotionTiming()
   const animateRoute = timing.routeEnter > 0
 
   return (

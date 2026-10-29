@@ -1,4 +1,6 @@
 import { UiHint } from '../components/ui/UiHint'
+import { AnimatePresence } from 'framer-motion'
+import { ContentTransition } from '../components/ui/ContentTransition'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, ArrowUpRight, Star } from 'lucide-react'
@@ -111,14 +113,14 @@ export function ResourceLibraryPage({ kind }: { kind: 'material' | 'upload' }) {
         {kind === 'upload' && <SelectMenu ariaLabel={action.status} value={status} onChange={setStatus} options={[{value:"active",label:text.active},{value:"retired",label:text.retired},{value:"all",label:text.all}]} />}
         {kind === 'material' && <button aria-pressed={favorites} onClick={()=>setFavorites(!favorites)} className={`flex items-center gap-1 rounded-lg border border-border-color px-3 py-2 text-sm ${favorites ? 'text-accent' : 'text-text-muted'}`}><Star size={15}/>{action.favorites}</button>}{kind === 'upload' && <span className="text-sm text-text-muted">{items.length}</span>}</div>
       {((!selected && error) || libraryError) && <p role="alert" className="mb-4 whitespace-pre-wrap text-red-400">{(!selected && error) || libraryError}</p>}{!selected && notice && <p role="status" className="mb-3 text-sm text-accent">{notice}</p>}
-        <div className="resource-card-grid">{pagination.visible.map(item => <button disabled={busy} key={item.id} onClick={() => setSelected(item.id)} aria-pressed={selected === item.id} className={`overflow-hidden rounded-xl border bg-bg-card p-3 text-left transition-colors ${selected === item.id ? 'border-accent ring-1 ring-accent' : 'border-border-color hover:border-accent'}`}>
+        <ContentTransition changeKey={pagination.visible.map(item => item.id).join(',')} className="resource-card-grid">{pagination.visible.map(item => <button disabled={busy} key={item.id} onClick={() => setSelected(item.id)} aria-pressed={selected === item.id} className={`overflow-hidden rounded-xl border bg-bg-card p-3 text-left transition-colors ${selected === item.id ? 'border-accent ring-1 ring-accent' : 'border-border-color hover:border-accent'}`}>
           {item.preview}<p className="mt-3 truncate text-sm font-medium">{item.favorite && '★ '}{item.name}</p><p className="mt-1 text-xs text-text-muted">{item.caption}</p></button>)}
-          {!items.length && <p className="col-span-full py-14 text-center text-text-muted">{text.empty}</p>}</div>
+          {!items.length && <p className="col-span-full py-14 text-center text-text-muted">{text.empty}</p>}</ContentTransition>
         <ResourcePagination {...pagination} />
         {kind === 'upload' && <ResourceCleanupPanel />}
         </div>
     </div></main>
-    {selected && <ResourceDetailDrawer resourceId={selected} title={title} category={kind === 'material' ? text.materials : text.uploads} onClose={closePreview}>
+    <AnimatePresence initial={false}>{selected && <ResourceDetailDrawer key="resource-preview" resourceId={selected} title={title} category={kind === 'material' ? text.materials : text.uploads} onClose={closePreview}>
             {error && <p role="alert" className="mb-4 whitespace-pre-wrap text-red-400">{error}</p>}
             {notice && <p role="status" className="mb-3 text-sm text-accent">{notice}</p>}
             {kind === 'material' && material ? <JournalMaterialTile material={material} /> : image && <MediaImage path={image.file_path} alt={image.original_filename} className="max-h-60 w-full object-contain" />}
@@ -133,6 +135,6 @@ export function ResourceLibraryPage({ kind }: { kind: 'material' | 'upload' }) {
             {image && <dl className="mt-4 space-y-2 text-sm"><dt className="text-text-muted">{text.dimensions}</dt><dd>{image.width} × {image.height}</dd><dt className="text-text-muted">{text.size}</dt><dd>{(image.file_size / 1024 / 1024).toFixed(2)} MB</dd><dt className="text-text-muted">{text.created}</dt><dd>{image.created_at}</dd></dl>}
             <h3 className="mt-6 border-t border-border-color pt-4 text-sm font-semibold">{text.usage}</h3>
             {loadingUsage ? <p className="mt-3 text-sm text-text-muted">…</p> : usage.length ? <ul className="mt-2 space-y-2">{usage.map(item => <li key={`${item.type}:${item.id}`}><Link className="flex items-center gap-2 rounded-lg p-2 text-sm hover:bg-bg-secondary" to={item.type === 'page' ? `/journal/pages/${item.id}/edit` : '/resources/templates'}><ArrowUpRight size={14} className="shrink-0 text-accent" /><span className="truncate">{item.title || t('common.untitled')}</span></Link></li>)}</ul> : <p className="mt-3 text-sm leading-relaxed text-text-muted">{text.unused}</p>}
-    </ResourceDetailDrawer>}
+    </ResourceDetailDrawer>}</AnimatePresence>
   </div>
 }

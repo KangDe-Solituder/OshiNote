@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { AnimatePresence } from 'framer-motion'
+import { ContentTransition } from '../components/ui/ContentTransition'
 import { Calendar, GalleryVerticalEnd, Heart, ImageIcon, LayoutGrid, List, Plus, Search, UserRound } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { PAGE_CONTENT_CLASS, PAGE_PREVIEW_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
@@ -197,6 +198,7 @@ export function IllustrationsPage() {
             </div>
           </div>
 
+          <ContentTransition changeKey={`${initialLoading}:${viewMode}:${illustrations.map(item => item.id).join(',')}`}>
           {initialLoading ? (
             <PageLoadingState label={t('common.loading')} layout={viewMode === 'list' ? 'rows' : 'cards'} />
           ) : illustrations.length === 0 ? (
@@ -246,10 +248,11 @@ export function IllustrationsPage() {
               ))}
             </div>
           )}
+          </ContentTransition>
         </div>
       </main>
 
-      {showCreate && (
+      <AnimatePresence>{showCreate && (
         <IllustrationCreateModal
           oshiId=""
           oshis={oshis}
@@ -260,7 +263,7 @@ export function IllustrationsPage() {
             setSelectedId(created.id)
           }}
         />
-      )}
+      )}</AnimatePresence>
 
       <AnimatePresence initial={false}>
         {selected && (
