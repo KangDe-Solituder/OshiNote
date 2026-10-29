@@ -53,13 +53,13 @@ export function ResourceTemplatesPage() {
       <input ref={picker} hidden type="file" accept=".json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void run(()=>importResourcePack(file))}} />
     </header>
     <main className={`${PAGE_CONTENT_CLASS} !overflow-hidden`}><div className={`${PAGE_WIDE_FRAME_CLASS} flex h-full min-h-0 flex-col`}>
+      <div ref={listScroll} className="resource-list-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
       <div className="mb-4 flex flex-wrap items-center gap-2"><input aria-label={text.search} placeholder={text.search} value={query} onChange={e=>setQuery(e.target.value)} className="rounded-lg border border-border-color bg-bg-card px-3 py-2 text-sm" />
         {(['all','note','journal_page','stamp','material'] as const).map(value=><button key={value} onClick={()=>setType(value)} className={`rounded-lg border px-3 py-2 text-sm ${type===value?'border-accent bg-accent-soft text-accent':'border-border-color bg-bg-card text-text-secondary'}`}>{value==='all'?text.all:t(`templates.type.${value}` as never)}</button>)}
         <button onClick={()=>setTrash(!trash)} aria-pressed={trash} className={`rounded-lg border px-3 py-2 text-sm ${trash?'border-accent text-accent':'border-border-color text-text-muted'}`}>{text.trash}</button>
       </div>
       <p className="mb-5 text-sm text-text-muted">{trash?text.deletedHint:text.templateHint}</p>
       {error&&<p role="alert" className="mb-4 text-red-400">{error}</p>}
-      <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
       {!filtered.length&&<div className="py-16 text-center text-text-muted"><Layers3 className="mx-auto mb-3"/>{t('templates.empty.title')}</div>}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{pagination.visible.map(template=>{
         const Icon=TYPE_ICONS[template.type]
@@ -80,8 +80,8 @@ export function ResourceTemplatesPage() {
           </div>
         </section>
       })}</div>
-      </div>
       <ResourcePagination {...pagination} />
+      </div>
     </div></main>
   </div>
 }

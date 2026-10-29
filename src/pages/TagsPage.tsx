@@ -16,8 +16,7 @@ export function TagsPage() {
   return (
     <div className={PAGE_CONTENT_CLASS}>
       <div className={PAGE_DASHBOARD_FRAME_CLASS}>
-      <h1 className="text-3xl font-bold text-text-primary mb-2">{t('tags.title')}</h1>
-      <p className="text-text-secondary mb-8">{t('tags.subtitle')}</p>
+      <h1 className="text-3xl font-bold text-text-primary mb-6">{t('tags.title')}</h1>
 
       {tags.length === 0 ? (
         <div className="text-center py-20">

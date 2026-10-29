@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
+import { usePreviewDismiss } from '../components/features/usePreviewDismiss'
 import { PAGE_CONTENT_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import {
@@ -153,7 +154,7 @@ export function OshiIllustrationsPage() {
   if (!oshiId) return null
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg-primary">
+    <div className="preview-content-area relative flex h-full min-h-0 flex-col overflow-hidden bg-bg-primary">
       <main className={`${PAGE_CONTENT_CLASS} min-h-0`}>
         <div className={`${PAGE_WIDE_FRAME_CLASS} flex h-full flex-col`}>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-border-color">
@@ -729,6 +730,8 @@ export function IllustrationDetailDrawer({
   onDelete: (illustration: Illustration) => void
 }) {
   const { t } = useI18n()
+  const drawer = useRef<HTMLElement>(null)
+  usePreviewDismiss(drawer, onClose)
   const motionSeconds = useUiMotionSeconds()
   const [editing, setEditing] = useState(false)
   const [selectedOshiId, setSelectedOshiId] = useState(illustration.oshi_id || '')
@@ -791,6 +794,7 @@ export function IllustrationDetailDrawer({
     <AnimatePresence>
       {showPreview && (
         <motion.div
+          data-preview-overlay
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -834,11 +838,12 @@ export function IllustrationDetailDrawer({
 
   return (
     <motion.aside
+      ref={drawer}
       initial={{ opacity: 0, x: motionSeconds === 0 ? 0 : 28 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: motionSeconds === 0 ? 0 : 28 }}
       transition={{ duration: motionSeconds, ease: 'easeOut' }}
-      className="fixed right-0 top-0 flex h-full w-[min(440px,100vw)] flex-col border-l border-border-color bg-bg-primary shadow-2xl transform-gpu will-change-[transform,opacity]"
+      className="illustration-detail-drawer absolute right-0 top-0 flex h-full w-[min(440px,100%)] flex-col border-l border-border-color bg-bg-primary shadow-2xl transform-gpu will-change-[transform,opacity]"
       style={{ zIndex: OVERLAY_Z_INDEX.drawer }}
     >
       <div className="flex items-center gap-3 border-b border-border-color p-4">

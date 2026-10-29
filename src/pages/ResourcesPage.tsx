@@ -2,7 +2,7 @@ import { useMaterialLibrary } from '../features/resources/useMaterialLibrary'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, ImageIcon, Layers3, PackageOpen, Upload, Tag } from 'lucide-react'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_PREVIEW_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { useI18n } from '../i18n/useI18n'
 import { getAllTags, getTotalNoteCount } from '../features/notes/noteService'
 import { fetchIllustrations, getTotalIllustrationCount } from '../features/illustrations/illustrationService'
@@ -51,11 +51,10 @@ export function ResourcesPage() {
 
   return (
     <div className="flex h-full flex-col bg-bg-primary">
-      <header className={PAGE_HEADER_CLASS}>
+      <header className={PAGE_PREVIEW_HEADER_CLASS}>
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-text-muted">{t('resources.eyebrow')}</p>
-          <h1 className="text-3xl font-bold text-text-primary">{t('resources.title')}</h1>
-          <p className="mt-1 text-text-secondary">{text.subtitle}</p>
+          <h1 className="text-2xl font-bold leading-8 text-text-primary">{t('resources.title')}</h1>
         </div>
       </header>
 

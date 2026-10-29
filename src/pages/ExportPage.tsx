@@ -257,8 +257,7 @@ export function ExportPage() {
   return (
     <div className={PAGE_CONTENT_CLASS}>
       <div className={PAGE_FORM_FRAME_CLASS}>
-      <h1 className="mb-2 text-3xl font-bold text-text-primary">{t('export.title')}</h1>
-      <p className="mb-6 text-text-secondary">{t('export.subtitle')}</p>
+      <h1 className="mb-6 text-3xl font-bold text-text-primary">{t('export.title')}</h1>
 
       <div className="mb-8 inline-flex rounded-xl border border-border-color bg-bg-secondary p-1">
         {(['sync', 'backup', 'export'] as const).map((tab) => (

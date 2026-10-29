@@ -45,8 +45,7 @@ export function OshiListPage() {
       <div className={PAGE_DASHBOARD_FRAME_CLASS}>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="mb-1 text-2xl font-bold text-text-primary">{t('oshis.title')}</h1>
-          <p className="text-sm text-text-secondary">{t('oshis.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-text-primary">{t('oshis.title')}</h1>
         </div>
         <Button className="rounded-2xl px-5" onClick={() => { setEditingOshi(null); setFormOpen(true) }}>
           <Plus size={18} />

@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { AnimatePresence } from 'framer-motion'
 import { Calendar, GalleryVerticalEnd, Heart, ImageIcon, LayoutGrid, List, Plus, Search, UserRound } from 'lucide-react'
 import { Button } from '../components/ui/Button'
-import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
+import { PAGE_CONTENT_CLASS, PAGE_PREVIEW_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 import { fetchAllOshis } from '../features/oshis/oshiService'
 import {
   deleteIllustration,
@@ -112,12 +112,11 @@ export function IllustrationsPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg-primary">
-      <header className={PAGE_HEADER_CLASS}>
+    <div className="preview-content-area relative flex h-full min-h-0 flex-col overflow-hidden bg-bg-primary">
+      <header className={PAGE_PREVIEW_HEADER_CLASS}>
         <div className="flex w-full items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">{t('illustrations.title')}</h1>
-            <p className="mt-1 text-text-secondary">{t('illustrations.subtitle')}</p>
+            <h1 className="text-2xl font-bold leading-8 text-text-primary">{t('illustrations.title')}</h1>
           </div>
           <Button onClick={() => setShowCreate(true)}>
             <Plus size={16} />

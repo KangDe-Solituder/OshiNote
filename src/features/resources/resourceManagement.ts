@@ -28,6 +28,7 @@ export async function loadMaterialLibrary(database?: Database): Promise<LibraryM
     const definition = resolveMaterialSnapshot(row.payload)
     if (!definition) return []
     const metadata = safeJsonParse<Record<string, unknown>>(row.metadata, {}, isRecord)
+    if (metadata.deleted === true) return []
     const builtin = JOURNAL_MATERIALS.find(item => `builtin:${item.id}` === row.id)
     return [{ ...definition, kind: row.kind as JournalMaterialKind,
       displayName: builtin?.nameKey === row.name ? undefined : row.name,
@@ -55,6 +56,19 @@ export async function updateResource(assetId: string, changes: { name?: string; 
   await loadMaterialLibrary(db)
   notifyResourcesChanged()
 }
+/** Remove a material from the library without invalidating placed or synced versions. */
+export async function deleteMaterial(assetId: string) {
+  const db = await getDb()
+  const [asset] = await db.select<ResourceAsset[]>('SELECT * FROM resource_assets WHERE id = ?', [assetId])
+  if (!asset || !['sticker', 'tape', 'paper', 'label'].includes(asset.kind)) throw new Error('Material not found')
+  const metadata = safeJsonParse<Record<string, unknown>>(asset.metadata, {}, isRecord)
+  metadata.deleted = true
+  // The marker travels with resource metadata in sync/backups; archived also hides it from older pickers.
+  await commitResources([{ query: 'UPDATE resource_assets SET metadata = ?, archived = 1 WHERE id = ?', values: [JSON.stringify(metadata), assetId] }])
+  await loadMaterialLibrary(db)
+  notifyResourcesChanged()
+}
+
 export async function decodeMaterialFile(file: File) {
   const error = validateJournalImageFile(file)
   if (error) throw new Error(error)

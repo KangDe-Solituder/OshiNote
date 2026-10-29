@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from '@tauri-apps/plugin-sql'
 import { ensureResourceSchema } from './resourceSchema'
 import { reconcileResourceLibrary } from './resourceLibrary'
-import { importMaterial, loadMaterialLibrary, updateResource, instantiateMaterialTemplate } from './resourceManagement'
+import { deleteMaterial, importMaterial, loadMaterialLibrary, updateResource, instantiateMaterialTemplate } from './resourceManagement'
 import { getMaterialSnapshot, getJournalMaterialDefinition, resolveMaterialSnapshot } from '../journal/journalMaterials'
 import { exportMaterialPack, exportTemplatePack, importResourcePack, validatePackShape } from './resourcePacks'
 import { createResourceTemplate, duplicateResourceTemplate, fetchResourceTemplates, updateResourceTemplate } from '../templates/templateService'
@@ -56,6 +56,32 @@ afterEach(()=>{sqlite.close();vi.unstubAllGlobals()})
 function image(name='new.png',data='first'){return new File([data],name,{type:'image/png'})}
 function records():SyncRecord[]{return ['resource_assets','resource_versions','journal_items','templates'].flatMap(table=>sqlite.prepare('SELECT * FROM '+table).all().map(row=>({key:`${table}:${row.id}`,table,id:String(row.id),value:row}))) }
 describe('imported material lifecycle',()=>{
+  it('deletes materials from the library while retaining placed versions across reconciliation and restore',async()=>{
+    const id=await importMaterial(image(),'sticker')
+    const definition=getJournalMaterialDefinition(id)!
+    const snapshot=getMaterialSnapshot(definition)
+    sqlite.prepare("INSERT INTO journal_items VALUES ('placed','material',?,?,NULL,'page','{}')").run(id,snapshot)
+    const builtin=(await loadMaterialLibrary()).find(item=>item.source==='builtin')!
+    await deleteMaterial(id)
+    await deleteMaterial(builtin.assetId)
+    await reconcileResourceLibrary(db)
+    const library=await loadMaterialLibrary()
+    expect(library.some(item=>item.id===id||item.id===builtin.id)).toBe(false)
+    expect(sqlite.prepare("SELECT material_snapshot FROM journal_items WHERE id='placed'").get()!.material_snapshot).toBe(snapshot)
+    expect(resolveMaterialSnapshot(snapshot)?.imagePath).toBe(definition.imagePath)
+    expect(shared.files.has(definition.imagePath!)).toBe(true)
+    expect(await inspectResourceCleanup()).toEqual([])
+    const saved=records()
+    expect(()=>validateResourceGraph(saved)).not.toThrow()
+    sqlite.close();await resetDatabase()
+    for(const record of saved){
+      const row=record.value!, columns=Object.keys(row)
+      sqlite.prepare(`INSERT INTO ${record.table} (${columns.join(',')}) VALUES (${columns.map(()=>'?').join(',')}) ON CONFLICT(id) DO UPDATE SET ${columns.filter(column=>column!=='id').map(column=>`${column}=excluded.${column}`).join(',')}`).run(...Object.values(row) as SQLInputValue[])
+    }
+    await reconcileResourceLibrary(db)
+    expect((await loadMaterialLibrary()).some(item=>item.id===id||item.id===builtin.id)).toBe(false)
+    expect(()=>validateResourceGraph(records())).not.toThrow()
+  })
   it('keeps placed snapshots and files stable after rename, replacement, archive and restore',async()=>{
     const id=await importMaterial(image(),'sticker')
     const initial=getJournalMaterialDefinition(id)!
