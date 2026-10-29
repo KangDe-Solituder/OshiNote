@@ -21,16 +21,19 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
+import { saveNoteAtomically } from '../features/notes/noteSave'
+import { useUnsavedNote } from '../hooks/useUnsavedNote'
+import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
 import { TipTapEditor } from '../components/editor/TipTapEditor'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_READING_FRAME_CLASS } from '../components/layout/pageShell'
 import { useEditorStore } from '../stores/editorStore'
 import { useNoteStore } from '../stores/noteStore'
-import { fetchNoteById, fetchNoteImages, getAllTags, replaceNoteImages } from '../features/notes/noteService'
+import { fetchNoteById, fetchNoteImages, getAllTags } from '../features/notes/noteService'
 import { createArchive as createArchiveRecord, fetchArchivesByOshi } from '../features/oshis/archiveService'
 import { fetchAllOshis } from '../features/oshis/oshiService'
-import { fetchStampForTarget, persistStampForTarget } from '../features/stamps/stampService'
+import { fetchStampForTarget } from '../features/stamps/stampService'
 import type { Archive, Note, Oshi, Stamp, StampInput } from '../types'
 import { SelectMenu } from '../components/ui/SelectMenu'
 import { StampControl } from '../components/features/stamps/StampControl'
@@ -56,6 +59,9 @@ export function NoteEditorPage() {
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const saveLock = useRef(false)
+  const newId = useRef(crypto.randomUUID())
   const [favorite, setFavorite] = useState(false)
   const [selectedOshiId, setSelectedOshiId] = useState(oshiId || '')
   const [archiveId, setArchiveId] = useState('')
@@ -76,12 +82,13 @@ export function NoteEditorPage() {
 
   const editorRef = useRef<{ json: object; text: string }>({ json: createEmptyDoc(), text: '' })
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const { createNote, updateNote, deleteNote, toggleFavorite } = useNoteStore()
+  const { deleteNote, toggleFavorite } = useNoteStore()
   const isDirty = useEditorStore((s) => s.isDirty)
   const markSaved = useEditorStore((s) => s.markSaved)
   const markDirty = useEditorStore((s) => s.markDirty)
   const stampSoundEnabled = useStampSettingsStore((s) => s.soundEnabled)
 
+  const protection = useUnsavedNote(isDirty, saving)
   const selectedOshi = oshis.find((oshi) => oshi.id === selectedOshiId)
   const selectedArchive = archives.find((archive) => archive.id === archiveId)
   const openedUrl = normalizeWebUrl(sourceUrl)
@@ -92,11 +99,13 @@ export function NoteEditorPage() {
   }, [])
 
   useEffect(() => {
+    let active = true
     if (!selectedOshiId) {
       setArchives([])
       return
     }
-    fetchArchivesByOshi(selectedOshiId).then(setArchives).catch(() => setArchives([]))
+    fetchArchivesByOshi(selectedOshiId).then(value => { if (active) setArchives(value) }).catch(() => { if (active) setArchives([]) })
+    return () => { active = false }
   }, [selectedOshiId])
 
   useEffect(() => {
@@ -109,7 +118,9 @@ export function NoteEditorPage() {
       return
     }
     if (!noteId) return
+    let active = true
     Promise.all([fetchNoteById(noteId), fetchNoteImages(noteId), fetchStampForTarget('note', noteId)]).then(([n, savedImages, savedStamp]) => {
+      if (!active) return
       if (n) {
         const parsedContent = parseNoteContent(n.content)
         setNote(n)
@@ -129,66 +140,35 @@ export function NoteEditorPage() {
       }
       markSaved()
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [noteId, isNew, markSaved])
 
   async function handleSave() {
+    if (saveLock.current || (!isNew && !note)) return
+    saveLock.current = true
     setSaving(true)
+    setSaveError('')
+    const savedRevision = useEditorStore.getState().revision
+    const { json, text } = editorRef.current
+    const input = { id: isNew ? newId.current : note!.id, oshi_id: selectedOshiId || null,
+      archive_id: archiveId || null, title: title || t('noteEditor.untitled'), content: JSON.stringify(json),
+      plain_text: text, source_url: sourceUrl.trim(), tags, created_at: fromDateTimeLocalValue(createdAt),
+      favorite, images, stamp: stampDraft }
     try {
-      const { json, text } = editorRef.current
-      const noteDate = fromDateTimeLocalValue(createdAt)
-
-      if (isNew) {
-        const newNote = await createNote({
-          oshi_id: selectedOshiId || null,
-          archive_id: archiveId || null,
-          title: title || 'Untitled',
-          content: JSON.stringify(json),
-          plain_text: text,
-          source_url: sourceUrl.trim(),
-          tags,
-          created_at: noteDate,
-        })
-        await replaceNoteImages(newNote.id, images)
-        await persistStampForNote(newNote.id)
-        markSaved()
-        navigate(selectedOshiId ? `/oshis/${selectedOshiId}/notes/${newNote.id}` : `/notes/${newNote.id}`, {
-          replace: true,
-          state: location.state,
-        })
-      } else if (note) {
-        await updateNote(note.id, {
-          title: title || 'Untitled',
-          content: JSON.stringify(json),
-          plain_text: text,
-          source_url: sourceUrl.trim(),
-          tags,
-          oshi_id: selectedOshiId || null,
-          archive_id: archiveId || null,
-          created_at: noteDate,
-        })
-        await replaceNoteImages(note.id, images)
-        await persistStampForNote(note.id)
-        markSaved()
-        setNote({
-          ...note,
-          title,
-          content: JSON.stringify(json),
-          plain_text: text,
-          source_url: sourceUrl.trim(),
-          tags,
-          oshi_id: selectedOshiId || null,
-          archive_id: archiveId || null,
-          created_at: noteDate,
-        })
-      }
+      await saveNoteAtomically(input)
+      const unchanged = savedRevision === useEditorStore.getState().revision
+      if (unchanged) markSaved()
+      if (isNew && unchanged) {
+        protection.allow()
+        navigate(selectedOshiId ? `/oshis/${selectedOshiId}/notes/${input.id}` : `/notes/${input.id}`, { replace: true, state: location.state })
+      } else if (note) setNote({ ...note, ...input })
+    } catch {
+      setSaveError(t('noteEditor.saveFailed'))
     } finally {
+      saveLock.current = false
       setSaving(false)
     }
-  }
-
-  async function persistStampForNote(targetId: string) {
-    setStampDraft(await persistStampForTarget('note', targetId, stampDraft))
   }
 
   function handleStampPlace(value: StampInput) {
@@ -200,6 +180,8 @@ export function NoteEditorPage() {
     if (!note) return
     if (!confirm('Delete this note?')) return
     await deleteNote(note.id)
+    protection.allow()
+    markSaved()
     navigate(backTo)
   }
 
@@ -320,14 +302,23 @@ export function NoteEditorPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oshiId, title, tags, note, isNew, selectedOshiId, archiveId, createdAt, sourceUrl, images])
+  }, [oshiId, title, tags, note, isNew, selectedOshiId, archiveId, createdAt, sourceUrl, images, stampDraft, favorite])
 
   if (loading) {
     return <PageLoadingState label={t('common.loading')} layout="editor" className="h-full bg-bg-primary" />
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg-primary">
+    <div aria-busy={saving} className="flex h-full min-h-0 flex-col bg-bg-primary">
+      <Modal open={protection.leaving} onClose={protection.cancel} title={t('noteEditor.unsavedTitle')}>
+        <p className="mb-4 text-text-secondary">{t('noteEditor.unsavedBody')}</p>
+        <div className="flex justify-end gap-3">
+          <Button onClick={protection.cancel}>{t('noteEditor.keepEditing')}</Button>
+          <Button disabled={saving} onClick={() => void protection.discard()}>{t('noteEditor.discard')}</Button>
+        </div>
+      </Modal>
+      {saving && <div className="fixed inset-0 z-[80] cursor-wait" aria-label={t('noteEditor.saving')} />}
+      {saveError && <p role="alert" className="px-6 py-2 text-red-400">{saveError}</p>}
       <header className={`${PAGE_HEADER_CLASS} gap-4`}>
         <Link
           to={backTo}
@@ -349,7 +340,7 @@ export function NoteEditorPage() {
           />
         </div>
 
-        {isDirty && <span className="hidden text-xs text-text-muted sm:inline">Unsaved</span>}
+        {isDirty && <span className="hidden text-xs text-text-muted sm:inline">{t('noteEditor.unsavedTitle')}</span>}
         <button
           onClick={handleToggleFavorite}
           className={`rounded-xl p-2.5 transition-colors ${

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), read: vi.fn(), write: vi.fn(), upload: vi.fn(), download: vi.fn() }))
+vi.mock('@tauri-apps/api/path', () => ({ appDataDir: async () => 'C:/isolated', join: async (...parts: string[]) => parts.join('/') }))
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }))
 vi.mock('../../database', () => ({ withClosedDatabase: (work: () => Promise<unknown>) => work() }))
 vi.mock('./index', () => ({ readBackupSyncMetadata: async () => ({ schema_version: 4 }) }))
 vi.mock('../sync/webdavService', () => ({ readWebDavText: mocks.read, writeWebDavText: mocks.write, uploadWebDavAppDataFile: mocks.upload, downloadWebDavAppDataFile: mocks.download }))
-import { createLocationBackup, listLocationBackups } from './catalog'
+import { createLocationBackup, listLocationBackups, resolveBackupFile } from './catalog'
 import type { DataLocation } from './locations'
 const cloud: DataLocation = { id: 'c', name: 'Test', kind: 'webdav', config: { baseUrl: 'https://example.invalid', remotePath: 'BackUp/OshiNote-ResourceTest', username: '', password: '', allowInvalidCert: false } }
 
@@ -33,4 +34,10 @@ describe('backup locations and history', () => {
     mocks.read.mockResolvedValue({ exists: true, text: JSON.stringify([{ name: '../secret', path: '../secret', bytes: 1 }]) })
     await expect(listLocationBackups(cloud)).rejects.toThrow('catalog')
   })
+})
+
+it.each(['backups/oshinote-1-0.oshi.zip','oshinote-latest-full.oshi.zip'])('stages %s under the native download allowlist',async path=>{
+  const result=await resolveBackupFile(cloud,{name:path.split('/').at(-1)!,path,bytes:1})
+  expect(result).toMatch(/^C:\/isolated\/sync-cache\/restore-.*\.oshi\.zip$/)
+  expect(mocks.download).toHaveBeenLastCalledWith(cloud.kind === 'webdav' ? cloud.config : null,path,expect.stringMatching(/^sync-cache\/restore-/))
 })

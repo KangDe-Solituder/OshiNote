@@ -1,0 +1,73 @@
+{
+  "baseline": "eb08e30bcbcd5a00096446cbec5eb27fe18ed321",
+  "userDataAccessed": false,
+  "networkUsed": false,
+  "results": [
+    {
+      "id": "T1",
+      "method": "static exact guard extraction; not native E2E",
+      "outcome": "Caller backups/restore-*.oshi.zip conflicts with sync-cache-only preflight",
+      "guard": "    if !local_relative_path\r\n        .replace('\\\\', \"/\")\r\n        .starts_with(\"sync-cache/\")\r\n    {\r\n        return Err(\"WebDAV downloads must be staged in sync-cache.\".to_string());\r\n    }\r\n"
+    },
+    {
+      "id": "T2",
+      "method": "actual TS function, synthetic DB response",
+      "outcome": {
+        "repository_id": "synthetic-repository",
+        "head_commit": null,
+        "schema_version": 4
+      }
+    },
+    {
+      "id": "T3",
+      "method": "actual export formatter, 3 synthetic ownership cases",
+      "outcome": {
+        "json": 3,
+        "markdown": 1,
+        "txt": 1
+      }
+    },
+    {
+      "id": "T4",
+      "method": "actual replaceNoteImages + in-memory SQLite + injected INSERT failure",
+      "outcome": {
+        "previousImages": 1,
+        "remainingImages": 0
+      }
+    },
+    {
+      "id": "T5",
+      "method": "actual Zustand action with synthetic SQL adapter",
+      "outcome": {
+        "sliderEvents": 10,
+        "writes": 90
+      }
+    },
+    {
+      "id": "T6",
+      "method": "actual formatter + call-site check",
+      "outcome": "Conflict renders both side summaries, not only a record key; not a field-level diff"
+    },
+    {
+      "id": "T7",
+      "method": "Python SQLite in-memory tokenizer experiment; not current app tokenizer",
+      "outcome": {
+        "涼花": 0,
+        "みなせ": 1
+      }
+    },
+    {
+      "id": "T8",
+      "method": "actual current Oshi query + page/store call-site check",
+      "outcome": "Current Oshi search uses LIKE + SQL LIMIT/OFFSET; FTS/JS search function is not this UI path"
+    },
+    {
+      "id": "T9",
+      "method": "actual migration helper exposed in-memory + synthetic SQLite + injected rename failure; not full app startup",
+      "outcome": {
+        "rowsInRecoveryTableAfterInterruption": 1,
+        "rowsAfterHelperRetry": 0
+      }
+    }
+  ]
+}

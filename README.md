@@ -107,26 +107,21 @@ The main app shell, local SQLite storage, oshi spaces, note editor, illustration
 
 ### Backup And Sync
 
-- Existing readable exports remain available as JSON, Markdown, and TXT.
-- Portable OshiNote ZIP backups support two modes:
-  - data only: database content without local media files;
-  - complete data: database content plus local illustrations, thumbnails, and stamp fonts.
-- Backups can be imported through the Data page; the app restarts after replacing the local database.
-- Optional WebDAV snapshot sync can test a server, upload the latest complete backup, or download and restore it.
-- WebDAV sync is snapshot-based in the first version. It does not merge records bidirectionally.
+- The Data page groups locations, incremental sync, full backups, and staged restore in one view.
+- WebDAV sync merges records and media into each device’s own database, with explicit conflict resolution.
+- Full ZIP backups include the database, notes, journals, media, material versions, templates and fonts. Connection settings and credentials stay on the device.
+- Restore validates and migrates a temporary copy before confirmation replaces local data and reloads the app. Legacy data-only archives remain readable.
+- Windows protects saved connection passwords with DPAPI. Other operating systems do not yet have a protected credential adapter.
 
 ## Not Implemented Yet
 
-- Full user-facing material library management.
-- User-uploaded stickers and reusable custom materials.
 - Advanced material packs and template packs.
 - Postcard templates and postcard gacha.
-- LLM-assisted tag pool understanding and quote extraction.
 - User-imported PNG stamps.
 - Advanced journal templates with fixed slots.
-- Automatic scheduled backup and conflict-aware WebDAV merging.
+- Automatic scheduled backup.
 - Search normalization for Japanese readings, aliases, and kana/kanji expansion.
-- Route-level code splitting and deeper performance audits.
+- Further shared-bundle splitting and performance audits.
 
 ## Next Direction
 
@@ -169,17 +164,6 @@ The gacha flow should eventually:
 - reroll
 - save the result to a Journal page
 
-### 4. LLM Pool Understanding
-
-LLM support should be a later enhancement, not a v1 dependency.
-
-Good LLM tasks include:
-
-- group related tags into themed pools
-- extract postcard-friendly quotes from long notes
-- recommend templates
-- generate short postcard titles
-- identify content themes such as anniversary, healing, live recap, movie memory, or monthly review
 
 ## Tech Stack
 
@@ -254,7 +238,7 @@ OshiNote/
 |   |-- hooks/             # Shared React hooks
 |   |-- i18n/              # English / Chinese / Japanese translations
 |   |-- pages/             # Route pages
-|   |-- services/          # Media, export, update, AI services
+|   |-- services/          # Media, backup, sync and update services
 |   |-- stores/            # Zustand stores
 |   |-- utils/             # Shared safe parsing/storage helpers
 |   `-- styles/            # Themes and global styles

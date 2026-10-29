@@ -6,7 +6,7 @@ OshiNote uses WebDAV as an object transport. The live SQLite file is never uploa
 
 - `sync/v1/refs/main.json` is the only authoritative remote sync state.
 - Complete ZIP backups are recovery snapshots derived from local data.
-- A WebDAV recovery snapshot is uploaded only after a successful manual incremental sync, so its `head_commit` identifies the represented remote state.
+- A complete backup can be created independently of sync, including while offline. Its legacy `head_commit` field records the last applied synchronization baseline, not the exact contents of the ZIP; local unsynced edits are included.
 - Restoring a ZIP never rewrites the remote HEAD directly.
 
 ## Remote layout
@@ -31,11 +31,13 @@ The following user-content tables participate in sync:
 
 - `oshis`, `archives`, `notes`, and `note_images`
 - `illustrations`
-- `journal_books`, `journal_pages`, and `journal_items`
+- `journal_books`, `journal_pages`, `journal_items`, and `journal_images`
+- `resource_assets` and immutable `resource_versions`
+- `oshi_schedules` and `oshi_schedule_overrides`
 - `stamps` and `templates`
 - explicitly portable display preferences from `settings`
 
-Search indexes, updater state, WebDAV credentials, AI credentials, device identity, logs, downloaded fonts, and temporary cache are excluded.
+Search indexes, updater state, connection credentials, device identity, logs, downloaded fonts, and temporary cache are excluded.
 
 Note image data URLs are converted to content-addressed blobs for transport and reconstructed when applied locally. Illustration originals are uploaded as blobs; thumbnails remain regenerable local data.
 
@@ -56,3 +58,14 @@ Server timestamps are display metadata only. Commit ancestry, generations, hashe
 Downloaded blobs are written under `sync-cache/`, verified by SHA-256, and only then atomically activated into `media/`. Replaced or remotely deleted media is moved into `sync-cache/orphans/` instead of being erased. Cache cleanup is restricted to `sync-cache/`; it cannot directly address active original media, SQLite data, commits, or recovery snapshots.
 
 The first protocol version does not delete immutable remote objects. This deliberately favors recoverability over reclaiming remote storage.
+
+
+## Full backup and restore (schema 2)
+
+- Local and WebDAV locations are device-local. Windows passwords are protected with DPAPI; they are never exported or synchronized. A different Windows account must re-enter its password. Connection addresses are not restored over the current device's configuration.
+- Full ZIPs contain the database, retained media, and downloaded fonts. A temporary database copy is sanitized using a closed list of portable UI settings and VACUUM; transient sync state/conflicts are removed. The active database is not sanitized by export. Historical ZIPs are not rewritten.
+- New cloud backups live in `backups/oshinote-<timestamp>-<sequence>.oshi.zip`, with a conditional-write `backups/index.json`. The legacy root `oshinote-latest-full.oshi.zip` remains readable. Both download to `sync-cache/restore-<uuid>.oshi.zip`.
+- Restore extracts into isolated paths, migrates on a dedicated SQLite connection, verifies integrity and resources, then waits for confirmation. Activation retains its rollback journal. Restoring starts a new sync association and never updates remote HEAD.
+- Migration uses one `BEGIN IMMEDIATE` transaction, a schema ledger, and a pre-v2 local safety copy on normal startup. That safety copy is private local recovery material, may retain old configuration, and is not published as a sanitized backup. Interrupted old table replacements are recovered; ambiguous extra records cause a safe stop rather than deletion.
+- Resource limits: 100,000 ZIP entries, 1 MiB manifest, 8 GiB per extracted file and 32 GiB total declared size; extraction also enforces each entry's actual byte budget. Network connections time out after 15 s, idle reads after 60 s and operations after 30 minutes. Uploads/downloads stream files and cap their size at 32 GiB.
+- Note saves remain manual. Body, attachments, and stamp commit together; leaving with unsaved edits requires confirmation. No automatic Note recovery drafts are created.

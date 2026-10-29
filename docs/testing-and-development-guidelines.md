@@ -76,7 +76,7 @@ Do not add new `JSON.parse` calls in render paths unless there is a narrow, docu
 ## Current Known Risks
 
 - `JournalCreationFlow` and `JournalDraftCanvas` are still large and should be split before adding major new Journal features.
-- The production JS chunk is currently large enough for Vite to warn; route-level code splitting is a future performance task.
+- Routes are already lazy-loaded. The shared production JS chunk still triggers Vite's size warning; further splitting should follow measured startup and navigation costs.
 - View mode and detailed edit mode share more visual logic than before, but their interaction shells are still separate.
 - Some large pages outside Journal still need later review: `NoteEditorPage`, `OshiIllustrationsPage`, `JournalHomePage`, and `translations.ts`.
 
@@ -87,3 +87,14 @@ Do not add new `JSON.parse` calls in render paths unless there is a narrow, docu
 3. Share renderers between view mode and detailed edit mode.
 4. Add targeted tests whenever shared pure logic changes.
 5. Only after that, expand templates, material packs, and custom material import.
+
+
+## Reliability regression checks
+
+Run `cargo test --manifest-path src-tauri/Cargo.toml --lib` for native database rollback, DPAPI, backup byte sanitization, extraction budgets, activation recovery, and loopback HTTP download tests. These use synthetic data in temporary directories, not an installed application profile or the production NAS.
+
+`src/database/restoreMigration.test.ts` runs the real migration statements against a Python SQLite instance (FTS5 enabled); its injected failures cover destructive DROP/RENAME boundaries. `noteSave.test.ts` tests generated body/image/stamp SQL, while the Rust batch test verifies the native transaction wrapper.
+
+The historical `docs/reviews/2026-10-29-kimi/verify-report.cjs` reproduces defects at commit `eb08e30`; it is not the current regression suite. Its original evidence is retained for model evaluation.
+
+Native UI checks must use an independent application identifier. Never launch a newly built migration test against `com.oshinote.app` or send test data to `BackUp/OshiNote`.

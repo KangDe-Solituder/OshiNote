@@ -9,7 +9,7 @@ import { measureStartup, markStartup } from '../services/startup'
 let db: Database | null = null
 let dbPromise: Promise<Database> | null = null
 let maintenance = false
-export const DATABASE_SCHEMA_VERSION = 1
+export const DATABASE_SCHEMA_VERSION = 2
 
 export async function getDb(): Promise<Database> {
   if (maintenance) throw new Error('Database maintenance is in progress. Please wait.')
@@ -67,9 +67,25 @@ async function runMigrations(db: Database): Promise<void> {
 }
 
 // Also runs against an isolated restore database before it is activated.
-export async function migrateDatabase(db: Database, mediaPrefix = ''): Promise<void> {
+export async function migrateDatabase(database: Database, mediaPrefix = ''): Promise<void> {
+  const token = await invoke<string>('begin_database_migration', { databaseUrl: database.path })
+  const db = Object.assign(Object.create(database) as Database, {
+    execute: (query: string, values: unknown[] = []) => invoke('migration_query', { token, query, values, select: false }),
+    select: (query: string, values: unknown[] = []) => invoke('migration_query', { token, query, values, select: true }),
+  })
+  try {
+    await migrateOnConnection(db, mediaPrefix)
+    await invoke('finish_database_migration', { token, commit: true })
+  } catch (error) {
+    await invoke('finish_database_migration', { token, commit: false }).catch(() => undefined)
+    throw error
+  }
+}
+
+export async function migrateOnConnection(db: Database, mediaPrefix = ''): Promise<void> {
   const [version] = await db.select<{ user_version: number }[]>('PRAGMA user_version')
   if ((version?.user_version || 0) > DATABASE_SCHEMA_VERSION) throw new Error('This database requires a newer OshiNote version.')
+  await recoverInterruptedJournalMigrations(db)
   await measureStartup('migration-recovery', () => recoverInterruptedNoteOwnershipMigration(db))
   await measureStartup('schema-checks', async () => {
     for (const sql of MIGRATIONS) {
@@ -91,6 +107,9 @@ export async function migrateDatabase(db: Database, mediaPrefix = ''): Promise<v
   })
   await measureStartup('resource-reconcile', () => reconcileResourceLibrary(db, mediaPrefix))
   await measureStartup('search-index', () => rebuildNoteSearchIndex(db))
+  await db.execute("DELETE FROM settings WHERE key = 'aiConfig' OR lower(key) LIKE '%webdav%' OR lower(key) LIKE '%credential%' OR lower(key) LIKE '%apikey%'")
+  await db.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+  await db.execute('INSERT OR IGNORE INTO schema_migrations (version) VALUES (2)')
   await db.execute(`PRAGMA user_version = ${DATABASE_SCHEMA_VERSION}`)
 }
 
@@ -599,4 +618,27 @@ async function recoverInterruptedNoteOwnershipMigration(db: Database): Promise<v
 
 export function generateId(): string {
   return crypto.randomUUID()
+}
+
+// Preserve a replacement left by an older non-transactional build before CREATE IF NOT EXISTS.
+async function recoverInterruptedJournalMigrations(db: Database): Promise<void> {
+  for (const [table, replacements] of [
+    ['journal_pages', ['journal_pages_v2', 'journal_pages_v3']],
+    ['journal_items', ['journal_items_v2', 'journal_items_v3']],
+    ['journal_images', ['journal_images_v2']],
+  ] as const) {
+    const rows = await db.select<{ name: string }[]>("SELECT name FROM sqlite_master WHERE type = 'table'")
+    const names = new Set(rows.map(row => row.name))
+    const existing = replacements.filter(name => names.has(name))
+    if (!existing.length) continue
+    if (names.has(table)) {
+      // Ambiguous old remnants require inspection, never silently discard possible user data.
+      for (const name of existing) {
+        const [missing] = await db.select<{ count: number }[]>(`SELECT COUNT(*) AS count FROM ${name} WHERE id NOT IN (SELECT id FROM ${table})`)
+        if (missing.count) throw new Error(`Interrupted migration contains additional records in ${name}. Original files are preserved.`)
+      }
+    } else if (existing.length === 1) {
+      await db.execute(`ALTER TABLE ${existing[0]} RENAME TO ${table}`)
+    } else throw new Error(`Multiple interrupted replacements for ${table}. Original files are preserved.`)
+  }
 }

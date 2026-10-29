@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
+use sqlx::Connection;
 use tauri_plugin_sql::{DbInstances, DbPool};
 
 const SYNC_REF_PATH: &str = "sync/v1/refs/main.json";
@@ -94,37 +95,49 @@ pub async fn execute_sync_transaction(
     .execute(&mut *connection)
     .await
     .map_err(|error| format!("Could not configure the sync database connection: {error}"))?;
-    sqlx::query("BEGIN IMMEDIATE")
-        .execute(&mut *connection)
-        .await
-        .map_err(format_sync_database_error)?;
+    apply_statements(&mut connection, statements).await
+}
 
+fn validate_statements(statements: &[SyncDatabaseStatement]) -> Result<(), String> {
+    const TABLES: &[&str] = &["oshis", "archives", "notes", "note_images", "illustrations", "journal_books", "journal_pages", "journal_items", "journal_images", "templates", "stamps", "resource_assets", "resource_versions", "oshi_schedules", "oshi_schedule_overrides", "settings"];
+    if statements.len() > 100_000 { return Err("Transaction has too many operations.".into()); }
+    let mut budget = 0usize;
+    for statement in statements {
+        budget = budget.saturating_add(statement.query.len()).saturating_add(serde_json::to_vec(&statement.values).map_err(|e| e.to_string())?.len());
+        if budget > 256 * 1024 * 1024 { return Err("Transaction exceeds size limit.".into()); }
+        let query = statement.query.to_ascii_lowercase();
+        if query.contains(';') || query.contains("--") || query.contains("/*") { return Err("Only single data statements are allowed.".into()); }
+        let words: Vec<&str> = query.split(|c: char| c.is_whitespace() || c == '(').filter(|s| !s.is_empty()).collect();
+        let table = match words.first().copied() {
+            Some("update") => words.get(1).copied(),
+            Some("insert") => words.iter().position(|s| *s == "into").and_then(|i| words.get(i+1).copied()),
+            Some("delete") if words.get(1) == Some(&"from") => words.get(2).copied(),
+            _ => None,
+        };
+        if !table.is_some_and(|t| TABLES.contains(&t)) { return Err("Invalid transaction operation or table.".into()); }
+    }
+    Ok(())
+}
+
+async fn apply_statements(connection: &mut sqlx::SqliteConnection, statements: Vec<SyncDatabaseStatement>) -> Result<(), String> {
+    validate_statements(&statements)?;
+    // RAII rolls back even if the command is cancelled, so the pool cannot retain an open transaction.
+    let mut transaction = connection.begin_with("BEGIN IMMEDIATE").await.map_err(format_sync_database_error)?;
     for statement in statements {
         let mut query = sqlx::query(&statement.query);
         for value in statement.values {
-            if value.is_null() {
-                query = query.bind(None::<JsonValue>);
-            } else if let Some(value) = value.as_str() {
-                query = query.bind(value.to_owned());
-            } else if let Some(value) = value.as_number() {
-                query = query.bind(value.as_f64().unwrap_or_default());
-            } else {
-                query = query.bind(value);
-            }
+            query = match value {
+                JsonValue::Null => query.bind(None::<String>),
+                JsonValue::String(value) => query.bind(value),
+                JsonValue::Number(value) if value.is_i64() => query.bind(value.as_i64().unwrap()),
+                JsonValue::Number(value) => query.bind(value.as_f64().unwrap_or_default()),
+                JsonValue::Bool(value) => query.bind(value),
+                other => query.bind(other.to_string()),
+            };
         }
-
-        if let Err(error) = query.execute(&mut *connection).await {
-            let _ = sqlx::query("ROLLBACK").execute(&mut *connection).await;
-            return Err(format_sync_database_error(error));
-        }
+        query.execute(&mut *transaction).await.map_err(format_sync_database_error)?;
     }
-
-    if let Err(error) = sqlx::query("COMMIT").execute(&mut *connection).await {
-        let _ = sqlx::query("ROLLBACK").execute(&mut *connection).await;
-        return Err(format_sync_database_error(error));
-    }
-
-    Ok(())
+    transaction.commit().await.map_err(format_sync_database_error)
 }
 
 fn format_sync_database_error(error: sqlx::Error) -> String {
@@ -268,15 +281,17 @@ pub async fn upload_webdav_app_data_file(
     if_none_match: bool,
 ) -> Result<WebDavWriteResult, String> {
     let local_path = resolve_managed_app_data_path(&app, &local_relative_path)?;
-    let bytes = fs::read(&local_path)
-        .map_err(|error| format!("Could not read {}: {error}", local_path.display()))?;
+    let file = tokio::fs::File::open(&local_path).await.map_err(|e| e.to_string())?;
+    let length = file.metadata().await.map_err(|e| e.to_string())?.len();
+    if length > 32 * 1024 * 1024 * 1024 { return Err("Upload exceeds 32 GiB limit.".into()); }
     let client = webdav_client(&config)?;
     ensure_webdav_relative_directories(&client, &config, &remote_relative_path).await?;
     let mut request = client
         .put(webdav_relative_url(&config, &remote_relative_path)?)
         .basic_auth(&config.username, Some(&config.password))
         .header("Content-Type", "application/octet-stream")
-        .body(bytes.clone());
+        .header("Content-Length", length)
+        .body(reqwest::Body::from(file));
     if if_none_match {
         request = request.header(IF_NONE_MATCH, "*");
     }
@@ -296,7 +311,7 @@ pub async fn upload_webdav_app_data_file(
         return Err(format!("WebDAV upload failed: {}", response.status()));
     }
     Ok(WebDavWriteResult {
-        bytes: bytes.len() as u64,
+        bytes: length,
         etag: header_value(response.headers(), ETAG),
         last_modified: header_value(response.headers(), LAST_MODIFIED),
         server_date: header_value(response.headers(), DATE),
@@ -310,13 +325,15 @@ pub async fn download_webdav_app_data_file(
     remote_relative_path: String,
     local_relative_path: String,
 ) -> Result<String, String> {
-    if !local_relative_path
-        .replace('\\', "/")
-        .starts_with("sync-cache/")
-    {
+    let root = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    download_into_cache(&root, config, remote_relative_path, local_relative_path).await
+}
+
+async fn download_into_cache(root: &Path, config: WebDavDataConfig, remote_relative_path: String, local_relative_path: String) -> Result<String, String> {
+    if !local_relative_path.replace('\\', "/").starts_with("sync-cache/") {
         return Err("WebDAV downloads must be staged in sync-cache.".to_string());
     }
-    let local_path = resolve_managed_app_data_path(&app, &local_relative_path)?;
+    let local_path = root.join(validate_relative_path(&local_relative_path.replace('\\', "/"))?);
     let client = webdav_client(&config)?;
     let response = client
         .get(webdav_relative_url(&config, &remote_relative_path)?)
@@ -327,16 +344,14 @@ pub async fn download_webdav_app_data_file(
     if !response.status().is_success() {
         return Err(format!("WebDAV download failed: {}", response.status()));
     }
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
     if let Some(parent) = local_path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
-
     let incoming = local_path.with_extension(format!("incoming-{}", timestamp_id()));
-    fs::write(&incoming, bytes).map_err(|error| error.to_string())?;
+    if let Err(error) = download_to_file(response, &incoming).await {
+        let _ = fs::remove_file(&incoming);
+        return Err(error);
+    }
     let previous = local_path.with_extension(format!("before-sync-{}", timestamp_id()));
     if local_path.exists() {
         fs::rename(&local_path, &previous).map_err(|error| error.to_string())?;
@@ -453,13 +468,7 @@ async fn read_text_object(
     let etag = header_value(response.headers(), ETAG);
     let last_modified = header_value(response.headers(), LAST_MODIFIED);
     let server_date = header_value(response.headers(), DATE);
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
-    if bytes.len() > MAX_TEXT_OBJECT_BYTES {
-        return Err("WebDAV text object is too large.".to_string());
-    }
+    let bytes = bounded_response(response, MAX_TEXT_OBJECT_BYTES).await?;
     let text = String::from_utf8(bytes.to_vec())
         .map_err(|_| "WebDAV object is not valid UTF-8.".to_string())?;
     Ok(WebDavTextObject {
@@ -474,6 +483,9 @@ async fn read_text_object(
 fn webdav_client(config: &WebDavDataConfig) -> Result<Client, String> {
     crate::validate_test_webdav_path(&config.base_url, &config.remote_path)?;
     Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .read_timeout(std::time::Duration::from_secs(60))
+        .timeout(std::time::Duration::from_secs(1800))
         .danger_accept_invalid_certs(config.allow_invalid_cert)
         .build()
         .map_err(|error| error.to_string())
@@ -643,5 +655,79 @@ mod tests {
         assert!(validate_relative_path("sync/../../outside").is_err());
         assert!(validate_relative_path("C:/outside").is_err());
         assert!(validate_relative_path("").is_err());
+    }
+}
+
+async fn download_to_file(mut response: reqwest::Response, path: &Path) -> Result<(), String> {
+    use std::io::Write;
+    const LIMIT: u64 = 32 * 1024 * 1024 * 1024;
+    if response.content_length().is_some_and(|size| size > LIMIT) { return Err("Download exceeds 32 GiB limit.".into()); }
+    let mut file = fs::OpenOptions::new().write(true).create_new(true).open(path).map_err(|e| e.to_string())?;
+    let mut total = 0u64;
+    while let Some(chunk) = response.chunk().await.map_err(|e| format_webdav_error(e.to_string()))? {
+        total += chunk.len() as u64;
+        if total > LIMIT { return Err("Download exceeds 32 GiB limit.".into()); }
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+    }
+    file.sync_all().map_err(|e| e.to_string())
+}
+
+pub(crate) async fn bounded_response(mut response: reqwest::Response, limit: usize) -> Result<Vec<u8>, String> {
+    if response.content_length().is_some_and(|size| size > limit as u64) { return Err("Response exceeds size limit.".into()); }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+        if bytes.len().saturating_add(chunk.len()) > limit { return Err("Response exceeds size limit.".into()); }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
+}
+
+#[cfg(test)]
+mod boundary_tests {
+    use super::*;
+    use std::io::{Read, Write};
+    #[test]
+    fn batch_failure_rolls_back_on_the_real_connection() {
+        tauri::async_runtime::block_on(async {
+            let mut db = sqlx::SqliteConnection::connect("sqlite::memory:").await.unwrap();
+            sqlx::raw_sql("CREATE TABLE notes(id TEXT PRIMARY KEY,title TEXT); INSERT INTO notes VALUES('n','old'); CREATE TABLE note_images(id TEXT PRIMARY KEY,note_id TEXT,data_url TEXT); INSERT INTO note_images VALUES('i','n','old');").execute(&mut db).await.unwrap();
+            let ops = vec![SyncDatabaseStatement {query:"UPDATE notes SET title = ? WHERE id = ?".into(),values:vec!["new".into(),"n".into()]},
+              SyncDatabaseStatement {query:"DELETE FROM note_images WHERE note_id = ?".into(),values:vec!["n".into()]},
+              SyncDatabaseStatement {query:"INSERT INTO stamps (id) VALUES (?)".into(),values:vec!["missing-table".into()]}];
+            assert!(apply_statements(&mut db, ops).await.is_err());
+            let title: String = sqlx::query_scalar("SELECT title FROM notes").fetch_one(&mut db).await.unwrap();
+            let count:i64 = sqlx::query_scalar("SELECT count(*) FROM note_images").fetch_one(&mut db).await.unwrap();
+            assert_eq!(title,"old"); assert_eq!(count,1);
+        });
+    }
+    #[test]
+    fn download_new_and_legacy_backups_through_real_http_and_cache_guard() {
+        let root = std::env::temp_dir().join(format!("oshinote-http-{}", timestamp_id())); fs::create_dir_all(&root).unwrap();
+        for remote in ["backups/oshinote-1-0.oshi.zip", "oshinote-latest-full.oshi.zip"] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap(); let address = listener.local_addr().unwrap();
+            let expected = format!("/isolated/{remote}");
+            let server = std::thread::spawn(move || {
+                let (mut socket,_) = listener.accept().unwrap(); socket.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+                let mut request=[0u8;4096]; let n=socket.read(&mut request).unwrap();
+                assert!(String::from_utf8_lossy(&request[..n]).contains(&expected));
+                socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nfixture").unwrap();
+            });
+            tauri::async_runtime::block_on(async {
+                let config = WebDavDataConfig {base_url:format!("http://{address}"),username:String::new(),password:String::new(),remote_path:"isolated".into(),allow_invalid_cert:false};
+                assert!(download_into_cache(&root,config.clone(),remote.into(),"backups/restore-bad.oshi.zip".into()).await.is_err());
+                assert!(download_into_cache(&root,config.clone(),remote.into(),"sync-cache/../outside".into()).await.is_err());
+                let local="sync-cache/restore-test.oshi.zip";
+                assert_eq!(download_into_cache(&root,config,remote.into(),local.into()).await.unwrap(),local);
+                assert_eq!(fs::read(root.join(local)).unwrap(),b"fixture");
+            });
+            server.join().unwrap();
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn transaction_rejects_schema_and_multi_statement_operations() {
+        for sql in ["DROP TABLE notes","UPDATE sqlite_master SET name = ?", "DELETE FROM notes; DELETE FROM oshis"] {
+            assert!(validate_statements(&[SyncDatabaseStatement {query:sql.into(),values:vec![]}]).is_err());
+        }
     }
 }

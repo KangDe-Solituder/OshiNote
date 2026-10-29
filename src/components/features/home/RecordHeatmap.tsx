@@ -317,7 +317,7 @@ function HeatmapDot({
   return (
     <button
       type="button"
-      aria-label={cell.date}
+      aria-label={`${cell.date}: ${cell.total}`}
       aria-pressed={selected}
       data-heatmap-date={cell.date}
       onMouseEnter={(event) => onEnter(cell, event.currentTarget)}
@@ -363,7 +363,7 @@ function MonthStrip({
           <button
             key={cell.date}
             type="button"
-            aria-label={cell.date}
+            aria-label={`${cell.date}: ${cell.total}`}
             aria-pressed={selectedDate === cell.date}
             data-heatmap-date={cell.date}
             onMouseEnter={(event) => onEnter(cell, event.currentTarget)}

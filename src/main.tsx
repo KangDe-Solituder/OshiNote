@@ -9,8 +9,10 @@ import './styles/themes/glass.css'
 import './index.css'
 import App from './App.tsx'
 import { markStartup } from './services/startup'
+import { initializeWindowCloseHandling } from './services/windowClose'
 
 markStartup('javascript-ready')
+void initializeWindowCloseHandling().catch(error => console.error('Could not initialize window close handling', error))
 
 createRoot(document.getElementById('root')!).render(
   <App />,

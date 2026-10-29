@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-29",
+  "branch": "codex/reliability-hardening",
+  "baseline": "eb08e30bcbcd5a00096446cbec5eb27fe18ed321",
+  "quality": {
+    "lint": "passed",
+    "testFiles": 34,
+    "tests": 239,
+    "typescript": "passed",
+    "vite": "passed",
+    "warning": "shared chunk exceeds 500 kB"
+  },
+  "nativeTests": 17,
+  "nativeNote": {
+    "schema": 2,
+    "manualNoteSave": true,
+    "leaveCancel": true,
+    "leaveDiscard": true,
+    "errors": []
+  },
+  "nativeRestore": {
+    "backup": "oshinote-1793261210417-7.oshi.zip",
+    "bytes": 12298,
+    "requests": [
+      "/BackUp/OshiNote-ResourceTest/backups/index.json",
+      "/BackUp/OshiNote-ResourceTest/oshinote-latest-full.oshi.zip",
+      "/BackUp/OshiNote-ResourceTest/backups/oshinote-1793261210417-7.oshi.zip",
+      "/BackUp/OshiNote-ResourceTest/backups/oshinote-1793261210417-7.oshi.zip"
+    ],
+    "cancelPreservedCurrent": true,
+    "restoreReplacedCurrent": true,
+    "secretExcluded": true,
+    "deviceSettingsPreserved": true,
+    "mediaRestored": true,
+    "errors": []
+  },
+  "nativeKeyboard": {
+    "tabWrap": true,
+    "reverseTabWrap": true,
+    "selectEndEnter": true,
+    "escapeClosesSelectBeforeModal": true,
+    "focusReturnsToTrigger": true
+  },
+  "productionDatabaseTouched": false,
+  "productionNasTouched": false,
+  "githubCiRun": false,
+  "nativeClose": {
+    "noteCloseCancelPreservesEdits": true,
+    "noteDiscardActuallyExits": true,
+    "cleanRouteThenReloadCloseExits": true,
+    "allChildProcessesExited": true
+  }
+}

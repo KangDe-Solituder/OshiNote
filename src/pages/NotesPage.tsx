@@ -42,6 +42,8 @@ export function NotesPage() {
   }, [])
 
   useEffect(() => {
+    let active = true
+    const timer = setTimeout(() => {
     fetchAllNotes({
       query,
       oshiId: oshiId || undefined,
@@ -54,14 +56,18 @@ export function NotesPage() {
       pageSize: PAGE_SIZE,
     })
       .then((result) => {
+        if (!active) return
         setNotes(result.notes)
         setTotal(result.total)
       })
       .catch(() => {
+        if (!active) return
         setNotes([])
         setTotal(0)
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (active) setLoading(false) })
+    }, 180)
+    return () => { active = false; clearTimeout(timer) }
   }, [archiveId, favorite, oshiId, ownership, page, query, sort, tag])
 
   const visibleArchives = useMemo(

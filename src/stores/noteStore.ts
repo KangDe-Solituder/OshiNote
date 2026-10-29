@@ -29,6 +29,8 @@ interface NoteState {
   setPage: (page: number) => void
 }
 
+let requestSequence = 0
+
 export const useNoteStore = create<NoteState>((set, get) => ({
   notes: [],
   totalNotes: 0,
@@ -42,9 +44,11 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   error: null,
 
   fetchByOshi: async (oshiId, params) => {
+    const request = ++requestSequence
     set({ loading: true, error: null })
     try {
       const result = await noteService.fetchNotesByOshi(oshiId, params)
+      if (request !== requestSequence) return
       set({
         notes: result.notes,
         totalNotes: result.total,
@@ -52,15 +56,18 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         loading: false,
       })
     } catch (e) {
+      if (request !== requestSequence) return
       set({ error: String(e), loading: false })
     }
   },
 
   fetchByArchive: async (archiveId, page) => {
+    const request = ++requestSequence
     set({ loading: true, error: null })
     try {
       const p = page || get().currentPage
       const result = await noteService.fetchNotesByArchive(archiveId, p, get().pageSize)
+      if (request !== requestSequence) return
       set({
         notes: result.notes,
         totalNotes: result.total,
@@ -68,14 +75,17 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         loading: false,
       })
     } catch (e) {
+      if (request !== requestSequence) return
       set({ error: String(e), loading: false })
     }
   },
 
   search: async (oshiId, params) => {
+    const request = ++requestSequence
     set({ loading: true, error: null })
     try {
       const result = await noteService.searchNotes(oshiId, params)
+      if (request !== requestSequence) return
       set({
         notes: result.notes,
         totalNotes: result.total,
@@ -83,6 +93,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         loading: false,
       })
     } catch (e) {
+      if (request !== requestSequence) return
       set({ error: String(e), loading: false })
     }
   },

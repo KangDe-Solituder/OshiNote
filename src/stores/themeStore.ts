@@ -1,3 +1,4 @@
+import { queueAppearance, pendingAppearance, flushAppearance, setSettingsWriteReporter } from './settingsWriter'
 import { create } from 'zustand'
 import type { ThemeId, BackgroundFilters, UiMotionDuration, TextTone } from '../types'
 import { getDb } from '../database'
@@ -22,6 +23,7 @@ interface ThemeState {
   uiMotionDuration: UiMotionDuration
   textTone: TextTone
   simpleMode: boolean
+  persistenceError: string | null
 
   setTheme: (id: ThemeId) => void
   setGlassEnabled: (enabled: boolean) => void
@@ -100,59 +102,60 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   uiMotionDuration: 'normal',
   textTone: 'colored',
   simpleMode: false,
+  persistenceError: null,
 
   setSimpleMode: (enabled) => {
     set({ simpleMode: enabled })
     document.documentElement.dataset.simpleMode = String(enabled)
-    get().persistToDB()
+    queueAppearance('simpleMode', String(enabled))
   },
 
   setTheme: (id) => {
     set({ currentTheme: id })
     document.documentElement.setAttribute('data-theme', id)
-    get().persistToDB()
+    queueAppearance('theme', id)
   },
 
   setGlassEnabled: (enabled) => {
     set({ glassEnabled: enabled })
     applyGlass(enabled)
-    get().persistToDB()
+    queueAppearance('glassEnabled', String(enabled))
   },
 
   setCustomBackground: (path) => {
     set({ customBackground: path })
-    get().persistToDB()
+    queueAppearance('customBg', path || '')
   },
 
   setFilter: (key, value) => {
     set((s) => ({
       backgroundFilters: { ...s.backgroundFilters, [key]: value },
     }))
-    get().persistToDB()
+    queueAppearance('bgFilters', JSON.stringify(get().backgroundFilters))
   },
 
   setThemeHotkey: (key, themeId) => {
     set((s) => ({
       themeHotkeys: { ...s.themeHotkeys, [key]: themeId },
     }))
-    get().persistToDB()
+    queueAppearance('hotkeys', JSON.stringify(get().themeHotkeys))
   },
 
   setFontSize: (size) => {
     set({ fontSize: size })
     applyFontSize(size)
-    get().persistToDB()
+    queueAppearance('fontSize', size)
   },
 
   setUiMotionDuration: (duration) => {
     set({ uiMotionDuration: duration })
-    get().persistToDB()
+    queueAppearance('uiMotionDuration', duration)
   },
 
   setTextTone: (tone) => {
     set({ textTone: tone })
     applyTextTone(tone)
-    get().persistToDB()
+    queueAppearance('textTone', tone)
   },
 
   loadFromDB: async () => {
@@ -161,7 +164,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       const rows = await db.select<{ key: string; value: string }[]>(
         "SELECT key, value FROM settings WHERE key IN ('theme', 'glassEnabled', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration', 'textTone', 'simpleMode')"
       )
-      for (const row of rows) {
+      const merged = new Map(rows.map(row => [row.key, row.value]))
+      for (const [key, value] of Object.entries(pendingAppearance())) merged.set(key, value)
+      for (const [key, value] of merged) {
+        const row = { key, value }
         switch (row.key) {
           case 'simpleMode':
             set({ simpleMode: row.value === 'true' })
@@ -237,25 +243,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     } catch {
       // DB not ready yet
     } finally {
+      void flushAppearance().catch(() => {})
       markStartup('theme-ready')
     }
   },
 
-  persistToDB: async () => {
-    try {
-      const db = await getDb()
-      const state = get()
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)", [state.currentTheme])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('glassEnabled', ?)", [String(state.glassEnabled)])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('customBg', ?)", [state.customBackground || ''])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('bgFilters', ?)", [JSON.stringify(state.backgroundFilters)])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('hotkeys', ?)", [JSON.stringify(state.themeHotkeys)])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('fontSize', ?)", [state.fontSize])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('uiMotionDuration', ?)", [state.uiMotionDuration])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('textTone', ?)", [state.textTone])
-      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('simpleMode', ?)", [String(state.simpleMode)])
-    } catch {
-      // Silently fail
-    }
-  },
+  persistToDB: flushAppearance,
 }))
+setSettingsWriteReporter(persistenceError => useThemeStore.setState({ persistenceError }))

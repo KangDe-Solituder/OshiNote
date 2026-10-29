@@ -63,7 +63,6 @@ It should not become:
 | --- | --- | --- |
 | Full vertical design toolbar | Reduce | Too close to a design app; first version should be note-first |
 | Independent shapes/text objects | Defer | Adds multiple object types too early |
-| Large always-visible AI panel | Move into selected-note panel | AI is useful, but not the main journal surface |
 | Full material library | Defer | Start with a small curated set |
 | Complex layer management | Defer | Use simple bring forward/send backward controls first |
 | Dense decorative default pages | Reduce | Real note pages need readability and long-term comfort |
@@ -121,7 +120,6 @@ It should not become:
 | Double-page spread mode | P2 | Strong book feeling | Render two `journal_pages` side by side |
 | Timeline auto-pages | P2 | Create pages by date/event | Generate pages by month, stream, tag, or archive |
 | Journal search overlay | P2 | Find notes without leaving view | Reuse existing search store |
-| AI tools in inspector | P2 | Translate/refine selected note | Reuse existing AI services inside selected-note panel |
 | Multi-select | P3 | Power user layout edits | Only after single-item interactions feel stable |
 | Free text/shape objects | P3 | More design freedom | Add only if real user need appears |
 
@@ -667,7 +665,6 @@ Do not build these in the first pass:
 - image export
 - double-page spread if single-page layout is not stable yet
 - timeline generation
-- AI panel always visible on the journal page
 - free text objects separate from notes
 
 These are good future features, but they should not block the core notebook experience.
@@ -709,7 +706,6 @@ The journal view should absorb the prototype's emotional strengths:
 But it should reject or defer the prototype's heavy design-tool instincts:
 
 - too many object tools
-- large permanent AI panel
 - full freeform material editing
 - complex layers
 
@@ -865,7 +861,6 @@ This section expands the next two recommended product tracks:
 1. complete the global Notes and editor ownership model
 2. build a template system for journal books, pages, and stickers
 
-The intent is to make OshiNote's data foundation stronger before adding heavier AI or media features. Notes should become easy to find, assign, sort, and reuse. Journal should become visually expressive through curated templates rather than a freeform design-tool surface.
 
 ---
 

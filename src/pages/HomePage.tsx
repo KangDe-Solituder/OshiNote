@@ -28,7 +28,7 @@ export function HomePage() {
 
   const statCards = [
     { icon: Heart, label: t('home.stats.oshis'), value: stats.oshis, color: 'text-pink-400', link: '/oshis' },
-    { icon: FileText, label: t('home.stats.notes'), value: stats.notes, color: 'text-blue-400', link: '/oshis' },
+    { icon: FileText, label: t('home.stats.notes'), value: stats.notes, color: 'text-blue-400', link: '/notes' },
     { icon: Tag, label: t('home.stats.tags'), value: stats.tags, color: 'text-purple-400', link: '/tags' },
   ]
 

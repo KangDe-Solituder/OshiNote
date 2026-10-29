@@ -45,6 +45,7 @@ export function SelectMenu({
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false)
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number; openUp: boolean; maxHeight: number } | null>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const timing = useMotionTiming()
@@ -92,8 +93,16 @@ export function SelectMenu({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        setOpen(false)
+        event.preventDefault(); event.stopPropagation(); setOpen(false); triggerRef.current?.focus()
       }
+      if (event.key === 'Tab') { setOpen(false); triggerRef.current?.focus(); return }
+      if (!['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return
+      event.preventDefault()
+      const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || [])
+      if (!items.length) return
+      const index = items.indexOf(document.activeElement as HTMLButtonElement)
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (index + 1) % items.length : (index <= 0 ? items.length : index) - 1
+      items[next].focus()
     }
 
     document.addEventListener('pointerdown', handlePointerDown)
@@ -173,6 +182,7 @@ export function SelectMenu({
                   onClick={() => {
                     onChange(option.value)
                     setOpen(false)
+                    if (!preserveFocusOnMouseDown) triggerRef.current?.focus()
                   }}
                   className={clsx(
                     'flex w-full items-center justify-between gap-3 rounded-[4px] px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
@@ -197,6 +207,8 @@ export function SelectMenu({
   return (
     <div ref={rootRef} className={clsx('relative shrink-0', className)}>
       <button
+        ref={triggerRef}
+        onKeyDown={event => { if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) { event.preventDefault(); toggleOpen() } }}
         type="button"
         disabled={disabled}
         onMouseDown={preserveFocusOnMouseDown ? (event) => event.preventDefault() : undefined}

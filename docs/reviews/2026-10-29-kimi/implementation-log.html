@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OshiNote 加固实施记录 · 2026-10-29</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,"Microsoft YaHei",sans-serif;background:#17151d;color:#eeeaf4}body{max-width:1280px;margin:40px auto;padding:0 24px 60px;line-height:1.75}h1{font-size:30px;margin-bottom:8px}h2{font-size:21px;margin-top:32px}a{color:#c8afff}code{font-size:.92em;color:#d4c2ff;overflow-wrap:anywhere}.lead,.box{padding:18px 22px;background:#252130;border:1px solid #494054;border-radius:14px}.muted{color:#bbb3c8}table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:13px 14px;border-bottom:1px solid #494054;text-align:left;vertical-align:top}th{background:#30283e;position:sticky;top:0}td:first-child{white-space:nowrap}tr:nth-child(even){background:#201c29}.done{color:#a4dfbd}.part{color:#f4cd8e}.scroll{overflow:auto}ul{padding-left:24px}@media print{:root{color-scheme:light;background:white;color:#222}body{margin:0}th{position:static}.lead,.box,th,tr:nth-child(even){background:#f4f1f7}a,code,.done,.part,.muted{color:#333}}</style>
+<h1>OshiNote 加固实施记录</h1>
+<p class="muted">2026-10-29 · 分支 <code>codex/reliability-hardening</code> · 基线 <code>eb08e30</code></p>
+<div class="lead">本轮根据代码核实后的计划实施，并采用用户最终决定：Note 保持手动保存；备份排除连接配置和凭据；移除 OshiNote AI；回收站／历史版本、字段级冲突对比和端到端加密暂缓。原审查与模型评估作为历史证据保留，本表记录后续实际变化。</div>
+<h2>修改记录表</h2>
+<div class="scroll"><table><thead><tr><th>计划</th><th>状态</th><th>实际修改</th><th>验证与边界</th></tr></thead><tbody>
+<tr><td>H01 云端恢复</td><td class="done">已修复</td><td>新、旧云端备份统一下载到 <code>sync-cache/restore-*.oshi.zip</code>，保持后端暂存目录限制。</td><td>原生回环 HTTP 覆盖新／旧路径和越界拒绝；独立应用实际完成 ZIP 下载、临时迁移、取消与确认恢复，验证笔记及 PNG 字节恢复。正式 NAS 未参与。</td></tr>
+<tr><td>H02 Note 保存</td><td class="done">按确认方向完成</td><td>正文、附件、印章同一连接原子提交；新建失败重试复用 ID；阻止重复保存；未保存离开／关窗提醒。独立附件替换和删除也改为事务。</td><td>真实 SQLite 故障注入验证回滚；原生界面验证手动保存、取消离开、丢弃未保存改动。没有自动保存、定时保存或恢复草稿；关窗监听已接入，未做强制断电测试。</td></tr>
+<tr><td>H03 迁移</td><td class="done">已加固</td><td>迁移拥有专用 SQLite 连接与事务；结构版本升至 2 并登记迁移记录；迁移前生成本机安全副本；恢复中断的 journal 临时表；提交前检查外键，拒绝过新数据库。</td><td>Python SQLite 夹具覆盖 DROP／RENAME 注入失败、回滚及重跑；Rust 验证单连接回滚；独立原生应用启动／恢复通过。未声称遍历所有历史数据库或操作系统崩溃时机。</td></tr>
+<tr><td>H04 备份秘密</td><td class="done">新备份已隔离</td><td>只在导出副本中保留便携设置白名单，删除连接／AI 配置及临时同步状态，安全删除并 VACUUM 后进入 ZIP；恢复迁移清理旧 AI 配置。</td><td>合成凭据 SQL 和字节检查通过，原库不因导出而改动。历史 ZIP 与迁移前安全副本不会自动改写或删除，不承诺其中的旧凭据已消失。</td></tr>
+<tr><td>H05 来源元数据</td><td class="done">已修复</td><td>统一备份元数据入口；<code>head_commit</code> 表达最近应用的同步基线。备份允许包含未同步编辑，恢复重新建立同步关联。</td><td>元数据测试通过；离线本地备份实测通过。没有添加“先同步才能备份”的限制。</td></tr>
+<tr><td>H06 本机凭据</td><td class="done">Windows 已实现</td><td>DPAPI 保护密码，localStorage 保存密文；迁移旧单配置／多目录明文；换 Windows 账户解密失败时保留密文并提示重填。</td><td>合成密码原生往返、失败保留旧配置及恢复后解锁通过。地址／用户名仍是本机配置，运行时密码仍需解密；这不防御已控制当前用户进程的攻击者。其他 OS 适配未实现。</td></tr>
+<tr><td>H07 网络／ZIP</td><td class="part">基础加固完成</td><td>连接、读取与总超时；流式上传下载；文本 32 MiB、字体 64 MiB；ZIP manifest 1 MiB、10 万条目、单项 8 GiB、总解压 32 GiB；实际解压限额、重复路径和越界检查。</td><td>受限解压、下载路径与真实 HTTP 已测试。尚未添加操作取消 UI、可配置预算或完整慢网／超大备份压力测试。</td></tr>
+<tr><td>H08 权限边界</td><td class="part">部分完成</td><td>从空 CSP 改为限制脚本、连接和嵌入；批量写入限制操作、目标表及体积，拒绝多语句／DDL；旧背景图改用本地 base64 解码。</td><td>非法批量操作测试通过。现有业务仍依赖通用 SQL 插件；尚未迁移为全套结构化命令，也没有字段级白名单，因此不能宣称已消除通用 SQL 旁路。</td></tr>
+<tr><td>H09 搜索竞态</td><td class="done">主要路径已修复</td><td>全局搜索去抖；Note Store 请求序号屏蔽旧结果；编辑页的异步 Note／归档加载增加过期保护。</td><td>慢旧请求不能覆盖新结果的回归通过；保留现有 SQL 分页。旧搜索服务未做无关重写。</td></tr>
+<tr><td>H10 媒体性能</td><td class="part">视口门控完成</td><td>屏外 MediaImage 延迟解析文件，接近视口后加载，保留 eager 和既有缓存。</td><td>构建通过；没有给出未经测量的性能提升比例。同步扫描、哈希缓存、并发和列表虚拟化继续按规模基准另行评估。</td></tr>
+<tr><td>H11 设置写入</td><td class="done">已加固</td><td>仅写变化字段，串行合并待写值；本机持久待写记录保留最后值与失败重试；备份／恢复前 flush。</td><td>快速多次修改、慢写、失败重试测试通过。它只用于外观设置，与 Note 自动保存无关。</td></tr>
+<tr><td>H12 导航／键盘</td><td class="part">主要问题已修复</td><td>首页笔记统计跳转修正；Modal 焦点进入／循环／返回；SelectMenu 方向键、Home／End、Escape；热力图数量标签和必要保存提示三语文案。</td><td>原生实测 Tab／Shift+Tab、End+Enter、嵌套 Escape 和焦点返回。未扩大成全应用触摸目标或布局重设计。</td></tr>
+<tr><td>H13 清理</td><td class="done">已完成</td><td>删除 AI 页面、面板、Store、Provider、原生本地聊天命令与启动加载；删除闲置通用导出服务；更新相关文档。</td><td>AI 运行链已移除；历史审查与清理旧配置所需的 AI 字段名保留。手账 PNG、素材等现用导出保留；JapRead 不在修改范围。</td></tr>
+<tr><td>H14 资源清理</td><td class="done">已收窄</td><td>只把明确的手账草稿 key 当作未保存资源引用，不再扫描全部 localStorage；保留删除前引用复核。</td><td>资源清理回归通过；连接配置与待写外观设置不参与草稿引用扫描。</td></tr>
+<tr><td>H15 验证</td><td class="done">本地验证完成</td><td>新增 SQLite／原生／凭据／恢复回归，加入 Windows GitHub Actions 质量门配置。</td><td>239 项前端测试、17 项原生测试通过，lint／生产构建通过。CI 尚未在 GitHub 运行；主共享 bundle 仍有 500 kB 提示。</td></tr>
+</tbody></table></div>
+<h2>合并前补充：关闭窗口修复</h2><p>复现隔离测试窗口点 × 后关闭命令成功但进程不退出。补齐 Tauri 关闭监听所需的 destroy 权限，并将原生关闭监听统一到每次页面启动；Note／手账编辑器只注册同步关闭保护，防止路由切换和重载留下无响应监听。新增 2 项生命周期测试，独立原生测试验证未保存 Note 取消可继续编辑、确认丢弃实际退出，以及干净页面重载后点 × 实际退出。旧隔离进程已结束。</p><h2>明确保留与暂缓</h2>
+<p>保留数据页“目录配置／同步／备份／恢复”的单页布局及就地反馈，不恢复独立通用导出入口。暂缓 Note 回收站与历史版本、字段级冲突对比、端到端加密、首页重设计及新的搜索索引方案。</p>
+<h2>验证范围</h2>
+<ul><li><code>pnpm quality</code>：lint、34 个测试文件／239 项测试、TypeScript 与 Vite 构建通过。</li><li><code>cargo test --manifest-path src-tauri/Cargo.toml --lib --locked</code>：17 项原生测试通过。</li><li>原生测试标识：<code>com.oshinote.resource-test.hardening</code>。回环服务器模拟 <code>BackUp/OshiNote-ResourceTest</code>；未连接正式 NAS。</li><li>人工驱动的原生 UI 自动化：手动 Note 保存与离开保护、真实完整 ZIP／PNG 恢复、DPAPI 密码保护与配置保留、弹窗／下拉框键盘行为。独立测试构建完成于最后一轮 Note 附件辅助函数与过期加载保护补充之前；这两项补充由最终全量回归覆盖。</li><li>正式数据库未切换、未运行迁移。修缮分支完成验收后本地合并 main；尚未推送。</li></ul>
+<p><a href="implementation-evidence.json">本轮验证摘要</a> · <a href="hardening-plan.html">原始加固计划（历史）</a> · <a href="kimi-evaluation.html">Kimi 模型评估（历史）</a></p>
+</html>

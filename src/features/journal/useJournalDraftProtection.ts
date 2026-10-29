@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
-import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { registerWindowCloseGuard } from '../../services/windowClose'
 import { parseEditorDraft, type JournalEditorDocument } from './journalEditorState'
 import { readLocalStorage } from '../../utils/safeLocalStorage'
 
@@ -46,15 +46,11 @@ export function useJournalDraftProtection(key: string, document: JournalEditorDo
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [dirty, recovery, persist])
   useEffect(() => {
-    if (!isTauri()) return
-    let disposed = false
-    let unlisten: (() => void) | undefined
-    void getCurrentWindow().onCloseRequested(event => {
-      if (!dirty || bypass.current) return
-      event.preventDefault()
+    return registerWindowCloseGuard(() => {
+      if (!dirty || bypass.current) return false
       setClosing(true)
-    }).then(stop => { if (disposed) stop(); else unlisten = stop }).catch(() => {})
-    return () => { disposed = true; unlisten?.() }
+      return true
+    })
   }, [dirty])
   useEffect(() => () => { if (!bypass.current && !recovery && dirty) persist(latest.current) }, [dirty, persist, recovery])
 

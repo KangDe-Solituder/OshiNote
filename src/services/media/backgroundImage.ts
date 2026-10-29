@@ -53,12 +53,14 @@ export async function migrateLegacyBackgroundDataUrl(dataUrl: string): Promise<s
   const match = /^data:(image\/[\w.+-]+);base64,/i.exec(dataUrl)
   if (!match) return null
   try {
-    const blob = await (await fetch(dataUrl)).blob()
+    const encoded = dataUrl.slice(match[0].length)
+    if (encoded.length > 48 * 1024 * 1024) return null
+    const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0))
     await ensureBackgroundDir()
     const ext = EXTENSION_BY_MIME[match[1]]
     if (!ext) return null
     const path = buildBackgroundPath(ext)
-    await writeFile(path, new Uint8Array(await blob.arrayBuffer()), { baseDir: BaseDirectory.AppData })
+    await writeFile(path, bytes, { baseDir: BaseDirectory.AppData })
     return path
   } catch {
     return null

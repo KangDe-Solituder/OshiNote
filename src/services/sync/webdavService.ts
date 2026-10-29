@@ -1,9 +1,6 @@
-import { reconcileResourceLibrary } from '../../features/resources/resourceLibrary'
-import { SYNC_SCHEMA_VERSION } from './syncModel'
 import { invoke, isTauri } from '@tauri-apps/api/core'
-import { closeDb, getDb } from '../../database'
 import { isRecord, safeJsonParse, asString } from '../../utils/safeJson'
-import { readLocalStorage, writeLocalStorage } from '../../utils/safeLocalStorage'
+import { readLocalStorage } from '../../utils/safeLocalStorage'
 import { assertTestRemotePath, isResourceTest, RESOURCE_TEST_PATH } from './testIsolation'
 
 const WEBDAV_CONFIG_KEY = 'oshinote.webdav.config'
@@ -12,6 +9,7 @@ export interface WebDavConfig {
   baseUrl: string
   username: string
   password: string
+  protectedPassword?: number[]
   remotePath: string
   allowInvalidCert: boolean
 }
@@ -55,8 +53,8 @@ export interface SyncCacheSummary {
 }
 
 const DEFAULT_CONFIG: WebDavConfig = {
-  baseUrl: 'https://192.168.3.37:5006',
-  username: 'KangDe',
+  baseUrl: '',
+  username: '',
   password: '',
   remotePath: 'BackUp/OshiNote',
   allowInvalidCert: false,
@@ -71,10 +69,6 @@ export function readWebDavConfig(): WebDavConfig {
     remotePath: isResourceTest ? RESOURCE_TEST_PATH : asString(parsed.remotePath, DEFAULT_CONFIG.remotePath),
     allowInvalidCert: parsed.allowInvalidCert === true,
   }
-}
-
-export function saveWebDavConfig(config: WebDavConfig): void {
-  writeLocalStorage(WEBDAV_CONFIG_KEY, JSON.stringify(config))
 }
 
 function requireTauri(): void {
@@ -95,23 +89,6 @@ function toCommandConfig(config: WebDavConfig) {
 export async function testWebDavConnection(config: WebDavConfig): Promise<WebDavRepositoryInspection> {
   requireTauri()
   return invoke<WebDavRepositoryInspection>('inspect_webdav_repository', { config: toCommandConfig(config) })
-}
-
-export async function uploadWebDavBackup(config: WebDavConfig): Promise<WebDavSummary> {
-  requireTauri()
-  const syncMetadata = await readBackupSyncMetadata()
-  await closeDb()
-  return invoke<WebDavSummary>('upload_webdav_backup', {
-    config: toCommandConfig(config),
-    sync_metadata: syncMetadata,
-  })
-}
-
-export async function downloadAndRestoreWebDavBackup(config: WebDavConfig): Promise<void> {
-  requireTauri()
-  const path = await invoke<string>('download_webdav_backup', { config: toCommandConfig(config) })
-  const { prepareRestore, activateRestore } = await import('../backup/restore')
-  await activateRestore(await prepareRestore(path))
 }
 
 export async function readWebDavText(config: WebDavConfig, relativePath: string): Promise<WebDavTextObject> {
@@ -185,21 +162,4 @@ export async function inspectSyncCache(): Promise<SyncCacheSummary> {
 export async function clearSyncCache(): Promise<SyncCacheSummary> {
   requireTauri()
   return invoke<SyncCacheSummary>('clear_sync_cache')
-}
-
-async function readBackupSyncMetadata() {
-  const db = await getDb()
-  const rows = await db.select<{ value: string }[]>("SELECT value FROM sync_state WHERE key = 'repository'")
-  await reconcileResourceLibrary(db)
-  if (!rows[0]?.value) return { repository_id: null, head_commit: null, schema_version: SYNC_SCHEMA_VERSION }
-  try {
-    const state = JSON.parse(rows[0].value) as { repository_id?: string; head?: string | null }
-    return {
-      repository_id: state.repository_id || null,
-      head_commit: state.head || null,
-      schema_version: SYNC_SCHEMA_VERSION,
-    }
-  } catch {
-    return { repository_id: null, head_commit: null, schema_version: SYNC_SCHEMA_VERSION }
-  }
 }

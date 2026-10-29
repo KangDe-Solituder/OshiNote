@@ -1,3 +1,4 @@
+import { flushAppearance } from '../../stores/settingsWriter'
 import Database from '@tauri-apps/plugin-sql'
 import { invoke } from '@tauri-apps/api/core'
 import { withClosedDatabase, migrateDatabase, checkpointDatabase } from '../../database'
@@ -51,6 +52,7 @@ export async function discardRestore(prepared: PreparedRestore): Promise<void> {
 }
 
 export async function activateRestore(prepared: PreparedRestore): Promise<void> {
+  await flushAppearance()
   await withResourceFiles(() => withClosedDatabase(() => invoke('activate_prepared_restore', { token: prepared.token })))
   window.location.reload()
 }

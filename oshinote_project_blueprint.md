@@ -1,7 +1,6 @@
 # OshiNote
 
 > A cozy desktop diary app for VTuber / livestream / ASMR fans.  
-> Record emotions, archive memories, and enhance fan-writing with AI.
 
 ---
 
@@ -13,14 +12,12 @@ OshiNote is a local-first desktop application designed for fans who want to:
 - Organize fan memories
 - Archive emotional moments
 - Write messages to their oshi
-- Use AI-assisted translation and writing refinement
 
 The application focuses on:
 
 - Emotional UX
 - Cozy visual design
 - Lightweight local storage
-- AI-assisted writing
 - Smooth desktop experience
 
 This is NOT a productivity app.
@@ -103,20 +100,6 @@ Used for:
 
 ---
 
-## AI Integration
-
-Abstraction layer design.
-
-Support:
-- OpenAI
-- Claude
-- Gemini
-- Local API
-
-All providers should follow unified interface.
-
----
-
 # 3. Core Product Structure
 
 The application uses:
@@ -144,7 +127,6 @@ Contains:
 - Home
 - Oshis
 - Tags
-- AI Tools
 - Export
 - Settings
 
@@ -356,69 +338,6 @@ Ctrl + 2 → Dark ASMR theme
 
 ---
 
-# 8. AI Features
-
-IMPORTANT:
-AI should enhance writing.
-
-AI is NOT the core product itself.
-
----
-
-## 8.1 Translation
-
-Layout:
-
-```txt
-Left: Original text
-Right: Translated result
-```
-
-Supports:
-- Japanese
-- Chinese
-- English
-
----
-
-## 8.2 Writing Refinement
-
-User may provide:
-- draft fan message
-- stream impression
-- tweet reply
-
-AI helps:
-- grammar
-- natural phrasing
-- politeness
-- emotional tone
-
----
-
-## 8.3 Context Reference
-
-User can attach:
-- tweets
-- stream summaries
-- text references
-
-AI uses them as:
-- style/context hints
-
----
-
-## 8.4 Future AI Features
-
-NOT MVP:
-
-- sentiment analysis
-- emotion timeline
-- auto tag suggestion
-- stream summary generation
-
----
-
 # 9. Export System
 
 Users own their data.
@@ -437,7 +356,6 @@ Optional later:
 
 # 10. Local-First Philosophy
 
-The application should work fully offline except AI functions.
 
 User data belongs entirely to the user.
 
@@ -480,7 +398,6 @@ src/
   features/
     notes/
     oshis/
-    ai/
     settings/
     themes/
 
@@ -491,8 +408,8 @@ src/
   database/
 
   services/
-    ai/
-    export/
+    backup/
+    sync/
 
   hooks/
 
@@ -519,15 +436,12 @@ Build first:
 - Search
 - Theme system
 
-NO AI YET.
 
 ---
 
 ## Phase 2
 
 Add:
-- AI translation
-- AI refinement
 - Export system
 
 ---
@@ -569,7 +483,6 @@ Keep scope focused.
 
 OshiNote is:
 
-> "A cozy AI-assisted emotional notebook for oshi activities."
 
 Not:
 - a productivity tool
@@ -587,7 +500,6 @@ The MVP is successful if users can:
 3. Organize memories comfortably
 4. Search old memories
 5. Enjoy the UI atmosphere
-6. Use AI to refine fan-writing
 
 That is enough for version 1.
 

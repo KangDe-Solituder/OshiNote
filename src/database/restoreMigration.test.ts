@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline'
 import { describe, expect, it } from 'vitest'
 import type Database from '@tauri-apps/plugin-sql'
 import { MIGRATIONS } from './migrations'
-import { DATABASE_SCHEMA_VERSION, migrateDatabase } from './index'
+import { DATABASE_SCHEMA_VERSION, migrateOnConnection } from './index'
 
 function adapter(raw: DatabaseSync): Database {
   return {
@@ -24,8 +24,8 @@ describe('restore schema migration', () => {
     try {
       for (const sql of MIGRATIONS) await raw.db.execute(sql)
       for (const sql of ["INSERT INTO oshis(id,name) VALUES ('oshi','Test')", "INSERT INTO archives(id,oshi_id,name) VALUES ('archive','oshi','Test')", "INSERT INTO notes(id,oshi_id,archive_id,title) VALUES ('note','oshi','archive','Retained')"]) await raw.db.execute(sql)
-      await migrateDatabase(raw.db)
-      await migrateDatabase(raw.db)
+      await migrateOnConnection(raw.db)
+      await migrateOnConnection(raw.db)
       expect(await raw.db.select('PRAGMA user_version')).toEqual([{ user_version: DATABASE_SCHEMA_VERSION }])
       expect(await raw.db.select("SELECT title FROM notes WHERE id='note'")).toEqual([{ title: 'Retained' }])
       expect(await raw.db.select('PRAGMA foreign_key_check')).toEqual([])
@@ -33,11 +33,54 @@ describe('restore schema migration', () => {
       expect(count.n).toBeGreaterThan(0)
     } finally { raw.close() }
   })
+  it('rolls back each destructive legacy migration boundary and preserves attachments', async () => {
+    const trace: string[] = []
+    async function fixture() {
+      const raw = pythonDatabase()
+      for (const sql of MIGRATIONS) await raw.db.execute(sql)
+      await raw.db.execute("INSERT INTO oshis(id,name) VALUES ('o','Test')")
+      await raw.db.execute("CREATE TABLE journal_images (id TEXT PRIMARY KEY,oshi_id TEXT,file_path TEXT,original_filename TEXT,mime_type TEXT,file_size INTEGER,width INTEGER,height INTEGER,created_at TEXT)")
+      await raw.db.execute("INSERT INTO journal_images VALUES ('image','o','media/journal/kept.png','kept','image/png',1,1,1,'2026-01-01')")
+      return raw
+    }
+    const baseline = await fixture()
+    try {
+      await migrateOnConnection({ ...baseline.db, execute: async (sql: string, args: unknown[] = []) => { if (/^(DROP TABLE|ALTER TABLE .* RENAME)/.test(sql)) trace.push(sql); return baseline.db.execute(sql,args) } } as Database)
+    } finally { baseline.close() }
+    expect(trace.length).toBeGreaterThan(0)
+    for (const boundary of trace) {
+      const raw = await fixture()
+      try {
+        await raw.db.execute('PRAGMA foreign_keys=OFF'); await raw.db.execute('BEGIN IMMEDIATE')
+        const connection = { ...raw.db, execute: async (sql: string, args: unknown[] = []) => {
+          if (sql.startsWith('PRAGMA foreign_keys')) return { rowsAffected:0 }
+          const result=await raw.db.execute(sql,args)
+          if(sql===boundary) throw new Error('injected after destructive operation')
+          return result
+        } } as Database
+        await expect(migrateOnConnection(connection)).rejects.toThrow('injected')
+        await raw.db.execute('ROLLBACK')
+        expect(await raw.db.select('SELECT id,file_path FROM journal_images')).toEqual([{id:'image',file_path:'media/journal/kept.png'}])
+        await migrateOnConnection(raw.db)
+        expect(await raw.db.select('SELECT id FROM journal_images')).toEqual([{id:'image'}])
+      } finally { raw.close() }
+    }
+  }, 30000)
+  it('recovers an old replacement when the source table is already missing', async () => {
+    const raw=pythonDatabase()
+    try {
+      for(const sql of MIGRATIONS) await raw.db.execute(sql)
+      await raw.db.execute("CREATE TABLE journal_images_v2 (id TEXT PRIMARY KEY,oshi_id TEXT,file_path TEXT,original_filename TEXT,mime_type TEXT,file_size INTEGER,width INTEGER,height INTEGER,created_at TEXT)")
+      await raw.db.execute("INSERT INTO journal_images_v2 VALUES('image',NULL,'media/journal/kept.png','kept','image/png',1,1,1,'2026-01-01')")
+      await migrateOnConnection(raw.db)
+      expect(await raw.db.select('SELECT id FROM journal_images')).toEqual([{id:'image'}])
+    } finally {raw.close()}
+  })
   it('rejects a newer database before changing any tables', async () => {
     const raw = new DatabaseSync(':memory:')
     try {
       raw.exec('PRAGMA user_version=999; CREATE TABLE sentinel(value TEXT); INSERT INTO sentinel VALUES (\'untouched\')')
-      await expect(migrateDatabase(adapter(raw))).rejects.toThrow('newer OshiNote')
+      await expect(migrateOnConnection(adapter(raw))).rejects.toThrow('newer OshiNote')
       expect(raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()).toEqual([{ name: 'sentinel' }])
       expect(raw.prepare('SELECT value FROM sentinel').get()?.value).toBe('untouched')
     } finally { raw.close() }

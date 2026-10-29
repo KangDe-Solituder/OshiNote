@@ -1,6 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
 import { useThemeStore } from '../../../stores/themeStore'
-import { useAiStore } from '../../../stores/aiStore'
 import { useLanguageStore } from '../../../stores/languageStore'
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts'
 import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
@@ -12,17 +11,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const textTone = useThemeStore((s) => s.textTone)
   const customBackground = useThemeStore((s) => s.customBackground)
   const backgroundFilters = useThemeStore((s) => s.backgroundFilters)
+  const persistenceError = useThemeStore(s => s.persistenceError)
   const loadTheme = useThemeStore((s) => s.loadFromDB)
-  const loadAi = useAiStore((s) => s.loadFromDB)
   const loadLanguage = useLanguageStore((s) => s.loadFromDB)
 
   useKeyboardShortcuts()
 
   useEffect(() => {
     loadTheme()
-    loadAi()
     loadLanguage()
-  }, [loadTheme, loadAi, loadLanguage])
+  }, [loadTheme, loadLanguage])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', currentTheme)
@@ -103,5 +101,5 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [customBackground, backgroundFilters])
 
-  return <>{children}</>
+  return <>{persistenceError && <p role="alert" className="fixed bottom-4 left-4 z-[100] rounded-xl bg-bg-primary p-3 text-sm text-red-400">{persistenceError}</p>}{children}</>
 }

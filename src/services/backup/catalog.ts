@@ -63,7 +63,7 @@ export async function listLocationBackups(location: DataLocation): Promise<Backu
 export async function resolveBackupFile(location: DataLocation, entry: BackupEntry): Promise<string> {
   if (location.kind === 'local') return entry.path
   if (entry.path !== 'oshinote-latest-full.oshi.zip' && entry.path !== `backups/${entry.name}`) throw new Error('Invalid backup path')
-  const localPath = `backups/restore-${crypto.randomUUID()}.oshi.zip`
+  const localPath = `sync-cache/restore-${crypto.randomUUID()}.oshi.zip`
   await downloadWebDavAppDataFile(location.config, entry.path, localPath)
   return join(await appDataDir(), localPath)
 }

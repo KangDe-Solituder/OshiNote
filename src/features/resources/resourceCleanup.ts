@@ -20,7 +20,7 @@ async function referenceText() {
     UNION ALL SELECT value FROM sync_state
     UNION ALL SELECT data_url FROM note_images`)
   const drafts: string[] = []
-  if (typeof localStorage !== 'undefined') for (let i=0;i<localStorage.length;i++) { const key=localStorage.key(i); if (key) drafts.push(localStorage.getItem(key) || '') }
+  if (typeof localStorage !== 'undefined') for (let i=0;i<localStorage.length;i++) { const key=localStorage.key(i); if (key?.startsWith('oshinote.journalDraft.')) drafts.push(localStorage.getItem(key) || '') }
   return [...records.map(row => row.value || ''), ...drafts].join('\n').replaceAll('\\\\', '/')
 }
 export async function inspectResourceCleanup(): Promise<CleanupCandidate[]> {

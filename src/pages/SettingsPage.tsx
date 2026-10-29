@@ -482,7 +482,6 @@ export function SettingsPage() {
         </Card>
       </section>
 
-      {/* LLM configuration is intentionally hidden for the first release. */}
       </div>
       </div>
     </div>

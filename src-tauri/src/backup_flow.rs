@@ -2,7 +2,7 @@ use super::*;
 use sqlx::Connection;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-const DATABASE_SCHEMA_VERSION: u32 = 1;
+const DATABASE_SCHEMA_VERSION: u32 = 2;
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[tauri::command]

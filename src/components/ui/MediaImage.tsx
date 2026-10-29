@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import clsx from 'clsx'
 import { ImageIcon } from 'lucide-react'
 import {
@@ -35,6 +35,16 @@ export function MediaImage({
   imgStyle,
   onLoad,
 }: MediaImageProps) {
+  const elementRef = useRef<HTMLElement | null>(null)
+  const [visible, setVisible] = useState(eager)
+  useEffect(() => {
+    if (eager || typeof IntersectionObserver === 'undefined') { setVisible(true); return }
+    const element = elementRef.current
+    if (!element) return
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { setVisible(true); observer.disconnect() } }, { rootMargin: '160px' })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [eager])
   const candidates = useMemo(
     () => Array.from(new Set([path, fallbackPath].filter((candidate): candidate is string => Boolean(candidate)))),
     [fallbackPath, path]
@@ -52,6 +62,7 @@ export function MediaImage({
   }, [candidates])
 
   useEffect(() => {
+    if (!visible && !eager) return
     let alive = true
     setSrc(getCachedMediaUrlWithFallback(candidates[sourceIndex], candidates[sourceIndex + 1]))
     let currentUrl = ''
@@ -74,7 +85,7 @@ export function MediaImage({
       alive = false
       releaseMediaUrl(currentUrl)
     }
-  }, [candidates, sourceIndex])
+  }, [candidates, sourceIndex, visible, eager])
 
   function handleImageError() {
     discardCachedMediaUrl(src)
@@ -88,7 +99,7 @@ export function MediaImage({
 
   if (!src || failed) {
     return (
-      <div className={clsx('flex items-center justify-center bg-bg-tertiary text-text-muted', reserveHeight && 'min-h-48', className)}>
+      <div ref={el => { elementRef.current = el }} className={clsx('flex items-center justify-center bg-bg-tertiary text-text-muted', reserveHeight && 'min-h-48', className)}>
         {failed && <ImageIcon size={26} />}
       </div>
     )
@@ -108,6 +119,7 @@ export function MediaImage({
       draggable={draggable}
       style={imgStyle}
       ref={(el) => {
+        elementRef.current = el
         if (el?.complete && el.naturalWidth > 0) setLoaded(true)
       }}
       onLoad={() => {

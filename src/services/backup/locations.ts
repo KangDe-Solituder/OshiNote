@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core'
 import { readLocalStorage } from '../../utils/safeLocalStorage'
 import { readWebDavConfig, type WebDavConfig } from '../sync/webdavService'
 import { isRecord, safeJsonParse } from '../../utils/safeJson'
@@ -44,7 +45,29 @@ export function validateLocation(location: DataLocation): void {
   }
 }
 
-export function saveLocations(settings: LocationSettings): void {
+export async function saveLocations(settings: LocationSettings): Promise<void> {
   settings.locations.forEach(validateLocation)
-  localStorage.setItem(KEY, JSON.stringify(settings))
+  const locations = await Promise.all(settings.locations.map(async location => location.kind === 'local' ? location : {
+    ...location, config: { ...location.config, password: '', protectedPassword: location.config.password
+      ? await invoke<number[]>('protect_connection_secret', { secret: location.config.password }) : (location.config.protectedPassword || []) },
+  }))
+  // Only replace the old record after every password was protected successfully.
+  localStorage.setItem(KEY, JSON.stringify({ ...settings, locations }))
+  localStorage.removeItem('oshinote.webdav.config')
+}
+
+export async function loadLocations(): Promise<{ settings: LocationSettings; locked: boolean }> {
+  const settings = readLocations()
+  let locked = false
+  for (const location of settings.locations) {
+    if (location.kind !== 'webdav') continue
+    const config = location.config as WebDavConfig & { protectedPassword?: number[] }
+    if (config.protectedPassword?.length) {
+      try { config.password = await invoke<string>('unprotect_connection_secret', { encrypted: config.protectedPassword }) }
+      catch { config.password = ''; locked = true }
+    }
+  }
+  // Preserve encrypted data on a different Windows account; let the user re-enter it in the editor.
+  if (!locked && settings.locations.length) await saveLocations(settings)
+  return { settings, locked }
 }

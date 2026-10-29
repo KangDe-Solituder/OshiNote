@@ -1,4 +1,6 @@
 import { getDb, generateId } from '../../database'
+import { invoke } from '@tauri-apps/api/core'
+import { noteDeleteStatements, noteImageStatements } from './noteSave'
 import type {
   Note,
   NoteLibraryItem,
@@ -10,7 +12,6 @@ import type {
   NoteImage,
   OshiArchiveNoteCounts,
 } from '../../types'
-import { deleteStampForTarget } from '../stamps/stampService'
 
 interface NoteLibraryRow extends NoteRow {
   oshi_name: string | null
@@ -257,10 +258,8 @@ export async function fetchAllNotes(params: GlobalNoteSearchParams): Promise<{ n
 }
 
 export async function deleteNote(id: string): Promise<void> {
-  const db = await getDb()
-  await db.execute('DELETE FROM note_images WHERE note_id = ?', [id])
-  await db.execute('DELETE FROM notes WHERE id = ?', [id])
-  await deleteStampForTarget('note', id)
+  await getDb()
+  await invoke('execute_sync_transaction', { statements: noteDeleteStatements(id) })
 }
 
 export async function fetchNoteImages(noteId: string): Promise<NoteImage[]> {
@@ -272,14 +271,8 @@ export async function fetchNoteImages(noteId: string): Promise<NoteImage[]> {
 }
 
 export async function replaceNoteImages(noteId: string, dataUrls: string[]): Promise<void> {
-  const db = await getDb()
-  await db.execute('DELETE FROM note_images WHERE note_id = ?', [noteId])
-  for (const [sortOrder, dataUrl] of dataUrls.entries()) {
-    await db.execute(
-      'INSERT INTO note_images (id, note_id, data_url, sort_order) VALUES (?, ?, ?, ?)',
-      [generateId(), noteId, dataUrl, sortOrder]
-    )
-  }
+  await getDb()
+  await invoke('execute_sync_transaction', { statements: noteImageStatements(noteId, dataUrls) })
 }
 
 export async function toggleFavorite(id: string): Promise<void> {

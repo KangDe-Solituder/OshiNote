@@ -1,11 +1,13 @@
 mod data_sync;
+mod database_session;
 mod backup_flow;
+mod backup_safety;
+mod credentials;
 
-use reqwest::{Client, Method, Url};
+use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -60,13 +62,6 @@ struct WebDavConfig {
     password: String,
     remote_path: String,
     allow_invalid_cert: bool,
-}
-
-#[derive(Debug, Serialize)]
-struct WebDavSummary {
-    remote_path: String,
-    file_name: String,
-    bytes: u64,
 }
 
 #[tauri::command]
@@ -140,13 +135,13 @@ async fn download_stamp_font(
         return Err("Invalid stamp font path.".to_string());
     }
 
-    let response = reqwest::get(trimmed_url)
+    let response = Client::builder().connect_timeout(std::time::Duration::from_secs(15)).timeout(std::time::Duration::from_secs(180)).build().map_err(|e| e.to_string())?.get(trimmed_url).send()
         .await
         .map_err(|error| error.to_string())?;
     if !response.status().is_success() {
         return Err(format!("Font download failed: {}", response.status()));
     }
-    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
+    let bytes = data_sync::bounded_response(response, 64 * 1024 * 1024).await?;
 
     let app_data_dir = app
         .path()
@@ -157,132 +152,6 @@ async fn download_stamp_font(
         std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
     std::fs::write(target_path, bytes).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn create_backup(
-    app: tauri::AppHandle,
-    destination: String,
-    include_media: bool,
-    sync_metadata: Option<BackupSyncMetadata>,
-) -> Result<BackupSummary, String> {
-    let path = PathBuf::from(destination);
-    create_backup_archive(&app, &path, include_media, sync_metadata.as_ref())
-}
-
-#[tauri::command]
-async fn test_webdav_connection(config: WebDavConfig) -> Result<(), String> {
-    let client = webdav_client(&config)?;
-    let url = webdav_directory_url(&config)?;
-    let response = client
-        .request(Method::from_bytes(b"PROPFIND").unwrap(), url)
-        .basic_auth(&config.username, Some(&config.password))
-        .header("Depth", "0")
-        .body("")
-        .send()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
-    if response.status().is_success() || response.status().as_u16() == 207 {
-        Ok(())
-    } else {
-        Err(format!("WebDAV connection failed: {}", response.status()))
-    }
-}
-
-#[tauri::command]
-async fn upload_webdav_backup(
-    app: tauri::AppHandle,
-    config: WebDavConfig,
-    sync_metadata: Option<BackupSyncMetadata>,
-) -> Result<WebDavSummary, String> {
-    let client = webdav_client(&config)?;
-    ensure_webdav_directories(&client, &config).await?;
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| error.to_string())?;
-    let backup_dir = app_data_dir.join("backups");
-    fs::create_dir_all(&backup_dir).map_err(|error| error.to_string())?;
-    let local_backup = backup_dir.join(WEBDAV_BACKUP_NAME);
-    create_backup_archive(&app, &local_backup, true, sync_metadata.as_ref())?;
-    let bytes = fs::read(&local_backup).map_err(|error| error.to_string())?;
-    let size = bytes.len() as u64;
-    let temporary_name = format!("{WEBDAV_BACKUP_NAME}.uploading");
-    let temporary_url = webdav_file_url(&config, &temporary_name)?;
-    let response = client
-        .put(temporary_url.clone())
-        .basic_auth(&config.username, Some(&config.password))
-        .header("Content-Type", "application/zip")
-        .body(bytes)
-        .send()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
-    if !response.status().is_success() {
-        return Err(format!("WebDAV upload failed: {}", response.status()));
-    }
-    let destination_url = webdav_file_url(&config, WEBDAV_BACKUP_NAME)?;
-    let moved = client
-        .request(Method::from_bytes(b"MOVE").unwrap(), temporary_url.clone())
-        .basic_auth(&config.username, Some(&config.password))
-        .header("Destination", destination_url.as_str())
-        .header("Overwrite", "T")
-        .send()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
-    if !moved.status().is_success() {
-        let fallback_bytes = fs::read(&local_backup).map_err(|error| error.to_string())?;
-        let fallback = client
-            .put(destination_url)
-            .basic_auth(&config.username, Some(&config.password))
-            .header("Content-Type", "application/zip")
-            .body(fallback_bytes)
-            .send()
-            .await
-            .map_err(|error| format_webdav_error(error.to_string()))?;
-        if !fallback.status().is_success() {
-            return Err(format!("WebDAV upload failed: {}", fallback.status()));
-        }
-        let _ = client
-            .delete(temporary_url)
-            .basic_auth(&config.username, Some(&config.password))
-            .send()
-            .await;
-    }
-    Ok(WebDavSummary {
-        remote_path: config.remote_path,
-        file_name: WEBDAV_BACKUP_NAME.to_string(),
-        bytes: size,
-    })
-}
-
-#[tauri::command]
-async fn download_webdav_backup(
-    app: tauri::AppHandle,
-    config: WebDavConfig,
-) -> Result<String, String> {
-    let client = webdav_client(&config)?;
-    let response = client
-        .get(webdav_file_url(&config, WEBDAV_BACKUP_NAME)?)
-        .basic_auth(&config.username, Some(&config.password))
-        .send()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
-    if !response.status().is_success() {
-        return Err(format!("WebDAV download failed: {}", response.status()));
-    }
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| error.to_string())?;
-    let backup_dir = app_data_dir.join("backups");
-    fs::create_dir_all(&backup_dir).map_err(|error| error.to_string())?;
-    let local_path = backup_dir.join("webdav-download.oshi.zip");
-    fs::write(&local_path, bytes).map_err(|error| error.to_string())?;
-    Ok(local_path.display().to_string())
 }
 
 fn create_backup_archive(
@@ -339,7 +208,9 @@ fn create_backup_archive(
     writer
         .write_all(&manifest_json)
         .map_err(|error| error.to_string())?;
-    add_file_to_archive(&mut writer, &database_path, "database/oshinote.db", options)?;
+    let clean_database = backup_safety::TemporaryDatabase(destination.with_extension(format!("sanitized-{}.db", timestamp_id())));
+    backup_safety::sanitized_copy(&database_path, &clean_database.0)?;
+    add_file_to_archive(&mut writer, &clean_database.0, "database/oshinote.db", options)?;
 
     if include_media {
         for path in &included_paths {
@@ -387,6 +258,7 @@ fn add_tree_to_archive(
     for entry in fs::read_dir(root).map_err(|error| error.to_string())? {
         let entry = entry.map_err(|error| error.to_string())?;
         let path = entry.path();
+        if entry.file_type().map_err(|e| e.to_string())?.is_symlink() { return Err("Backup media cannot contain symbolic links.".into()); }
         if path == destination {
             continue;
         }
@@ -401,12 +273,15 @@ fn add_tree_to_archive(
 }
 
 fn read_manifest(archive: &mut ZipArchive<File>) -> Result<BackupManifest, String> {
+    backup_safety::check_archive(archive)?;
     let mut file = archive
         .by_name("manifest.json")
         .map_err(|_| "Backup manifest is missing.".to_string())?;
     let mut json = String::new();
-    file.read_to_string(&mut json)
+    if file.size() > backup_safety::MAX_MANIFEST_BYTES { return Err("Backup manifest is too large.".into()); }
+    (&mut file).take(backup_safety::MAX_MANIFEST_BYTES + 1).read_to_string(&mut json)
         .map_err(|error| error.to_string())?;
+    if json.len() as u64 > backup_safety::MAX_MANIFEST_BYTES { return Err("Backup manifest is too large.".into()); }
     let manifest: BackupManifest =
         serde_json::from_str(&json).map_err(|error| format!("Invalid backup manifest: {error}"))?;
     if manifest.format != BACKUP_FORMAT
@@ -432,7 +307,8 @@ fn extract_backup_file(
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
     let mut output = File::create(destination).map_err(|error| error.to_string())?;
-    std::io::copy(&mut file, &mut output).map_err(|error| error.to_string())?;
+    let budget = file.size().min(backup_safety::MAX_ENTRY_BYTES);
+    backup_safety::copy_bounded(&mut file, &mut output, budget)?;
     Ok(())
 }
 
@@ -454,14 +330,15 @@ fn extract_backup_tree(
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
         let mut output = File::create(target).map_err(|error| error.to_string())?;
-        std::io::copy(&mut file, &mut output).map_err(|error| error.to_string())?;
+        let budget = file.size().min(backup_safety::MAX_ENTRY_BYTES);
+    backup_safety::copy_bounded(&mut file, &mut output, budget)?;
     }
     Ok(())
 }
 
 fn safe_relative_path(value: &str) -> Result<PathBuf, String> {
     let path = Path::new(value);
-    if path.is_absolute()
+    if value.is_empty() || value.contains(':') || value.contains('\\') || path.is_absolute()
         || path.components().any(|component| {
             matches!(
                 component,
@@ -501,6 +378,9 @@ fn validate_backup_media(database: &Path, root: &Path) -> Result<(), String> {
 fn webdav_client(config: &WebDavConfig) -> Result<Client, String> {
     validate_test_webdav_path(&config.base_url, &config.remote_path)?;
     Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .read_timeout(std::time::Duration::from_secs(60))
+        .timeout(std::time::Duration::from_secs(1800))
         .danger_accept_invalid_certs(config.allow_invalid_cert)
         .build()
         .map_err(|error| error.to_string())
@@ -577,43 +457,6 @@ fn append_webdav_path(url: &mut Url, path: &str, file_name: Option<&str>) -> Res
     Ok(())
 }
 
-async fn ensure_webdav_directories(client: &Client, config: &WebDavConfig) -> Result<(), String> {
-    let mut current =
-        Url::parse(config.base_url.trim_end_matches('/')).map_err(|error| error.to_string())?;
-    for segment in config
-        .remote_path
-        .split('/')
-        .filter(|segment| !segment.is_empty())
-    {
-        append_webdav_path(&mut current, segment, None)?;
-        let response = client
-            .request(Method::from_bytes(b"MKCOL").unwrap(), current.clone())
-            .basic_auth(&config.username, Some(&config.password))
-            .send()
-            .await
-            .map_err(|error| format_webdav_error(error.to_string()))?;
-        if !(response.status().is_success()
-            || response.status().as_u16() == 405
-            || response.status().as_u16() == 301)
-        {
-            return Err(format!(
-                "Could not create WebDAV directory: {}",
-                response.status()
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn format_webdav_error(error: String) -> String {
-    if error.to_ascii_lowercase().contains("certificate")
-        || error.to_ascii_lowercase().contains("tls")
-    {
-        return format!("WebDAV TLS error: {error}. If this is a trusted local server, enable the explicit invalid-certificate option.");
-    }
-    error
-}
-
 fn timestamp_id() -> String {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -626,121 +469,10 @@ fn format_timestamp() -> String {
     timestamp_id()
 }
 
-#[tauri::command]
-fn post_local_ai_chat(
-    url: String,
-    api_key: String,
-    body: serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let endpoint = parse_http_endpoint(&url)?;
-    let payload = serde_json::to_string(&body).map_err(|error| error.to_string())?;
-    let mut stream = TcpStream::connect((&endpoint.host[..], endpoint.port))
-        .map_err(|error| error.to_string())?;
-
-    let mut request = format!(
-        "POST {} HTTP/1.1\r\nHost: {}:{}\r\nContent-Type: application/json\r\nAccept: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
-        endpoint.path,
-        endpoint.host,
-        endpoint.port,
-        payload.as_bytes().len()
-    );
-    if !api_key.trim().is_empty() {
-        request.push_str(&format!("Authorization: Bearer {}\r\n", api_key.trim()));
-    }
-    request.push_str("\r\n");
-    request.push_str(&payload);
-
-    stream
-        .write_all(request.as_bytes())
-        .map_err(|error| error.to_string())?;
-
-    let mut response = String::new();
-    stream
-        .read_to_string(&mut response)
-        .map_err(|error| error.to_string())?;
-    let (headers, response_body) = response
-        .split_once("\r\n\r\n")
-        .ok_or_else(|| "Invalid Local API response".to_string())?;
-
-    let status_code = headers
-        .lines()
-        .next()
-        .and_then(|status_line| status_line.split_whitespace().nth(1))
-        .and_then(|code| code.parse::<u16>().ok())
-        .ok_or_else(|| "Invalid Local API status line".to_string())?;
-
-    let decoded_body = if headers
-        .to_ascii_lowercase()
-        .contains("transfer-encoding: chunked")
-    {
-        decode_chunked_body(response_body)?
-    } else {
-        response_body.to_string()
-    };
-
-    if !(200..300).contains(&status_code) {
-        return Err(format!("Local API error {}: {}", status_code, decoded_body));
-    }
-
-    serde_json::from_str(&decoded_body)
-        .map_err(|error| format!("Invalid Local API response: {error}; body: {decoded_body}"))
-}
-
-struct HttpEndpoint {
-    host: String,
-    port: u16,
-    path: String,
-}
-
-fn parse_http_endpoint(url: &str) -> Result<HttpEndpoint, String> {
-    let rest = url
-        .strip_prefix("http://")
-        .ok_or_else(|| "Local API currently supports http:// URLs only.".to_string())?;
-    let (authority, path) = match rest.split_once('/') {
-        Some((authority, path)) => (authority, format!("/{}", path)),
-        None => (rest, "/".to_string()),
-    };
-    let (host, port) = match authority.rsplit_once(':') {
-        Some((host, port)) => {
-            let parsed_port = port
-                .parse::<u16>()
-                .map_err(|_| "Invalid Local API port".to_string())?;
-            (host.to_string(), parsed_port)
-        }
-        None => (authority.to_string(), 80),
-    };
-    if host.is_empty() {
-        return Err("Invalid Local API host".to_string());
-    }
-    Ok(HttpEndpoint { host, port, path })
-}
-
-fn decode_chunked_body(body: &str) -> Result<String, String> {
-    let mut rest = body;
-    let mut decoded = String::new();
-
-    loop {
-        let (size_line, after_size) = rest
-            .split_once("\r\n")
-            .ok_or_else(|| "Invalid chunked response".to_string())?;
-        let size = usize::from_str_radix(size_line.trim(), 16)
-            .map_err(|_| "Invalid chunk size".to_string())?;
-        if size == 0 {
-            break;
-        }
-        if after_size.len() < size + 2 {
-            return Err("Invalid chunk payload".to_string());
-        }
-        decoded.push_str(&after_size[..size]);
-        rest = &after_size[size + 2..];
-    }
-
-    Ok(decoded)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(database_session::Sessions::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_sql::Builder::new().build())
@@ -760,11 +492,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            post_local_ai_chat,
             download_stamp_font,
             open_external_url,
             read_illustration_media_file,
-            create_backup,
+            credentials::protect_connection_secret,
+            credentials::unprotect_connection_secret,
+            database_session::begin_database_migration,
+            database_session::migration_query,
+            database_session::finish_database_migration,
             backup_flow::prepare_backup_restore,
             backup_flow::ensure_database_available,
             backup_flow::validate_prepared_restore,
@@ -773,9 +508,6 @@ pub fn run() {
             backup_flow::create_directory_backup,
             backup_flow::list_directory_backups,
             backup_flow::inspect_legacy_webdav_backup,
-            test_webdav_connection,
-            upload_webdav_backup,
-            download_webdav_backup,
             data_sync::inspect_webdav_repository,
             data_sync::read_webdav_text,
             data_sync::write_webdav_text,
