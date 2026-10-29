@@ -17,6 +17,9 @@ import { useI18n } from '../i18n/useI18n'
 import { JournalMaterialTile } from '../components/features/journal/JournalMaterialTile'
 import { MediaImage } from '../components/ui/MediaImage'
 import { Button } from '../components/ui/Button'
+import { SelectMenu } from '../components/ui/SelectMenu'
+import { ResourcePagination } from '../components/features/ResourcePagination'
+import { useResourcePagination } from '../features/resources/useResourcePagination'
 import { ResourceCleanupPanel } from '../components/features/ResourceCleanupPanel'
 import { PAGE_CONTENT_CLASS, PAGE_HEADER_CLASS, PAGE_WIDE_FRAME_CLASS } from '../components/layout/pageShell'
 
@@ -68,6 +71,11 @@ export function ResourceLibraryPage({ kind }: { kind: 'material' | 'upload' }) {
     .map(item => ({ id: item.id, name: item.displayName || t(item.nameKey), preview: <JournalMaterialTile material={item} />, caption: item.archived ? text.retired : t(item.categoryKey), favorite: item.favorite }))
     : images.filter(item => (status === 'all' || (status === 'retired') === Boolean(item.archived)) && item.original_filename.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
       .map(item => ({ id: item.id, name: item.original_filename, preview: <MediaImage path={item.file_path} alt={item.original_filename} className="h-32 w-full object-contain" />, caption: item.archived ? text.retired : `${item.width || '—'} × ${item.height || '—'}`, favorite: false }))
+  const pagination = useResourcePagination(items, JSON.stringify([kind, query, filter, status, favorites]))
+  const listScroll = useRef<HTMLDivElement>(null)
+  const inspectorScroll = useRef<HTMLElement>(null)
+  useEffect(() => { listScroll.current?.scrollTo(0, 0) }, [pagination.page, pagination.size, query, filter, status, favorites])
+  useEffect(() => { inspectorScroll.current?.scrollTo(0, 0) }, [selected])
   async function run(work: () => Promise<unknown>) {
     setBusy(true); setError(''); setNotice('')
     try { await work(); setRevision(value => value+1); setNotice(action.done) } catch(e) { setError(String(e)) } finally { setBusy(false) }
@@ -91,28 +99,34 @@ export function ResourceLibraryPage({ kind }: { kind: 'material' | 'upload' }) {
   const inputClass = 'w-full rounded-lg border border-border-color bg-bg-primary px-3 py-2 text-sm'
   return <div className="flex h-full flex-col bg-bg-primary">
     <header className={`${PAGE_HEADER_CLASS} flex-wrap justify-between gap-4`}><div><Link to="/resources" className="text-sm text-text-muted">{t('resources.title')}</Link><h1 className="mt-1 text-3xl font-bold">{kind === 'material' ? text.materials : text.uploads}</h1></div>
-      <div className="flex shrink-0 items-center gap-2">{kind === 'material' && <select disabled={busy} aria-label={action.kind} value={importKind} onChange={e => setImportKind(e.target.value as JournalMaterialKind)} className={`${inputClass} !w-auto`}>{JOURNAL_MATERIAL_KINDS.filter(item => item.id !== 'all').map(item => <option key={item.id} value={item.id}>{t(item.labelKey)}</option>)}</select>}<Button className="shrink-0 whitespace-nowrap" disabled={busy} onClick={() => picker.current?.click()}>{action.import}</Button></div>
+      <div className="flex shrink-0 items-center gap-2">{kind === 'material' && <SelectMenu disabled={busy} ariaLabel={action.kind} value={importKind} onChange={value => setImportKind(value as JournalMaterialKind)} options={JOURNAL_MATERIAL_KINDS.filter(item => item.id !== 'all').map(item => ({value: item.id, label: t(item.labelKey)}))} />}<Button className="shrink-0 whitespace-nowrap" disabled={busy} onClick={() => picker.current?.click()}>{action.import}</Button></div>
       <input ref={picker} type="file" accept={kind === 'material' ? 'image/png,image/jpeg,image/webp,image/gif,.json' : 'image/png,image/jpeg,image/webp,image/gif'} multiple hidden onChange={e => { const files=Array.from(e.target.files || []); e.target.value=''; if(files.length) void importFiles(files) }} />
       <input ref={replacePicker} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={e => { const files=Array.from(e.target.files || []); e.target.value=''; if(files.length) void importFiles(files,true) }} />
     </header>
-    <main className={PAGE_CONTENT_CLASS}><div className={PAGE_WIDE_FRAME_CLASS}>
+    <main className={`${PAGE_CONTENT_CLASS} !overflow-hidden`}><div className={`${PAGE_WIDE_FRAME_CLASS} flex h-full min-h-0 flex-col`}>
       <p className="mb-4 text-xs text-text-muted">{action.importHint}</p>
-      <div className="mb-5 flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 rounded-lg border border-border-color bg-bg-card px-3 py-2"><Search size={16} /><input aria-label={text.search} placeholder={text.search} value={query} onChange={e => setQuery(e.target.value)} className="min-w-0 bg-transparent outline-none" /></label>
-        {kind === 'material' && <select aria-label={action.kind} value={filter} onChange={e=>setFilter(e.target.value)} className="rounded-lg border border-border-color bg-bg-card px-3 py-2 text-sm">{JOURNAL_MATERIAL_KINDS.map(item=><option key={item.id} value={item.id}>{t(item.labelKey)}</option>)}</select>}
-        <select aria-label={action.status} value={status} onChange={e=>setStatus(e.target.value)} className="rounded-lg border border-border-color bg-bg-card px-3 py-2 text-sm"><option value="active">{text.active}</option><option value="retired">{text.retired}</option><option value="all">{text.all}</option></select>
+      <div className="mb-5 flex flex-wrap items-center gap-3"><label className="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-border-color bg-bg-card px-3 py-2 focus-within:ring-2 focus-within:ring-accent/30"><Search size={16} /><input aria-label={text.search} placeholder={text.search} value={query} onChange={e => setQuery(e.target.value)} className="min-w-0 w-full !bg-transparent !backdrop-filter-none text-text-primary outline-none" /></label>
+        {kind === 'material' && <SelectMenu ariaLabel={action.kind} value={filter} onChange={setFilter} options={JOURNAL_MATERIAL_KINDS.map(item=>({value:item.id,label:t(item.labelKey)}))} />}
+        <SelectMenu ariaLabel={action.status} value={status} onChange={setStatus} options={[{value:"active",label:text.active},{value:"retired",label:text.retired},{value:"all",label:text.all}]} />
         {kind === 'material' && <button aria-pressed={favorites} onClick={()=>setFavorites(!favorites)} className={`flex items-center gap-1 rounded-lg border border-border-color px-3 py-2 text-sm ${favorites ? 'text-accent' : 'text-text-muted'}`}><Star size={15}/>{action.favorites}</button>}<span className="text-sm text-text-muted">{items.length}</span></div>
       {(error || libraryError) && <p role="alert" className="mb-4 whitespace-pre-wrap text-red-400">{error || libraryError}</p>}{notice && <p role="status" className="mb-3 text-sm text-accent">{notice}</p>}
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{items.map(item => <button disabled={busy} key={item.id} onClick={() => setSelected(item.id)} aria-pressed={selected === item.id} className={`overflow-hidden rounded-xl border bg-bg-card p-3 text-left transition-colors ${selected === item.id ? 'border-accent ring-1 ring-accent' : 'border-border-color hover:border-accent'}`}>
+      <div className={`resource-workspace ${selected ? "has-selection" : ""}`}>
+        <div className="flex min-h-0 min-w-0 flex-col">
+        <div ref={listScroll} className="resource-list-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4">{pagination.visible.map(item => <button disabled={busy} key={item.id} onClick={() => setSelected(item.id)} aria-pressed={selected === item.id} className={`overflow-hidden rounded-xl border bg-bg-card p-3 text-left transition-colors ${selected === item.id ? 'border-accent ring-1 ring-accent' : 'border-border-color hover:border-accent'}`}>
           {item.preview}<p className="mt-3 truncate text-sm font-medium">{item.favorite && '★ '}{item.name}</p><p className="mt-1 text-xs text-text-muted">{item.caption}</p></button>)}
           {!items.length && <p className="col-span-full py-14 text-center text-text-muted">{text.empty}</p>}</div>
-        <aside className="sticky top-4 rounded-xl border border-border-color bg-bg-card p-5">
+        <ResourceCleanupPanel />
+        </div>
+        <ResourcePagination {...pagination} />
+        </div>
+        <aside ref={inspectorScroll} className={`resource-inspector min-h-0 overflow-y-auto overscroll-contain rounded-xl border border-border-color bg-bg-card p-5 ${!selected ? "resource-inspector-empty" : ""}`}>
           {!selected ? <div className="py-10 text-center text-sm leading-relaxed text-text-muted"><PackageOpen className="mx-auto mb-3" />{text.choose}</div> : <>
             {kind === 'material' && material ? <JournalMaterialTile material={material} /> : image && <MediaImage path={image.file_path} alt={image.original_filename} className="max-h-60 w-full object-contain" />}
             <h2 className="mt-4 break-words font-semibold">{title}</h2>
             <p className="mt-1 text-xs text-text-muted">{kind === 'material' ? material?.source === 'builtin' ? text.builtin : action.imported : text.upload}</p>
             {assetId && <form key={`${assetId}:${title}`} className="mt-4 space-y-3" onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget); void run(()=>updateResource(assetId,{name:String(form.get('name'))})) }}><label className="block text-xs text-text-muted">{action.rename}<input name="name" aria-label={action.rename} defaultValue={title} maxLength={160} required className={`${inputClass} mt-1 text-text-primary`} /></label><Button disabled={busy} variant="secondary" size="sm" type="submit">{action.save}</Button></form>}
-            {material && <div className="mt-3 space-y-3"><label className="block text-xs text-text-muted">{action.group}<select disabled={busy} aria-label={action.group} value={material.group || 'misc'} className={`${inputClass} mt-1 text-text-primary`} onChange={e=>void run(()=>updateResource(material.assetId,{group:e.target.value}))}>{JOURNAL_STICKER_GROUPS.filter(item=>item.id!=='all').map(item=><option key={item.id} value={item.id}>{t(item.labelKey)}</option>)}</select></label>
+            {material && <div className="mt-3 space-y-3"><label className="block text-xs text-text-muted">{action.group}<SelectMenu disabled={busy} ariaLabel={action.group} value={material.group || 'misc'} className="mt-1" buttonClassName="w-full" onChange={value=>void run(()=>updateResource(material.assetId,{group:value}))} options={JOURNAL_STICKER_GROUPS.filter(item=>item.id!=='all').map(item=>({value:item.id,label:t(item.labelKey)}))} /></label>
               <Button disabled={busy} variant="secondary" size="sm" onClick={()=>void run(()=>updateResource(material.assetId,{favorite:!material.favorite}))}>{material.favorite?action.unfavorite:action.favorite}</Button>
               <p className="text-xs text-text-muted">{action.versions}: {versions.length}</p></div>}
             <div className="mt-3 flex flex-wrap gap-2">{assetId && <Button disabled={busy} variant="secondary" size="sm" onClick={()=>void run(()=>updateResource(assetId,{archived:!archived}))}>{archived?action.restore:action.archive}</Button>}{material?.source==='import' && <Button disabled={busy} variant="secondary" size="sm" onClick={()=>replacePicker.current?.click()}>{action.replace}</Button>}{material && <Button disabled={busy} variant="secondary" size="sm" onClick={()=>void run(()=>exportMaterialPack(material.assetId,title))}>{action.export}</Button>}{material && <Button disabled={busy} variant="secondary" size="sm" onClick={()=>void run(()=>createResourceTemplate({type:'material',name:title,payload:JSON.stringify({version:1,materialSnapshot:getMaterialSnapshot(material),resourceDependencies:[material.resourceVersionId]})}))}>{action.saveTemplate}</Button>}</div>
@@ -123,7 +137,6 @@ export function ResourceLibraryPage({ kind }: { kind: 'material' | 'upload' }) {
           </>}
         </aside>
       </div>
-      <ResourceCleanupPanel />
     </div></main>
   </div>
 }

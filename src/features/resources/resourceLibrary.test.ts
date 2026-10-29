@@ -35,6 +35,25 @@ beforeEach(async () => {
 afterEach(() => sqlite.close())
 
 describe('resource migration and retention', () => {
+  it('checks an already migrated library with four reads and no repeated writes', async () => {
+    await reconcileResourceLibrary(db)
+    const select = vi.spyOn(db, 'select')
+    const execute = vi.spyOn(db, 'execute')
+    await reconcileResourceLibrary(db)
+    expect(select).toHaveBeenCalledTimes(4)
+    expect(execute).not.toHaveBeenCalled()
+  })
+  it('still detects immutable built-in collisions when using batched reads', async () => {
+    await reconcileResourceLibrary(db)
+    sqlite.exec("DROP TRIGGER immutable_resource_versions; UPDATE resource_versions SET payload='{}' WHERE id='builtin:heart:1'")
+    await expect(reconcileResourceLibrary(db)).rejects.toThrow('Resource version collision')
+  })
+  it('still reconciles upload archive changes on later startups', async () => {
+    await reconcileResourceLibrary(db)
+    sqlite.exec('UPDATE journal_images SET archived=1')
+    await reconcileResourceLibrary(db)
+    expect(sqlite.prepare("SELECT archived FROM resource_assets WHERE id='upload:img'").get()!.archived).toBe(1)
+  })
   it('allows concurrent reconciliation without overwriting immutable versions', async () => {
     await Promise.all([reconcileResourceLibrary(db), reconcileResourceLibrary(db)])
     const versions = sqlite.prepare('SELECT id FROM resource_versions').all()

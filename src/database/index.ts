@@ -3,6 +3,7 @@ import { MIGRATIONS } from './migrations'
 import { ensureResourceSchema } from '../features/resources/resourceSchema'
 import { reconcileResourceLibrary } from '../features/resources/resourceLibrary'
 import { loadMaterialLibrary } from '../features/resources/resourceManagement'
+import { measureStartup, markStartup } from '../services/startup'
 
 let db: Database | null = null
 let dbPromise: Promise<Database> | null = null
@@ -23,11 +24,12 @@ export async function closeDb(): Promise<void> {
 }
 
 async function initializeDb(): Promise<Database> {
-  const database = await Database.load('sqlite:oshinote.db')
+  const database = await measureStartup('database-open', () => Database.load('sqlite:oshinote.db'))
   try {
-    await recoverInterruptedNoteOwnershipMigration(database)
-    await runMigrations(database)
+    await measureStartup('migration-recovery', () => recoverInterruptedNoteOwnershipMigration(database))
+    await measureStartup('database-initialize', () => runMigrations(database))
     db = database
+    markStartup('database-ready')
     return database
   } catch (error) {
     dbPromise = null
@@ -36,25 +38,27 @@ async function initializeDb(): Promise<Database> {
 }
 
 async function runMigrations(db: Database): Promise<void> {
-  for (const sql of MIGRATIONS) {
-    await db.execute(sql)
-  }
-  await ensureOshiProfileColumns(db)
-  await ensureOshiAnniversaries(db)
-  await ensureNoteSourceUrl(db)
-  await ensureOptionalNoteOwnership(db)
-  await ensureJournalBooksSchema(db)
-  await ensureJournalPagesPostcardSchema(db)
-  await ensureJournalPagesOrientationSchema(db)
-  await ensureJournalItemsAssetSchema(db)
-  await ensureJournalItemsMaterialSchema(db)
-  await ensureJournalItemsStaged(db)
-  await ensureJournalImages(db)
-  await ensureScheduleTables(db)
-  await ensureResourceSchema(db)
-  await reconcileResourceLibrary(db)
-  await loadMaterialLibrary(db)
-  await rebuildNoteSearchIndex(db)
+  await measureStartup('schema-checks', async () => {
+    for (const sql of MIGRATIONS) {
+      await db.execute(sql)
+    }
+    await ensureOshiProfileColumns(db)
+    await ensureOshiAnniversaries(db)
+    await ensureNoteSourceUrl(db)
+    await ensureOptionalNoteOwnership(db)
+    await ensureJournalBooksSchema(db)
+    await ensureJournalPagesPostcardSchema(db)
+    await ensureJournalPagesOrientationSchema(db)
+    await ensureJournalItemsAssetSchema(db)
+    await ensureJournalItemsMaterialSchema(db)
+    await ensureJournalItemsStaged(db)
+    await ensureJournalImages(db)
+    await ensureScheduleTables(db)
+    await ensureResourceSchema(db)
+  })
+  await measureStartup('resource-reconcile', () => reconcileResourceLibrary(db))
+  await measureStartup('material-library', () => loadMaterialLibrary(db))
+  await measureStartup('search-index', () => rebuildNoteSearchIndex(db))
 }
 
 async function ensureOshiAnniversaries(db: Database): Promise<void> {

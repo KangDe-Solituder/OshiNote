@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { ThemeId, BackgroundFilters, UiMotionDuration, TextTone } from '../types'
 import { getDb } from '../database'
 import { migrateLegacyBackgroundDataUrl } from '../services/media/backgroundImage'
+import { markStartup, readStartupTheme } from '../services/startup'
 
 export type FontSize = 'small' | 'medium' | 'large'
 
@@ -88,7 +89,7 @@ export function normalizeThemeHotkeys(value: unknown): { hotkeys: Record<string,
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  currentTheme: 'warm-paper',
+  currentTheme: readStartupTheme() as ThemeId,
   glassEnabled: false,
   customBackground: null,
   backgroundFilters: { blur: 0, brightness: 100, opacity: 100, saturation: 100 },
@@ -222,6 +223,8 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       }
     } catch {
       // DB not ready yet
+    } finally {
+      markStartup('theme-ready')
     }
   },
 

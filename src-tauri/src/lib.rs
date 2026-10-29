@@ -952,7 +952,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            let _window = app.get_webview_window("main").unwrap();
+            let window = app.get_webview_window("main").unwrap();
+            // Choose the native/WebView backdrop before showing the window.
+            // HTML takes over with the user's saved OshiNote theme afterwards.
+            let background = match window.theme().unwrap_or(tauri::Theme::Dark) {
+                tauri::Theme::Light => tauri::window::Color(250, 248, 244, 255),
+                _ => tauri::window::Color(31, 26, 36, 255),
+            };
+            window.set_background_color(Some(background))?;
+            window.show()?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

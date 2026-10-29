@@ -9,7 +9,7 @@ export const BUILTIN_TEMPLATES: ResourceTemplate[] = [
     style: 'memory-note',
     fields: ['title', 'date', 'mood', 'body'],
   }),
-  ...JOURNAL_PAGE_TEMPLATES.map(toResourceTemplate),
+  ...JOURNAL_PAGE_TEMPLATES.filter(template => template.id.startsWith('weekly-reflections-')).map(toResourceTemplate),
   createBuiltinTemplate('builtin-stamp-recorded', 'stamp', 'templates.builtin.stampRecorded.name', 'templates.builtin.stampRecorded.description', {
     template_id: 'recorded',
     position: 'bottom-right',
@@ -35,7 +35,8 @@ export async function fetchResourceTemplates(type?: ResourceTemplateType, includ
       bindings
     )
     const merged = new Map(builtins.map(template => [template.id, template]))
-    rows.map(deserializeTemplate).forEach(template => merged.set(template.id, template))
+    rows.map(deserializeTemplate).filter(template => !(template.source === 'builtin' && template.type === 'journal_page'
+      && !template.id.startsWith('weekly-reflections-'))).forEach(template => merged.set(template.id, template))
     return [...merged.values()].filter(template => includeDeleted || (!template.deleted && !template.hidden))
   } catch {
     return builtins

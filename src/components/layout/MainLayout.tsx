@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useThemeStore } from '../../stores/themeStore'
 import { MOTION_EASING, MOTION_TIMING } from '../features/themes/uiMotion'
+import { markStartup } from '../../services/startup'
 
 const MAX_REMEMBERED_SCROLL_POSITIONS = 60
 /** Stored against the scrollable distance so 1 always means the bottom edge. */
@@ -37,6 +38,7 @@ function applyScrollRatio(element: HTMLElement, ratio: number) {
 }
 
 export function MainLayout() {
+  useEffect(() => { markStartup('shell-mounted') }, [])
   const location = useLocation()
   const navigationType = useNavigationType()
   const outlet = useOutlet()

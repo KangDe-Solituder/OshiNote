@@ -5,9 +5,59 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OshiNote</title>
+    <script>
+      performance.mark('startup:html-ready');
+      document.documentElement.dataset.theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark-night' : 'warm-paper';
+      try {
+        var theme = localStorage.getItem('oshinote:startup-theme');
+        if (['warm-paper', 'pink-cozy', 'dark-night', 'soft-blue', 'sakura', 'rainy-cafe'].includes(theme)) {
+          document.documentElement.dataset.theme = theme;
+        }
+      } catch (_) {}
+    </script>
+    <style>
+      html { background: #faf8f4; }
+      html[data-theme="dark-night"] { background: #1f1a24; color-scheme: dark; }
+      #startup-screen { --startup-bg: #faf8f4; --startup-ink: #6f665b; --startup-accent: #bc5a32;
+        position: fixed; inset: 0; z-index: 2147483647; display: grid; place-content: center;
+        justify-items: center; gap: 18px; background: var(--color-bg-primary, var(--startup-bg));
+        color: var(--color-text-secondary, var(--startup-ink)); font: 500 16px/1.5 system-ui, sans-serif;
+        transition: opacity 140ms ease; }
+      [data-theme="dark-night"] #startup-screen { --startup-bg: #1f1a24; --startup-ink: #c4b5d0; --startup-accent: #a78bfa; }
+      [data-theme="pink-cozy"] #startup-screen { --startup-bg: #fff5f5; --startup-accent: #ec4899; }
+      [data-theme="soft-blue"] #startup-screen { --startup-bg: #f0f9ff; --startup-accent: #60a5fa; }
+      [data-theme="sakura"] #startup-screen { --startup-bg: #fff0f5; --startup-accent: #f472b6; }
+      [data-theme="rainy-cafe"] #startup-screen { --startup-bg: #f5f0eb; --startup-accent: #8b7355; }
+      #startup-screen.startup-finished { opacity: 0; pointer-events: none; }
+      .startup-book { width: 44px; height: 38px; color: var(--color-accent, var(--startup-accent)); animation: startup-breathe 1.6s ease-in-out infinite; }
+      .startup-dots { display: flex; gap: 6px; }
+      .startup-dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: startup-dot 1.2s ease-in-out infinite; }
+      .startup-dots i:nth-child(2) { animation-delay: .15s; }
+      .startup-dots i:nth-child(3) { animation-delay: .3s; }
+      #startup-retry { color: inherit; font-size: 13px; }
+      @keyframes startup-breathe { 50% { transform: translateY(-3px); opacity: .65; } }
+      @keyframes startup-dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { #startup-screen, #startup-screen * { animation: none; transition: none; } }
+    </style>
   </head>
   <body>
+    <div id="startup-screen" role="status" aria-label="OshiNote" aria-busy="true">
+      <svg class="startup-book" viewBox="0 0 44 38" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M22 9C16 5 9 5 3 7v25c7-2 13-1 19 2 6-3 12-4 19-2V7c-6-2-13-2-19 2v25"/>
+        <path d="M9 13l7 1m-7 5 7 1m12-7 7-1m-7 7 7-1" opacity=".5"/>
+      </svg>
+      <span>OshiNote</span>
+      <span class="startup-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <a id="startup-retry" href="" hidden>重新加载 · Reload</a>
+    </div>
     <div id="root"></div>
+    <script>
+      var startupTimeout = setTimeout(function () {
+        var retry = document.getElementById('startup-retry');
+        if (retry) retry.hidden = false;
+      }, 12000);
+      window.addEventListener('oshinote:startup-ready', function () { clearTimeout(startupTimeout); }, { once: true });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -4,6 +4,7 @@ import { useAiStore } from '../../../stores/aiStore'
 import { useLanguageStore } from '../../../stores/languageStore'
 import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts'
 import { releaseMediaUrl, resolveMediaUrl } from '../../../services/media/illustrationMedia'
+import { rememberStartupTheme } from '../../../services/startup'
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const currentTheme = useThemeStore((s) => s.currentTheme)
@@ -25,6 +26,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', currentTheme)
+    rememberStartupTheme(currentTheme)
   }, [currentTheme])
 
   useEffect(() => {

@@ -8,6 +8,7 @@ import { importMaterial, loadMaterialLibrary, updateResource, instantiateMateria
 import { getMaterialSnapshot, getJournalMaterialDefinition, resolveMaterialSnapshot } from '../journal/journalMaterials'
 import { exportMaterialPack, exportTemplatePack, importResourcePack, validatePackShape } from './resourcePacks'
 import { createResourceTemplate, duplicateResourceTemplate, fetchResourceTemplates, updateResourceTemplate } from '../templates/templateService'
+import { getJournalPageTemplateDefinition, toResourceTemplate } from '../journal/journalPageTemplates'
 import { inspectResourceCleanup, cleanResourceFiles } from './resourceCleanup'
 import { validateResourceGraph } from './resourceIntegrity'
 import type { SyncRecord } from '../../services/sync/syncModel'
@@ -155,6 +156,16 @@ describe('portable packs and template management',()=>{
     expect((await fetchResourceTemplates()).some(t=>t.id===builtin.id)).toBe(false)
     await updateResourceTemplate({...builtin,deleted:true},{deleted:false})
     expect((await fetchResourceTemplates()).some(t=>t.id===builtin.id)).toBe(true)
+  })
+  it('retires old built-in layouts from pickers while preserving saved custom layouts and legacy resolution', async () => {
+    const legacy = getJournalPageTemplateDefinition('quiet-letter')!
+    expect(legacy).toBeTruthy()
+    await updateResourceTemplate(toResourceTemplate(legacy), { deleted: false })
+    const copy = await duplicateResourceTemplate(toResourceTemplate(legacy), 'My saved letter')
+    const templates = await fetchResourceTemplates('journal_page', true)
+    expect(templates.filter(item => item.source === 'builtin').map(item => item.id)).toEqual(['weekly-reflections-4'])
+    expect(templates.some(item => item.id === copy.id)).toBe(true)
+    expect(getJournalPageTemplateDefinition('quiet-letter')).toEqual(legacy)
   })
 })
 describe('reference-aware cleanup',()=>{

@@ -22,7 +22,7 @@ export function ResourcesPage() {
   const { t } = useI18n()
   const text = useResourceText()
   const { materials } = useMaterialLibrary()
-  const featuredMaterial = materials.find(material => !material.archived) || defaultMaterial
+  const featuredMaterial = materials.find(material => material.id === 'flow-cat') || defaultMaterial
   const [uploads, setUploads] = useState<JournalImage[]>([])
   const [illustration, setIllustration] = useState<Illustration>()
   const [error, setError] = useState(false)
@@ -77,7 +77,7 @@ export function ResourcesPage() {
         <h2 className="mb-3 mt-8 text-sm font-semibold text-text-muted">{text.tools}</h2>
         <div className="grid gap-4 md:grid-cols-3">
           <ResourceCard icon={PackageOpen} title={text.materials} count={materials.filter(material => !material.archived).length} to="/resources/materials" action={text.open}>
-            <div className="h-36 w-36"><JournalMaterialTile material={featuredMaterial} fill /></div>
+            <div className="h-44 w-44"><JournalMaterialTile material={featuredMaterial} fill /></div>
           </ResourceCard>
           <ResourceCard icon={Upload} title={text.uploads} count={uploads.length} to="/resources/uploads" action={text.open}>
             {uploads[0] ? <MediaImage path={uploads[0].file_path} alt={uploads[0].original_filename} className="h-full w-full object-contain" eager /> : <AbstractPreview kind="image" />}
@@ -116,11 +116,8 @@ function ResourceCard({
         <h3 className="min-w-0 flex-1 text-base font-semibold text-text-primary">{title}</h3>
         <span className="rounded-full bg-bg-secondary px-2.5 py-1 text-xs font-semibold tabular-nums text-text-secondary">{count}</span>
       </div>
-      <div className="my-4 flex h-40 items-center justify-center overflow-hidden rounded-lg bg-bg-primary/60">
+      <Link to={to} aria-label={`${action} · ${title}`} className="mt-4 flex h-52 items-center justify-center overflow-hidden rounded-lg bg-bg-primary/60 transition-colors hover:bg-bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
         {children}
-      </div>
-      <Link to={to} aria-label={`${action} · ${title}`} className="inline-flex items-center justify-center rounded-lg border border-border-color bg-bg-secondary px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-bg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-        {action}
       </Link>
     </section>
   )

@@ -107,6 +107,20 @@ body {
   max-width: var(--page-wide-max);
 }
 
+.resource-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 24px;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+@media (max-width: 899px) {
+  .resource-workspace { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .resource-workspace.has-selection { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .resource-inspector-empty { display: none; }
+}
+
 .page-frame-dashboard {
   max-width: var(--page-dashboard-max);
 }

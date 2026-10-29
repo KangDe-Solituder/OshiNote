@@ -13,6 +13,12 @@ export interface ResourceVersion {
 }
 export interface ResourceUsage { id: string; title: string; type: 'page' | 'template' }
 
+function assertSameVersion(stored: ResourceVersion, version: ResourceVersion) {
+  for (const key of ['asset_id', 'renderer', 'payload', 'file_path', 'content_hash'] as const) {
+    if (stored[key] !== version[key]) throw new Error(`Resource version collision: ${version.id}`)
+  }
+}
+
 export async function registerVersion(db: Database, version: ResourceVersion, name: string, kind: string, source: string) {
   await db.execute(`INSERT OR IGNORE INTO resource_assets (id, kind, name, source, current_version_id) VALUES (?, ?, ?, ?, ?)`,
     [version.asset_id, kind, name, source, version.id])
@@ -36,9 +42,18 @@ export async function registerVersion(db: Database, version: ResourceVersion, na
 
 /** Idempotent migration, also run before sync/backup to capture newly placed resources. */
 export async function reconcileResourceLibrary(db: Database) {
+  // Read immutable definitions together instead of issuing an INSERT + SELECT
+  // for every built-in on every startup. Missing versions still use the
+  // concurrency-safe registration path; existing definitions are still checked.
+  const versions = new Map((await db.select<ResourceVersion[]>(
+    "SELECT * FROM resource_versions WHERE id LIKE 'builtin:%' OR id LIKE 'upload:%'"
+  )).map(version => [version.id, version]))
   for (const material of JOURNAL_MATERIALS) {
     const payload = getMaterialSnapshot(material)
-    await registerVersion(db, { id: `builtin:${material.id}:1`, asset_id: `builtin:${material.id}`, renderer: 'builtin-v1', payload, file_path: null, content_hash: null }, material.nameKey, material.kind, 'builtin')
+    const version = { id: `builtin:${material.id}:1`, asset_id: `builtin:${material.id}`, renderer: 'builtin-v1', payload, file_path: null, content_hash: null }
+    const stored = versions.get(version.id)
+    if (stored) assertSameVersion(stored, version)
+    else await registerVersion(db, version, material.nameKey, material.kind, 'builtin')
   }
   const items = await db.select<{ id: string; material_id: string | null; material_snapshot: string }[]>(
     "SELECT id, material_id, material_snapshot FROM journal_items WHERE item_type IN ('material', 'tape')")
@@ -55,16 +70,21 @@ export async function reconcileResourceLibrary(db: Database) {
     await registerVersion(db, { id, asset_id: `builtin:${material.id}`, renderer: 'builtin-v1', payload, file_path: null, content_hash: null }, material.nameKey, material.kind, 'builtin')
     await db.execute('UPDATE journal_items SET material_snapshot = ? WHERE id = ?', [payload, item.id])
   }
-  const images = await db.select<{ id: string; file_path: string; original_filename: string; archived: number }[]>('SELECT id, file_path, original_filename, archived FROM journal_images')
+  const images = await db.select<{ id: string; file_path: string; original_filename: string; archived: number; asset_archived: number | null }[]>(
+    "SELECT i.id, i.file_path, i.original_filename, i.archived, a.archived AS asset_archived FROM journal_images i LEFT JOIN resource_assets a ON a.id = 'upload:' || i.id")
   for (const image of images) {
-    const previous = await db.select<ResourceVersion[]>('SELECT * FROM resource_versions WHERE id = ?', [`upload:${image.id}:1`])
-    let contentHash = previous[0]?.content_hash || null
-    if (!previous.length && isTauri() && await exists(image.file_path, { baseDir: BaseDirectory.AppData })) {
+    const previous = versions.get(`upload:${image.id}:1`)
+    let contentHash = previous?.content_hash || null
+    if (!previous && isTauri() && await exists(image.file_path, { baseDir: BaseDirectory.AppData })) {
       contentHash = await sha256Bytes(new Uint8Array(await readFile(image.file_path, { baseDir: BaseDirectory.AppData })))
     }
-    await registerVersion(db, { id: `upload:${image.id}:1`, asset_id: `upload:${image.id}`, renderer: 'image-v1',
-      payload: JSON.stringify({ journalImageId: image.id }), file_path: image.file_path, content_hash: contentHash }, image.original_filename, 'image', 'upload')
-    await db.execute('UPDATE resource_assets SET archived = ? WHERE id = ?', [image.archived, `upload:${image.id}`])
+    const version = { id: `upload:${image.id}:1`, asset_id: `upload:${image.id}`, renderer: 'image-v1',
+      payload: JSON.stringify({ journalImageId: image.id }), file_path: image.file_path, content_hash: contentHash }
+    if (previous) assertSameVersion(previous, version)
+    else await registerVersion(db, version, image.original_filename, 'image', 'upload')
+    if (image.asset_archived !== image.archived) {
+      await db.execute('UPDATE resource_assets SET archived = ? WHERE id = ?', [image.archived, `upload:${image.id}`])
+    }
   }
   const templates = await db.select<{ id: string; payload: string }[]>("SELECT id, payload FROM templates WHERE type = 'journal_page'")
   for (const template of templates) {
