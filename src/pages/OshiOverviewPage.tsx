@@ -87,7 +87,7 @@ export function OshiOverviewPage() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
       <main className={PAGE_CONTENT_CLASS}>
-        <div className={PAGE_DASHBOARD_FRAME_CLASS}>
+        <div className={`${PAGE_DASHBOARD_FRAME_CLASS} compact-page-blocks`}>
         <section className="mb-5 rounded-2xl border border-border-color bg-bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-start gap-4">
             <div

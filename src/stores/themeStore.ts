@@ -21,6 +21,7 @@ interface ThemeState {
   fontSize: FontSize
   uiMotionDuration: UiMotionDuration
   textTone: TextTone
+  simpleMode: boolean
 
   setTheme: (id: ThemeId) => void
   setGlassEnabled: (enabled: boolean) => void
@@ -30,6 +31,7 @@ interface ThemeState {
   setFontSize: (size: FontSize) => void
   setUiMotionDuration: (duration: UiMotionDuration) => void
   setTextTone: (tone: TextTone) => void
+  setSimpleMode: (enabled: boolean) => void
 
   loadFromDB: () => Promise<void>
   persistToDB: () => Promise<void>
@@ -97,6 +99,13 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   fontSize: 'medium',
   uiMotionDuration: 'normal',
   textTone: 'colored',
+  simpleMode: false,
+
+  setSimpleMode: (enabled) => {
+    set({ simpleMode: enabled })
+    document.documentElement.dataset.simpleMode = String(enabled)
+    get().persistToDB()
+  },
 
   setTheme: (id) => {
     set({ currentTheme: id })
@@ -150,10 +159,14 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     try {
       const db = await getDb()
       const rows = await db.select<{ key: string; value: string }[]>(
-        "SELECT key, value FROM settings WHERE key IN ('theme', 'glassEnabled', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration', 'textTone')"
+        "SELECT key, value FROM settings WHERE key IN ('theme', 'glassEnabled', 'customBg', 'bgFilters', 'hotkeys', 'fontSize', 'uiMotionDuration', 'textTone', 'simpleMode')"
       )
       for (const row of rows) {
         switch (row.key) {
+          case 'simpleMode':
+            set({ simpleMode: row.value === 'true' })
+            document.documentElement.dataset.simpleMode = String(row.value === 'true')
+            break
           case 'theme':
             {
               const coerced = coerceTheme(row.value)
@@ -240,6 +253,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('fontSize', ?)", [state.fontSize])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('uiMotionDuration', ?)", [state.uiMotionDuration])
       await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('textTone', ?)", [state.textTone])
+      await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('simpleMode', ?)", [String(state.simpleMode)])
     } catch {
       // Silently fail
     }

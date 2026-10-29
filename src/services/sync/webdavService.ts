@@ -109,10 +109,9 @@ export async function uploadWebDavBackup(config: WebDavConfig): Promise<WebDavSu
 
 export async function downloadAndRestoreWebDavBackup(config: WebDavConfig): Promise<void> {
   requireTauri()
-  await invoke<string>('download_webdav_backup', { config: toCommandConfig(config) })
-  await closeDb()
-  await invoke('restore_downloaded_webdav_backup')
-  window.location.reload()
+  const path = await invoke<string>('download_webdav_backup', { config: toCommandConfig(config) })
+  const { prepareRestore, activateRestore } = await import('../backup/restore')
+  await activateRestore(await prepareRestore(path))
 }
 
 export async function readWebDavText(config: WebDavConfig, relativePath: string): Promise<WebDavTextObject> {

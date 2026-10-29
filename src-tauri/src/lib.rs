@@ -1,4 +1,5 @@
 mod data_sync;
+mod backup_flow;
 
 use reqwest::{Client, Method, Url};
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,7 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 const BACKUP_FORMAT: &str = "oshinote-backup";
 const BACKUP_VERSION: u32 = 2;
 const WEBDAV_BACKUP_NAME: &str = "oshinote-latest-full.oshi.zip";
-const RESTORE_LOG_FILE: &str = "restore.log";
+
 const MAX_ILLUSTRATION_MEDIA_BYTES: u64 = 25 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,6 +33,10 @@ struct BackupManifest {
     head_commit: Option<String>,
     #[serde(default)]
     schema_version: Option<u32>,
+    #[serde(default)]
+    app_version: Option<String>,
+    #[serde(default)]
+    database_schema_version: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -163,144 +168,6 @@ fn create_backup(
 ) -> Result<BackupSummary, String> {
     let path = PathBuf::from(destination);
     create_backup_archive(&app, &path, include_media, sync_metadata.as_ref())
-}
-
-#[tauri::command]
-fn restore_backup(app: tauri::AppHandle, archive_path: String) -> Result<BackupSummary, String> {
-    restore_backup_with_log(&app, &PathBuf::from(archive_path))
-}
-
-#[tauri::command]
-fn restore_downloaded_webdav_backup(app: tauri::AppHandle) -> Result<BackupSummary, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| error.to_string())?;
-    let archive_path = app_data_dir
-        .join("backups")
-        .join("webdav-download.oshi.zip");
-    restore_backup_with_log(&app, &archive_path)
-}
-
-fn restore_backup_with_log(
-    app: &tauri::AppHandle,
-    archive_path: &Path,
-) -> Result<BackupSummary, String> {
-    let log_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|error| error.to_string())?;
-    append_restore_log(
-        &log_dir,
-        &format!(
-            "restore requested archive={} exists={}",
-            archive_path.display(),
-            archive_path.is_file()
-        ),
-    );
-    let result = restore_backup_archive(app, archive_path);
-    if result.is_ok() {
-        append_restore_log(&log_dir, "restore completed");
-    } else if let Err(error) = &result {
-        append_restore_log(&log_dir, &format!("restore failed: {error}"));
-    }
-    result
-}
-
-fn restore_backup_archive(
-    app: &tauri::AppHandle,
-    archive_path: &Path,
-) -> Result<BackupSummary, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| error.to_string())?;
-    let app_config_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|error| error.to_string())?;
-    let archive_file =
-        File::open(archive_path).map_err(|error| format!("Could not open backup: {error}"))?;
-    let mut archive = ZipArchive::new(archive_file)
-        .map_err(|error| format!("Invalid backup archive: {error}"))?;
-    let manifest = read_manifest(&mut archive)?;
-    if manifest.schema_version.unwrap_or(1) > 4 {
-        return Err("This backup requires a newer OshiNote data schema.".into());
-    }
-    let staging = app_data_dir.join(format!(".restore-staging-{}", timestamp_id()));
-    fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
-
-    let restore_result = (|| {
-        extract_backup_file(
-            &mut archive,
-            "database/oshinote.db",
-            &staging.join("oshinote.db"),
-        )?;
-        if manifest.mode == "complete" {
-            for path in &manifest.included_paths {
-                if path == "media" || path == "fonts" {
-                    fs::create_dir_all(staging.join(path)).map_err(|error| error.to_string())?;
-                    extract_backup_tree(
-                        &mut archive,
-                        &format!("appdata/{path}/"),
-                        &staging.join(path),
-                    )?;
-                }
-            }
-            validate_backup_media(&staging.join("oshinote.db"), &staging)?;
-        }
-
-        let database_path = app_config_dir.join("oshinote.db");
-        let previous_database_path = app_config_dir.join("oshinote.db.before-restore");
-        let replacement_path = app_config_dir.join("oshinote.db.restore-new");
-        fs::create_dir_all(&app_config_dir).map_err(|error| error.to_string())?;
-        fs::copy(staging.join("oshinote.db"), &replacement_path)
-            .map_err(|error| format!("Could not prepare restored database: {error}"))?;
-        for suffix in ["-wal", "-shm"] {
-            let sidecar = app_config_dir.join(format!("oshinote.db{suffix}"));
-            if sidecar.exists() {
-                fs::remove_file(sidecar)
-                    .map_err(|error| format!("Could not clear SQLite sidecar: {error}"))?;
-            }
-        }
-        if database_path.exists() {
-            if previous_database_path.exists() {
-                fs::remove_file(&previous_database_path)
-                    .map_err(|error| format!("Could not clear previous restore backup: {error}"))?;
-            }
-            fs::rename(&database_path, &previous_database_path).map_err(|error| {
-                format!("Could not release current database for restore: {error}")
-            })?;
-        }
-        if let Err(error) = fs::rename(&replacement_path, &database_path) {
-            if previous_database_path.exists() && !database_path.exists() {
-                let _ = fs::rename(&previous_database_path, &database_path);
-            }
-            return Err(format!("Could not activate restored database: {error}"));
-        }
-
-        if manifest.mode == "complete" {
-            if let Err(error) =
-                activate_restored_trees(&staging, &app_data_dir, &manifest.included_paths)
-            {
-                rollback_restored_database(
-                    &database_path,
-                    &previous_database_path,
-                    &app_config_dir,
-                );
-                return Err(error);
-            }
-        }
-        Ok::<(), String>(())
-    })();
-
-    let _ = fs::remove_dir_all(&staging);
-    restore_result?;
-    Ok(BackupSummary {
-        mode: manifest.mode,
-        path: archive_path.display().to_string(),
-        included_paths: manifest.included_paths,
-    })
 }
 
 #[tauri::command]
@@ -457,6 +324,8 @@ fn create_backup_archive(
         repository_id: sync_metadata.and_then(|metadata| metadata.repository_id.clone()),
         head_commit: sync_metadata.and_then(|metadata| metadata.head_commit.clone()),
         schema_version: sync_metadata.and_then(|metadata| metadata.schema_version),
+        app_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        database_schema_version: Some(backup_flow::database_version(&database_path)?),
     };
 
     let file =
@@ -627,80 +496,6 @@ fn validate_backup_media(database: &Path, root: &Path) -> Result<(), String> {
         connection.close().await.map_err(|e| e.to_string())?;
         Ok(())
     })
-}
-
-fn activate_restored_trees(
-    staging: &Path,
-    app_data_dir: &Path,
-    included_paths: &[String],
-) -> Result<(), String> {
-    let activation_id = timestamp_id();
-    let mut activated: Vec<(PathBuf, PathBuf)> = Vec::new();
-    for name in included_paths {
-        if name != "media" && name != "fonts" {
-            continue;
-        }
-        let source = staging.join(name);
-        fs::create_dir_all(&source).map_err(|error| error.to_string())?;
-        let destination = app_data_dir.join(name);
-        let previous = app_data_dir.join(format!(".{name}.before-restore-{activation_id}"));
-        if previous.exists() {
-            fs::remove_dir_all(&previous).map_err(|error| error.to_string())?;
-        }
-        if destination.exists() {
-            fs::rename(&destination, &previous).map_err(|error| {
-                format!("Could not preserve previous {name} directory: {error}")
-            })?;
-        }
-        if let Err(error) = fs::rename(&source, &destination) {
-            if previous.exists() && !destination.exists() {
-                let _ = fs::rename(&previous, &destination);
-            }
-            for (active_destination, active_previous) in activated.iter().rev() {
-                if active_destination.exists() {
-                    let _ = fs::remove_dir_all(active_destination);
-                }
-                if active_previous.exists() {
-                    let _ = fs::rename(active_previous, active_destination);
-                }
-            }
-            return Err(format!(
-                "Could not activate restored {name} directory: {error}"
-            ));
-        }
-        activated.push((destination, previous));
-    }
-    for (_, previous) in activated {
-        if previous.exists() {
-            let _ = fs::remove_dir_all(previous);
-        }
-    }
-    Ok(())
-}
-
-fn rollback_restored_database(database_path: &Path, previous_path: &Path, config_dir: &Path) {
-    let failed_path = config_dir.join("oshinote.db.failed-restore");
-    if failed_path.exists() {
-        let _ = fs::remove_file(&failed_path);
-    }
-    if database_path.exists() {
-        let _ = fs::rename(database_path, &failed_path);
-    }
-    if previous_path.exists() && !database_path.exists() {
-        let _ = fs::rename(previous_path, database_path);
-    }
-}
-
-fn append_restore_log(app_data_dir: &Path, message: &str) {
-    let log_path = app_data_dir.join(RESTORE_LOG_FILE);
-    if let Ok(mut log) = OpenOptions::new().create(true).append(true).open(log_path) {
-        let _ = writeln!(
-            log,
-            "{} pid={} {message}",
-            format_timestamp(),
-            std::process::id()
-        );
-    }
 }
 
 fn webdav_client(config: &WebDavConfig) -> Result<Client, String> {
@@ -952,6 +747,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            backup_flow::recover_interrupted_restore(app.handle()).map_err(std::io::Error::other)?;
             let window = app.get_webview_window("main").unwrap();
             // Choose the native/WebView backdrop before showing the window.
             // HTML takes over with the user's saved OshiNote theme afterwards.
@@ -969,8 +765,14 @@ pub fn run() {
             open_external_url,
             read_illustration_media_file,
             create_backup,
-            restore_backup,
-            restore_downloaded_webdav_backup,
+            backup_flow::prepare_backup_restore,
+            backup_flow::ensure_database_available,
+            backup_flow::validate_prepared_restore,
+            backup_flow::activate_prepared_restore,
+            backup_flow::discard_prepared_restore,
+            backup_flow::create_directory_backup,
+            backup_flow::list_directory_backups,
+            backup_flow::inspect_legacy_webdav_backup,
             test_webdav_connection,
             upload_webdav_backup,
             download_webdav_backup,

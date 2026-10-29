@@ -551,8 +551,9 @@ fn resolve_managed_app_data_path(
 ) -> Result<PathBuf, String> {
     let relative = validate_relative_path(relative_path)?;
     let normalized = relative.to_string_lossy().replace('\\', "/");
-    if !(normalized.starts_with("media/") || normalized.starts_with("sync-cache/")) {
-        return Err("Only managed media or sync-cache paths are allowed.".to_string());
+    if !(normalized.starts_with("media/") || normalized.starts_with("sync-cache/")
+        || (normalized.starts_with("backups/") && normalized.ends_with(".oshi.zip"))) {
+        return Err("Only managed media, sync-cache or backup archive paths are allowed.".to_string());
     }
     let app_data = app
         .path()

@@ -1,4 +1,5 @@
 import Database from '@tauri-apps/plugin-sql'
+import { invoke } from '@tauri-apps/api/core'
 import { MIGRATIONS } from './migrations'
 import { ensureResourceSchema } from '../features/resources/resourceSchema'
 import { reconcileResourceLibrary } from '../features/resources/resourceLibrary'
@@ -7,13 +8,33 @@ import { measureStartup, markStartup } from '../services/startup'
 
 let db: Database | null = null
 let dbPromise: Promise<Database> | null = null
+let maintenance = false
+export const DATABASE_SCHEMA_VERSION = 1
 
 export async function getDb(): Promise<Database> {
+  if (maintenance) throw new Error('Database maintenance is in progress. Please wait.')
   if (db) return db
   if (!dbPromise) {
     dbPromise = initializeDb()
   }
   return dbPromise
+}
+
+// Keep background reads/writes from reopening SQLite while its file is copied or replaced.
+export async function withClosedDatabase<T>(work: () => Promise<T>): Promise<T> {
+  if (maintenance) throw new Error('Database maintenance is already in progress.')
+  maintenance = true
+  try {
+    const current = db || (dbPromise ? await dbPromise : null)
+    if (current) await checkpointDatabase(current)
+    await closeDb()
+    return await work()
+  } finally { maintenance = false }
+}
+
+export async function checkpointDatabase(database: Database): Promise<void> {
+  const [result] = await database.select<{ busy: number; log: number; checkpointed: number }[]>('PRAGMA wal_checkpoint(TRUNCATE)')
+  if (result?.busy || (result && result.log > result.checkpointed)) throw new Error('Database is busy. Wait for other operations to finish and try again.')
 }
 
 export async function closeDb(): Promise<void> {
@@ -24,20 +45,32 @@ export async function closeDb(): Promise<void> {
 }
 
 async function initializeDb(): Promise<Database> {
-  const database = await measureStartup('database-open', () => Database.load('sqlite:oshinote.db'))
+  let database: Database | null = null
   try {
-    await measureStartup('migration-recovery', () => recoverInterruptedNoteOwnershipMigration(database))
-    await measureStartup('database-initialize', () => runMigrations(database))
+    await invoke('ensure_database_available')
+    database = await measureStartup('database-open', () => Database.load('sqlite:oshinote.db'))
+    const opened = database
+    await measureStartup('database-initialize', () => runMigrations(opened))
     db = database
     markStartup('database-ready')
     return database
   } catch (error) {
     dbPromise = null
+    if (database) await database.close().catch(() => undefined)
     throw error
   }
 }
 
 async function runMigrations(db: Database): Promise<void> {
+  await migrateDatabase(db)
+  await measureStartup('material-library', () => loadMaterialLibrary(db))
+}
+
+// Also runs against an isolated restore database before it is activated.
+export async function migrateDatabase(db: Database, mediaPrefix = ''): Promise<void> {
+  const [version] = await db.select<{ user_version: number }[]>('PRAGMA user_version')
+  if ((version?.user_version || 0) > DATABASE_SCHEMA_VERSION) throw new Error('This database requires a newer OshiNote version.')
+  await measureStartup('migration-recovery', () => recoverInterruptedNoteOwnershipMigration(db))
   await measureStartup('schema-checks', async () => {
     for (const sql of MIGRATIONS) {
       await db.execute(sql)
@@ -56,9 +89,9 @@ async function runMigrations(db: Database): Promise<void> {
     await ensureScheduleTables(db)
     await ensureResourceSchema(db)
   })
-  await measureStartup('resource-reconcile', () => reconcileResourceLibrary(db))
-  await measureStartup('material-library', () => loadMaterialLibrary(db))
+  await measureStartup('resource-reconcile', () => reconcileResourceLibrary(db, mediaPrefix))
   await measureStartup('search-index', () => rebuildNoteSearchIndex(db))
+  await db.execute(`PRAGMA user_version = ${DATABASE_SCHEMA_VERSION}`)
 }
 
 async function ensureOshiAnniversaries(db: Database): Promise<void> {

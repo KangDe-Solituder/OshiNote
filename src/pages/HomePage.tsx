@@ -1,3 +1,4 @@
+import { UiHint } from '../components/ui/UiHint'
 import { useEffect, useState } from 'react'
 import { Heart, FileText, Tag } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -33,10 +34,10 @@ export function HomePage() {
 
   return (
     <div className={PAGE_CONTENT_CLASS}>
-      <div className={PAGE_DASHBOARD_FRAME_CLASS}>
+      <div className={`${PAGE_DASHBOARD_FRAME_CLASS} compact-page-blocks`}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2">{t('home.title')}</h1>
-        <p className="text-text-secondary">{t('home.subtitle')}</p>
+        <UiHint className="text-text-secondary">{t('home.subtitle')}</UiHint>
       </div>
 
       <div className="overview-stats-grid mb-8">

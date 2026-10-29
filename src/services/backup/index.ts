@@ -46,13 +46,13 @@ export async function importBackup(): Promise<BackupSummary | null> {
   }))
   if (!path) return null
 
-  await closeDb()
-  await invoke<BackupSummary>('restore_backup', { archive_path: path })
-  window.location.reload()
+  const { prepareRestore, activateRestore } = await import('./restore')
+  const prepared = await prepareRestore(path)
+  await activateRestore(prepared)
   return null
 }
 
-async function readBackupSyncMetadata() {
+export async function readBackupSyncMetadata() {
   const db = await getDb()
   const rows = await db.select<{ value: string }[]>("SELECT value FROM sync_state WHERE key = 'repository'")
   await reconcileResourceLibrary(db)

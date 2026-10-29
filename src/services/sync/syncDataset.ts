@@ -56,6 +56,7 @@ const SETTINGS_ALLOWLIST = [
   'fontSize',
   'uiMotionDuration',
   'textTone',
+  'simpleMode',
   'locale',
 ]
 

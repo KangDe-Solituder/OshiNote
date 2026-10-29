@@ -41,7 +41,7 @@ export async function registerVersion(db: Database, version: ResourceVersion, na
 }
 
 /** Idempotent migration, also run before sync/backup to capture newly placed resources. */
-export async function reconcileResourceLibrary(db: Database) {
+export async function reconcileResourceLibrary(db: Database, mediaPrefix = '') {
   // Read immutable definitions together instead of issuing an INSERT + SELECT
   // for every built-in on every startup. Missing versions still use the
   // concurrency-safe registration path; existing definitions are still checked.
@@ -75,8 +75,9 @@ export async function reconcileResourceLibrary(db: Database) {
   for (const image of images) {
     const previous = versions.get(`upload:${image.id}:1`)
     let contentHash = previous?.content_hash || null
-    if (!previous && isTauri() && await exists(image.file_path, { baseDir: BaseDirectory.AppData })) {
-      contentHash = await sha256Bytes(new Uint8Array(await readFile(image.file_path, { baseDir: BaseDirectory.AppData })))
+    const mediaPath = mediaPrefix ? `${mediaPrefix}/${image.file_path}` : image.file_path
+    if (!previous && isTauri() && await exists(mediaPath, { baseDir: BaseDirectory.AppData })) {
+      contentHash = await sha256Bytes(new Uint8Array(await readFile(mediaPath, { baseDir: BaseDirectory.AppData })))
     }
     const version = { id: `upload:${image.id}:1`, asset_id: `upload:${image.id}`, renderer: 'image-v1',
       payload: JSON.stringify({ journalImageId: image.id }), file_path: image.file_path, content_hash: contentHash }

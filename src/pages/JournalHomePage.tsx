@@ -1,3 +1,4 @@
+import { UiHint } from '../components/ui/UiHint'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -300,7 +301,7 @@ export function JournalHomePage() {
                 >
                   <Plus size={30} />
                   <span className="mt-4 text-sm font-semibold">{t('journalHome.new')}</span>
-                  <span className="mt-1 px-4 text-center text-xs text-text-muted">{t('journalHome.newHint')}</span>
+                  <UiHint as="span" className="mt-1 px-4 text-center text-xs text-text-muted">{t('journalHome.newHint')}</UiHint>
                 </button>
               </motion.div>
             ) : (

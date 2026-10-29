@@ -9,6 +9,7 @@
 }
 
 :root {
+  --layout-gap-scale: 1;
   --ui-motion-duration: 0.18s;
   --page-gutter: clamp(20px, 2.35cqw, 44px);
   --page-block-gap: clamp(20px, 2cqw, 32px);
@@ -32,6 +33,32 @@
   --journal-sticker-3: color-mix(in srgb, var(--color-bg-card, white) 82%, var(--color-accent, #EC4899));
   --journal-sticker-4: color-mix(in srgb, var(--color-bg-card, white) 76%, var(--color-bg-tertiary, #FCE7F3));
   --journal-sticker-5: color-mix(in srgb, var(--color-bg-card, white) 84%, var(--color-text-secondary, #831843));
+}
+
+:root[data-simple-mode='true'] {
+  --layout-gap-scale: 0.666667;
+}
+
+/* Compact structural spacing only; editor content and control hit areas stay intact. */
+.compact-page-blocks > .mb-8 {
+  margin-bottom: calc(2rem * var(--layout-gap-scale));
+}
+
+.compact-page-blocks > .mb-5 {
+  margin-bottom: calc(1.25rem * var(--layout-gap-scale));
+}
+
+.compact-page-blocks > .mt-5 {
+  margin-top: calc(1.25rem * var(--layout-gap-scale));
+}
+
+.settings-section > h2,
+.settings-section > .mb-4 {
+  margin-bottom: calc(1rem * var(--layout-gap-scale));
+}
+
+.settings-section > .settings-options-grid {
+  gap: calc(0.75rem * var(--layout-gap-scale));
 }
 
 :root[data-text-tone='neutral'] {
@@ -110,7 +137,7 @@ body {
 .resource-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
-  gap: 12px;
+  gap: calc(12px * var(--layout-gap-scale));
 }
 
 .page-frame-dashboard {
@@ -134,7 +161,7 @@ body {
 .adaptive-library-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-  gap: clamp(14px, 1.3cqw, 20px);
+  gap: calc(clamp(14px, 1.3cqw, 20px) * var(--layout-gap-scale));
 }
 
 .page-loading-placeholder {
@@ -202,31 +229,37 @@ body {
 
 .overview-links-grid {
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: calc(8px * var(--layout-gap-scale));
 }
 
 .overview-stats-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-  gap: 12px;
+  gap: calc(12px * var(--layout-gap-scale));
 }
 
 .overview-content-grid {
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: calc(12px * var(--layout-gap-scale));
 }
 
 .overview-calendar-grid {
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: calc(12px * var(--layout-gap-scale));
 }
 
 .settings-layout-grid {
   grid-template-columns: minmax(0, 1fr);
-  gap: clamp(28px, 3cqw, 42px);
+  gap: calc(clamp(28px, 3cqw, 42px) * var(--layout-gap-scale));
 }
 
 .settings-section {
   min-width: 0;
+}
+
+.data-location-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: calc(16px * var(--layout-gap-scale));
 }
 
 @container app-content (min-width: 760px) {

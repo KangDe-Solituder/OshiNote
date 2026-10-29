@@ -1,3 +1,4 @@
+import { UiHint } from '../components/ui/UiHint'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, ArrowUpRight, Star } from 'lucide-react'
@@ -104,7 +105,7 @@ export function ResourceLibraryPage({ kind }: { kind: 'material' | 'upload' }) {
     </header>
     <main className={`${PAGE_CONTENT_CLASS} !overflow-hidden`}><div className={`${PAGE_WIDE_FRAME_CLASS} flex h-full min-h-0 flex-col`}>
       <div ref={listScroll} className="resource-list-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
-      <p className="mb-4 text-xs text-text-muted">{action.importHint}</p>
+      <UiHint className="mb-4 text-xs text-text-muted">{action.importHint}</UiHint>
       <div className="mb-5 flex flex-wrap items-center gap-3"><label className="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-border-color bg-bg-card px-3 py-2 focus-within:ring-2 focus-within:ring-accent/30"><Search size={16} /><input aria-label={text.search} placeholder={text.search} value={query} onChange={e => setQuery(e.target.value)} className="min-w-0 w-full !bg-transparent !backdrop-filter-none text-text-primary outline-none" /></label>
         {kind === 'material' && <SelectMenu ariaLabel={action.kind} value={filter} onChange={setFilter} options={JOURNAL_MATERIAL_KINDS.map(item=>({value:item.id,label:t(item.labelKey)}))} />}
         {kind === 'upload' && <SelectMenu ariaLabel={action.status} value={status} onChange={setStatus} options={[{value:"active",label:text.active},{value:"retired",label:text.retired},{value:"all",label:text.all}]} />}

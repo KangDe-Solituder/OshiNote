@@ -1,3 +1,4 @@
+import { UiHint } from '../components/ui/UiHint'
 import { instantiateMaterialTemplate } from '../features/resources/resourceManagement'
 import { readReusableLayout } from '../features/journal/journalReusableLayouts'
 import { useEffect, useRef, useState } from 'react'
@@ -58,7 +59,7 @@ export function ResourceTemplatesPage() {
         {(['all','note','journal_page','stamp','material'] as const).map(value=><button key={value} onClick={()=>setType(value)} className={`rounded-lg border px-3 py-2 text-sm ${type===value?'border-accent bg-accent-soft text-accent':'border-border-color bg-bg-card text-text-secondary'}`}>{value==='all'?text.all:t(`templates.type.${value}` as never)}</button>)}
         <button onClick={()=>setTrash(!trash)} aria-pressed={trash} className={`rounded-lg border px-3 py-2 text-sm ${trash?'border-accent text-accent':'border-border-color text-text-muted'}`}>{text.trash}</button>
       </div>
-      <p className="mb-5 text-sm text-text-muted">{trash?text.deletedHint:text.templateHint}</p>
+      {trash ? <p className="mb-5 text-sm text-text-muted">{text.deletedHint}</p> : <UiHint className="mb-5 text-sm text-text-muted">{text.templateHint}</UiHint>}
       {error&&<p role="alert" className="mb-4 text-red-400">{error}</p>}
       {!filtered.length&&<div className="py-16 text-center text-text-muted"><Layers3 className="mx-auto mb-3"/>{t('templates.empty.title')}</div>}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{pagination.visible.map(template=>{

@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { UiHint } from '../components/ui/UiHint'
+import { useId, useRef, type ReactNode } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import { Card } from '../components/ui/Card'
 import { MediaImage } from '../components/ui/MediaImage'
@@ -7,7 +8,7 @@ import { useThemeStore } from '../stores/themeStore'
 import { useUpdateStore } from '../stores/updateStore'
 import type { TextTone, ThemeId, UiMotionDuration } from '../types'
 import { checkForUpdate, getCurrentAppVersion, installPendingUpdate, type UpdateInfo, type UpdateInstallProgress } from '../services/update/updateService'
-import { Download, Loader2, RefreshCw, Sparkles, Trash2, Upload, Volume2 } from 'lucide-react'
+import { CircleHelp, ListFilter, Download, Loader2, RefreshCw, Sparkles, Trash2, Upload, Volume2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { LOCALE_OPTIONS } from '../i18n/translations'
@@ -47,6 +48,7 @@ export function SettingsPage() {
     fontSize, setFontSize,
     uiMotionDuration, setUiMotionDuration,
     textTone, setTextTone,
+    simpleMode, setSimpleMode,
   } = useThemeStore()
   const { checkOnStartup, setCheckOnStartup, loadFromDB: loadUpdateSettings } = useUpdateStore()
   const dragEnabled = useSidebarStore((s) => s.dragEnabled)
@@ -130,78 +132,32 @@ export function SettingsPage() {
 
   return (
     <div className={PAGE_CONTENT_CLASS}>
-      <div className={PAGE_FORM_FRAME_CLASS}>
+      <div className={`${PAGE_FORM_FRAME_CLASS} compact-page-blocks`}>
       <h1 className="mb-8 text-3xl font-bold text-text-primary">{t('settings.title')}</h1>
 
       <div className="settings-layout-grid">
 
-      <section className="settings-section settings-section-half">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.theme')}</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <section className="settings-section settings-section-half flex flex-col self-stretch" data-settings-themes>
+        <h2 className="mb-4 text-lg font-semibold text-text-primary" title={t('settings.themeShortcut')}>{t('settings.theme')}</h2>
+        <div className="settings-options-grid grid flex-1 auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2">
           {THEMES.map((theme) => (
-            <button
-              key={theme.id}
-              onClick={() => setTheme(theme.id)}
-              className={clsx(
-                'p-4 rounded-xl border text-left transition-all',
-                currentTheme === theme.id
-                  ? 'border-accent bg-accent/5 ring-1 ring-accent/45'
-                  : 'border-border-color hover:border-border-hover bg-bg-secondary'
-              )}
-            >
+            <button key={theme.id} onClick={() => setTheme(theme.id)} className={clsx(
+              'rounded-xl border p-4 text-left transition-all',
+              currentTheme === theme.id ? 'border-accent bg-accent/5 ring-1 ring-accent/45' : 'border-border-color hover:border-border-hover bg-bg-secondary'
+            )}>
               <p className="font-medium text-text-primary">{t(`settings.theme.${theme.id}.label`)}</p>
-              <p className="text-sm text-text-muted">{t(`settings.theme.${theme.id}.description`)}</p>
+              <UiHint className="text-sm text-text-muted">{t(`settings.theme.${theme.id}.description`)}</UiHint>
             </button>
           ))}
         </div>
-        <p className="text-xs text-text-muted mt-3">
-          {t('settings.themeShortcut')}
-        </p>
       </section>
 
-      <section className="settings-section settings-section-half">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">{t('settings.appearance')}</h2>
-        <div className="space-y-3">
-          <button
-            onClick={() => setGlassEnabled(!glassEnabled)}
-            className={clsx(
-              'w-full rounded-2xl border p-5 text-left transition-all flex items-center justify-between gap-4',
-              glassEnabled
-                ? 'border-accent bg-accent/5 text-accent'
-                : 'border-border-color bg-bg-secondary text-text-secondary hover:border-border-hover hover:text-accent'
-            )}
-          >
-            <span className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border-color bg-bg-primary">
-                <Sparkles size={22} />
-              </span>
-              <span>
-                <span className="block font-medium text-text-primary">{t('settings.glassEffect')}</span>
-                <span className="block text-sm text-text-muted">{t('settings.glassEffectDescription')}</span>
-              </span>
-            </span>
-            <ToggleSwitch enabled={glassEnabled} />
-          </button>
-          <button
-            onClick={() => setStampSoundEnabled(!stampSoundEnabled)}
-            className={clsx(
-              'w-full rounded-2xl border p-5 text-left transition-all flex items-center justify-between gap-4',
-              stampSoundEnabled
-                ? 'border-accent bg-accent/5 text-accent'
-                : 'border-border-color bg-bg-secondary text-text-secondary hover:border-border-hover hover:text-accent'
-            )}
-          >
-            <span className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border-color bg-bg-primary">
-                <Volume2 size={22} />
-              </span>
-              <span>
-                <span className="block font-medium text-text-primary">{t('settings.stampSound')}</span>
-                <span className="block text-sm text-text-muted">{t('settings.stampSoundDescription')}</span>
-              </span>
-            </span>
-            <ToggleSwitch enabled={stampSoundEnabled} />
-          </button>
+      <section className="settings-section settings-section-half flex flex-col self-stretch" data-settings-appearance>
+        <h2 className="mb-4 text-lg font-semibold text-text-primary">{t('settings.appearance')}</h2>
+        <div className="settings-options-grid grid flex-1 auto-rows-fr gap-3">
+          <AppearanceOption icon={<Sparkles size={20} />} title={t('settings.glassEffect')} description={t('settings.glassEffectDescription')} enabled={glassEnabled} onToggle={() => setGlassEnabled(!glassEnabled)} />
+          <AppearanceOption icon={<Volume2 size={20} />} title={t('settings.stampSound')} description={t('settings.stampSoundDescription')} enabled={stampSoundEnabled} onToggle={() => setStampSoundEnabled(!stampSoundEnabled)} />
+          <AppearanceOption icon={<ListFilter size={20} />} title={t('settings.simpleMode')} help={t('settings.simpleModeHint')} enabled={simpleMode} onToggle={() => setSimpleMode(!simpleMode)} />
         </div>
       </section>
 
@@ -209,7 +165,7 @@ export function SettingsPage() {
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">{t('settings.stampFonts')}</h2>
-            <p className="mt-1 text-sm text-text-muted">{t('settings.stampFontsDescription')}</p>
+            <UiHint className="mt-1 text-sm text-text-muted">{t('settings.stampFontsDescription')}</UiHint>
           </div>
           <button
             type="button"
@@ -241,7 +197,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text-primary">{t('settings.customBackground')}</p>
-              <p className="text-xs text-text-muted">{t('settings.customBackgroundDescription')}</p>
+              <UiHint className="text-xs text-text-muted">{t('settings.customBackgroundDescription')}</UiHint>
             </div>
             <div className="flex items-center gap-2">
               {customBackground && (
@@ -364,7 +320,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text-primary">{t('settings.language')}</p>
-              <p className="text-xs text-text-muted">{t('settings.languageDescription')}</p>
+              <UiHint className="text-xs text-text-muted">{t('settings.languageDescription')}</UiHint>
             </div>
             <SelectMenu
               value={locale}
@@ -378,7 +334,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text-primary">{t('settings.fontSize')}</p>
-              <p className="text-xs text-text-muted">{t('settings.fontSizeDescription')}</p>
+              <UiHint className="text-xs text-text-muted">{t('settings.fontSizeDescription')}</UiHint>
             </div>
             <SelectMenu
               value={fontSize}
@@ -395,7 +351,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text-primary">{t('settings.animationSpeed')}</p>
-              <p className="text-xs text-text-muted">{t('settings.animationSpeedDescription')}</p>
+              <UiHint className="text-xs text-text-muted">{t('settings.animationSpeedDescription')}</UiHint>
             </div>
             <SelectMenu
               value={uiMotionDuration}
@@ -411,7 +367,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text-primary">{t('settings.textTone')}</p>
-              <p className="text-xs text-text-muted">{t('settings.textToneDescription')}</p>
+              <UiHint className="text-xs text-text-muted">{t('settings.textToneDescription')}</UiHint>
             </div>
             <SelectMenu
               value={textTone}
@@ -451,7 +407,7 @@ export function SettingsPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-text-primary">{t('settings.checkOnStartup')}</p>
-              <p className="text-xs text-text-muted">{t('settings.checkOnStartupDescription')}</p>
+              <UiHint className="text-xs text-text-muted">{t('settings.checkOnStartupDescription')}</UiHint>
             </div>
             <button
               onClick={() => setCheckOnStartup(!checkOnStartup)}
@@ -565,7 +521,7 @@ function StampFontRow({
               {available ? t('settings.stampFontAvailable') : t('settings.stampFontMissing')}
             </span>
           </div>
-          <p className="mt-1 text-xs text-text-muted">{t(font.descriptionKey as never)}</p>
+          <UiHint className="mt-1 text-xs text-text-muted">{t(font.descriptionKey as never)}</UiHint>
           <p className="mt-2 break-all rounded-lg bg-bg-primary/70 px-2 py-1.5 font-mono text-[11px] text-text-muted">
             {t('settings.stampFontSavePath', { path: font.appDataPath })}
           </p>
@@ -659,7 +615,7 @@ function SettingToggle({
     >
       <span>
         <span className="block text-sm font-medium text-text-primary">{title}</span>
-        <span className="block text-xs text-text-muted">{description}</span>
+        <UiHint as="span" className="block text-xs text-text-muted">{description}</UiHint>
       </span>
       <ToggleSwitch enabled={enabled} />
     </button>
@@ -682,4 +638,25 @@ function ToggleSwitch({ enabled }: { enabled: boolean }) {
       />
     </span>
   )
+}
+
+function AppearanceOption({ icon, title, description, help, enabled, onToggle }: {
+  icon: ReactNode; title: string; description?: string; help?: string; enabled: boolean; onToggle: () => void
+}) {
+  const helpId = useId()
+  return <div className={clsx('relative flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors', enabled ? 'border-accent bg-accent/5' : 'border-border-color bg-bg-secondary')}>
+    <button type="button" role="switch" aria-checked={enabled} aria-label={title} onClick={onToggle} className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" />
+    <span className="pointer-events-none relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border-color bg-bg-primary text-accent">{icon}</span>
+    <span className="pointer-events-none relative min-w-0 flex-1">
+      <span className="flex items-center gap-1 font-medium text-text-primary">
+        {title}
+        {help && <span className="group pointer-events-auto relative inline-flex shrink-0">
+          <button type="button" aria-label={`${title} — ${help}`} aria-describedby={helpId} className="rounded-full p-1 text-text-muted hover:text-accent focus-visible:ring-2 focus-visible:ring-accent"><CircleHelp size={16} /></button>
+          <span id={helpId} role="tooltip" className="invisible pointer-events-none absolute right-0 top-full z-10 mt-2 w-56 max-w-[70vw] rounded-lg border border-border-color bg-bg-primary p-3 text-xs font-normal leading-relaxed text-text-primary shadow-lg group-hover:visible group-focus-within:visible">{help}</span>
+        </span>}
+      </span>
+      {description && <UiHint as="span" className="block text-xs text-text-muted">{description}</UiHint>}
+    </span>
+    <span data-appearance-switch className="pointer-events-none relative shrink-0"><ToggleSwitch enabled={enabled} /></span>
+  </div>
 }
