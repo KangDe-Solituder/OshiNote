@@ -243,7 +243,6 @@ OshiNote/
 |   |-- stores/            # Zustand stores
 |   |-- utils/             # Safe parsing and local storage helpers
 |   `-- styles/            # Themes and global styles
-|-- docs/                  # Architecture and stabilization notes
 |-- public/                # Static assets and optional font placeholders
 |-- src-tauri/             # Rust / Tauri app
 |-- local-dev-plan/        # Local planning notes, not release docs

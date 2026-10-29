@@ -242,7 +242,6 @@ OshiNote/
 |   |-- stores/            # Zustand stores
 |   |-- utils/             # 安全解析、本地存储等通用工具
 |   `-- styles/            # 主题与全局样式
-|-- docs/                  # 架构和稳定化记录
 |-- public/                # 静态资源和可选字体占位
 |-- src-tauri/             # Rust / Tauri 应用
 |-- local-dev-plan/        # 本地开发计划，不作为发布文档
