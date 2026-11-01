@@ -49,7 +49,7 @@ export function MainLayout() {
       <TopBar />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <Sidebar />
-        <main className="app-main-container relative isolate min-h-0 flex-1 overflow-hidden">
+        <main className="app-main-container relative isolate min-h-0 min-w-0 flex-1 overflow-hidden">
           <AnimatePresence initial={false}>
             <RouteView
               key={location.pathname}

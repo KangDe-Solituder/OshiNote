@@ -13,10 +13,10 @@
   --ui-motion-duration: 0.18s;
   --page-gutter: clamp(20px, 2.35cqw, 44px);
   --page-block-gap: clamp(20px, 2cqw, 32px);
-  --page-wide-max: 1760px;
-  --page-dashboard-max: 1760px;
-  --page-form-max: 1240px;
-  --page-reading-max: 1080px;
+  /* Forms and reading views stay bounded; browsing views fill the workspace. */
+  --page-dashboard-max: 80rem;
+  --page-form-max: 77.5rem;
+  --page-reading-max: 67.5rem;
   --color-shell-border: var(--color-border, color-mix(in srgb, var(--color-text-primary, #4a1942) 8%, transparent));
   --shadow-e1: 0 1px 2px rgba(23, 16, 28, 0.05), 0 0 1px rgba(23, 16, 28, 0.04);
   --shadow-e2: 0 4px 16px rgba(23, 16, 28, 0.08), 0 1px 3px rgba(23, 16, 28, 0.05);
@@ -112,7 +112,7 @@ body {
   border-bottom: 1px solid var(--color-shell-border);
   background: color-mix(in srgb, var(--color-bg-primary, #fff5f5) 95%, transparent);
   padding-block: 14px;
-  padding-inline: max(var(--page-gutter), calc((100cqw - var(--page-wide-max)) / 2));
+  padding-inline: var(--page-gutter);
 }
 
 .page-content {
@@ -131,12 +131,12 @@ body {
 }
 
 .page-frame-wide {
-  max-width: var(--page-wide-max);
+  max-width: 100%;
 }
 
 .resource-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
   gap: calc(12px * var(--layout-gap-scale));
 }
 
@@ -152,15 +152,31 @@ body {
   max-width: var(--page-reading-max);
 }
 
-.adaptive-note-grid {
+.adaptive-note-grid,
+.adaptive-journal-grid,
+.adaptive-image-grid {
+  --grid-gap: 1rem;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-  gap: clamp(12px, 1.2cqw, 18px);
+  /* Four readable columns at most; use the grid's own available width. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(17.5rem, calc((100% - 3 * var(--grid-gap)) / 4))), 1fr));
+  gap: var(--grid-gap);
+}
+
+.adaptive-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+
+.journal-book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr));
+  gap: 2.5rem 1.75rem;
 }
 
 .adaptive-library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18.75rem), 1fr));
   gap: calc(clamp(14px, 1.3cqw, 20px) * var(--layout-gap-scale));
 }
 

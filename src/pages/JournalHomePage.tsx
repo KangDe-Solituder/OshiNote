@@ -277,7 +277,7 @@ export function JournalHomePage() {
               <motion.div
                 key="grid"
                 {...pageTransition}
-                className="grid grid-cols-2 justify-start gap-x-7 gap-y-10 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"
+                className="journal-book-grid"
               >
                 {filteredItems.map((item, index) => (
                   <ShelfGridCard

@@ -395,7 +395,7 @@ function IllustrationGrid({
 }) {
   const { t } = useI18n()
   return (
-    <div className="grid grid-cols-1 gap-3 pb-8 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+    <div className="adaptive-image-grid pb-8">
       {illustrations.map((illustration) => (
         <article
           key={illustration.id}

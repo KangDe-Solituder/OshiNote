@@ -64,7 +64,7 @@ export function ResourceTemplatesPage() {
       {trash ? <p className="mb-5 text-sm text-text-muted">{text.deletedHint}</p> : <UiHint className="mb-5 text-sm text-text-muted">{text.templateHint}</UiHint>}
       {error&&<p role="alert" className="mb-4 text-red-400">{error}</p>}
       {!filtered.length&&<div className="py-16 text-center text-text-muted"><Layers3 className="mx-auto mb-3"/>{t('templates.empty.title')}</div>}
-      <ContentTransition changeKey={pagination.visible.map(item => item.id).join(',')} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{pagination.visible.map(template=>{
+      <ContentTransition changeKey={pagination.visible.map(item => item.id).join(',')} className="adaptive-template-grid">{pagination.visible.map(template=>{
         const Icon=TYPE_ICONS[template.type]
         const layout=template.type==='journal_page'?getJournalPageTemplateDefinition(template.id):null
         const name=title(template)

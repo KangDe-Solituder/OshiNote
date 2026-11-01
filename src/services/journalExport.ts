@@ -3,6 +3,9 @@ import { writeFile } from '@tauri-apps/plugin-fs'
 import { save } from '@tauri-apps/plugin-dialog'
 import type { JournalItemWithNote, JournalPage, Stamp } from '../types'
 import { getJournalCanvasSize } from '../features/journal/journalLayout'
+import { JournalExportError } from './journalExportError'
+import { getJournalExportFontCSS } from './journalExportFonts'
+import { embedJournalExportImages } from './journalExportImages'
 
 export interface JournalExportOptions {
   untitled: string
@@ -21,7 +24,7 @@ export async function exportJournalPageImage(page: JournalPage, items: JournalIt
   void items
   void labels
   const source = findJournalPageElement()
-  if (!source) throw new Error('Journal page element not found on screen')
+  if (!source) throw new JournalExportError('render', new Error('Journal page element not found on screen'))
 
   const itemsForSize = items.filter((item) => !item.staged)
   const size = getJournalCanvasSize(itemsForSize, page.orientation || 'portrait')
@@ -41,23 +44,37 @@ export async function exportJournalPageImage(page: JournalPage, items: JournalIt
   document.body.appendChild(host)
 
   try {
-    const { domToPng } = await import('modern-screenshot')
-    const dataUrl = await domToPng(clone, {
-      scale: 2,
-      backgroundColor: undefined,
-      // Local blob: URLs and bundled fonts resolve same-origin in the webview.
-      fetch: { requestInit: { cache: 'force-cache' } },
-    })
+    let dataUrl: string
+    try {
+      const { domToPng } = await import('modern-screenshot')
+      await embedJournalExportImages(clone)
+      await document.fonts.ready
+      const fontCSS = await getJournalExportFontCSS(source.ownerDocument)
+      dataUrl = await domToPng(clone, {
+        scale: 2,
+        backgroundColor: undefined,
+        font: { cssText: fontCSS },
+        fetch: { requestInit: { cache: 'force-cache' } },
+      })
+    } catch (error) {
+      throw new JournalExportError('render', error)
+    }
     const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), (char) => char.charCodeAt(0))
     const fileName = `${(page.title || 'journal').replace(/[\\/:*?"<>|]/g, '_')}.png`
 
     if (isTauri()) {
-      const target = await save({
-        defaultPath: fileName,
-        filters: [{ name: 'PNG image', extensions: ['png'] }],
-      })
+      let target: string | null
+      try {
+        target = await save({
+          defaultPath: fileName,
+          filters: [{ name: 'PNG image', extensions: ['png'] }],
+        })
+      } catch (error) {
+        throw new JournalExportError('dialog', error)
+      }
       if (!target) return ''
-      await writeFile(target, bytes)
+      try { await writeFile(target, bytes) }
+      catch (error) { throw new JournalExportError('write', error) }
       return target
     }
 

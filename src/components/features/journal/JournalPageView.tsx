@@ -33,6 +33,7 @@ import {
 } from '../../../features/journal/journalItemStyles'
 import { releaseMediaUrl, resolveMediaUrlWithFallback } from '../../../services/media/illustrationMedia'
 import { exportJournalPageImage } from '../../../services/journalExport'
+import { describeExportError, JournalExportError } from '../../../services/journalExportError'
 
 interface JournalPageViewProps {
   initialPageId?: string
@@ -68,6 +69,7 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
   const userPickedPageRef = useRef(false)
   const [exporting, setExporting] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
+  const [exportError, setExportError] = useState('')
   const {
     pages,
     activePageId,
@@ -171,7 +173,7 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
     return () => window.clearTimeout(timer)
   }, [exportMessage])
 
-  useEffect(() => { setExportMessage('') }, [activePageId, viewingPageId])
+  useEffect(() => { setExportMessage(''); setExportError('') }, [activePageId, viewingPageId])
 
   async function handleCommitLayout(itemId: string, layout: JournalLayoutInput) {
     const item = items.find((candidate) => candidate.id === itemId)
@@ -265,14 +267,17 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
     if (!activePage || exporting) return
     setExporting(true)
     setExportMessage('')
+    setExportError('')
     try {
       const savedTo = await exportJournalPageImage(activePage, items, stampsByPageId[activePage.id] || null, {
         untitled: t('common.untitled'),
         noContent: t('common.noContent'),
       })
       setExportMessage(savedTo ? t('journal.exportDone') : '')
-    } catch {
-      setExportMessage(t('journal.exportFailed'))
+    } catch (error) {
+      console.error('Journal image export failed', error)
+      const stage = error instanceof JournalExportError ? error.stage : 'render'
+      setExportError(`${t('journal.exportFailed')} ${t(`journal.exportStage.${stage}`)}: ${describeExportError(error)}`)
     } finally {
       setExporting(false)
     }
@@ -314,6 +319,10 @@ export function JournalPageView({ initialPageId, oshiId, bookId, bookTitle, stan
             {loading && <Loader2 size={15} className="animate-spin text-accent" />}
             {error && <span className="truncate text-xs text-red-500">{error}</span>}
             {exportMessage && <span className="truncate text-xs text-accent">{exportMessage}</span>}
+            {exportError && <div role="alert" className="flex min-w-0 items-start gap-2 rounded-lg bg-red-500/10 p-2 text-xs text-red-400">
+              <span className="select-text whitespace-pre-wrap break-all">{exportError}</span>
+              <button type="button" className="shrink-0" onClick={() => setExportError('')} aria-label={t('window.close')}><X size={14} /></button>
+            </div>}
           </div>
           {!standalonePostcard && (
             <Button variant="secondary" size="sm" onClick={() => setShowPageSidebar(!showPageSidebar)}>
@@ -593,7 +602,7 @@ function PageGallery({
         {loading && pages.length === 0 ? (
           <Loader2 size={24} className="mx-auto mt-20 animate-spin text-accent" />
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,320px))] justify-start gap-5">
+          <div className="adaptive-journal-grid">
             {pages.map((page) => (
               <PagePreviewCard key={page.id} page={page} items={itemsByPageId[page.id] || []} stamp={stampsByPageId[page.id]} active={false} onSelect={() => onSelect(page.id)} t={t} />
             ))}

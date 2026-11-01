@@ -83,14 +83,15 @@ export function JournalCanvas({
           <Plus size={15} />
         </button>
       </div>
-      <div className="flex min-h-[calc(100%-56px)] min-w-full justify-center p-6 pt-2">
-      <div style={{ width: canvasSize.width * zoom, height: Math.max(canvasSize.height * zoom, 1) }}>
+      <div className="flex w-max min-w-full justify-center p-6 pt-2">
+      <div className="shrink-0" style={{ width: canvasSize.width * zoom, height: Math.max(canvasSize.height * zoom, 1) }}>
         <div
           className="journal-paper-page relative cursor-grab overflow-visible bg-[var(--journal-canvas-bg)]"
           style={{
             width: canvasSize.width,
             height: canvasSize.height,
-            minHeight: '100%',
+            // Keep the paper's logical size fixed. A percentage min-height here
+            // uses the already-scaled wrapper and stretches the page twice.
             transform: `scale(${zoom})`,
             transformOrigin: 'top left',
             ...getPageBackground(page?.background || 'paper'),

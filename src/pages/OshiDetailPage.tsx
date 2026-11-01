@@ -438,13 +438,15 @@ export function OshiDetailPage() {
                           <span className="block h-px bg-border-color/50" />
                         </div>
                       )}
-                      <div className={clsx('flex items-center gap-2 flex-wrap', cardStyle === 'bookshelf' && 'pl-2')}>
+                      <div className={clsx('flex items-center gap-2', cardStyle === 'bookshelf' && 'pl-2')}>
+                        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                         {note.tags.slice(0, 3).map((tag) => (
-                          <span key={tag} className="px-2 py-0.5 rounded-full text-xs bg-bg-tertiary text-text-muted">
+                          <span key={tag} title={tag} className="min-w-0 truncate px-2 py-0.5 rounded-full text-xs bg-bg-tertiary text-text-muted">
                             {tag}
                           </span>
                         ))}
-                        <span className="text-xs text-text-muted ml-auto">
+                        </div>
+                        <span className="shrink-0 whitespace-nowrap text-xs text-text-muted ml-auto">
                           {new Date(note.created_at).toLocaleDateString()}
                         </span>
                       </div>

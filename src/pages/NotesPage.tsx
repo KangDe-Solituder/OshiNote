@@ -246,11 +246,13 @@ function NoteRow({ note }: { note: NoteLibraryItem }) {
 function NoteMeta({ note }: { note: NoteLibraryItem }) {
   const { t } = useI18n()
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[11px] text-text-muted">
+    <div className="mt-4 flex items-center gap-1.5 text-[11px] text-text-muted">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 [&>span]:max-w-full [&>span]:truncate">
       <span className="rounded-full bg-bg-tertiary px-2 py-0.5">{note.oshi_name || t('common.unassigned')}</span>
       <span className="rounded-full bg-bg-tertiary px-2 py-0.5">{note.archive_name || t('common.unfiled')}</span>
       {note.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">#{tag}</span>)}
-      <span className="ml-auto">{new Date(note.created_at).toLocaleDateString()}</span>
+      </div>
+      <span className="ml-auto shrink-0 whitespace-nowrap">{new Date(note.created_at).toLocaleDateString()}</span>
     </div>
   )
 }
