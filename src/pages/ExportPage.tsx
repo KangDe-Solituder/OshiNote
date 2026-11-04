@@ -80,9 +80,7 @@ export function ExportPage() {
   function clearList() { setEntries(null); setEntryPath('') }
   async function chooseSync(id: string) {
     if (id === settings.syncId) return
-    if (settings.syncId && !window.confirm(text.switching)) return
     await run('sync', 'choose-sync', async () => {
-      await resetIncrementalSyncState()
       await persist({ ...settings, syncId: id }); setConflicts([]); setInspection(null)
     })
   }

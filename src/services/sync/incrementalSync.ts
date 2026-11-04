@@ -113,10 +113,7 @@ async function runIncrementalSyncUnlocked(
   if (remoteRef && remoteRef.repository_id !== repository.repository_id) {
     throw new Error('The remote HEAD belongs to a different OshiNote repository.')
   }
-  let localState = await readLocalState()
-  if (localState && localState.repository_id !== repository.repository_id) {
-    throw new Error('The selected WebDAV folder belongs to a different OshiNote repository.')
-  }
+  let localState = await selectSyncRepository(repository.repository_id)
   if (!localState) {
     localState = {
       repository_id: repository.repository_id,
@@ -258,6 +255,8 @@ export async function resolveSyncConflict(id: string, resolution: 'local' | 'rem
 
 export async function resetIncrementalSyncState(): Promise<void> {
   const db = await getDb()
+  const current = await readLocalState()
+  if (current) await db.execute('DELETE FROM sync_state WHERE key = ?', [`repository:${current.repository_id}`])
   await db.execute('DELETE FROM sync_conflicts')
   await db.execute("DELETE FROM sync_state WHERE key IN (?, ?)", [LOCAL_STATE_KEY, PENDING_MERGE_KEY])
 }
@@ -599,7 +598,23 @@ async function readLocalState(): Promise<LocalSyncState | null> {
 }
 
 async function writeLocalState(value: LocalSyncState): Promise<void> {
+  await writeSyncState(`repository:${value.repository_id}`, value)
   await writeSyncState(LOCAL_STATE_KEY, value)
+}
+
+// URLs are transport aliases; repository.json identifies the actual dataset.
+// Preserve each repository's merge base, including when returning from another NAS.
+export async function selectSyncRepository(repositoryId: string): Promise<LocalSyncState | null> {
+  const current = await readLocalState()
+  if (current?.repository_id === repositoryId) return current
+  if (current) await writeSyncState(`repository:${current.repository_id}`, current)
+  const saved = await readSyncState<LocalSyncState>(`repository:${repositoryId}`)
+  await clearPendingMerge()
+  if (saved?.repository_id === repositoryId) {
+    await writeLocalState(saved)
+    return saved
+  }
+  return null
 }
 
 async function readSyncState<T>(key: string): Promise<T | null> {

@@ -162,7 +162,7 @@ pub async fn inspect_webdav_repository(
         .body("")
         .send()
         .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
+        .map_err(|error| format_webdav_error(error))?;
 
     if !(response.status().is_success() || response.status().as_u16() == 207) {
         return Err(format!("WebDAV connection failed: {}", response.status()));
@@ -249,7 +249,7 @@ pub async fn write_webdav_text(
     let response = request
         .send()
         .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
+        .map_err(|error| format_webdav_error(error))?;
     if response.status() == StatusCode::PRECONDITION_FAILED {
         return Err("WEBDAV_PRECONDITION_FAILED".to_string());
     }
@@ -281,41 +281,89 @@ pub async fn upload_webdav_app_data_file(
     if_none_match: bool,
 ) -> Result<WebDavWriteResult, String> {
     let local_path = resolve_managed_app_data_path(&app, &local_relative_path)?;
-    let file = tokio::fs::File::open(&local_path).await.map_err(|e| e.to_string())?;
-    let length = file.metadata().await.map_err(|e| e.to_string())?.len();
-    if length > 32 * 1024 * 1024 * 1024 { return Err("Upload exceeds 32 GiB limit.".into()); }
-    let client = webdav_client(&config)?;
-    ensure_webdav_relative_directories(&client, &config, &remote_relative_path).await?;
-    let mut request = client
-        .put(webdav_relative_url(&config, &remote_relative_path)?)
-        .basic_auth(&config.username, Some(&config.password))
-        .header("Content-Type", "application/octet-stream")
-        .header("Content-Length", length)
-        .body(reqwest::Body::from(file));
-    if if_none_match {
-        request = request.header(IF_NONE_MATCH, "*");
+    upload_verified_file(&config, &local_path, &remote_relative_path, if_none_match).await
+}
+
+async fn file_digest(path: &Path) -> Result<(u64, String), String> {
+    use sha2::{Digest, Sha256};
+    use tokio::io::AsyncReadExt;
+    let mut file = tokio::fs::File::open(path).await.map_err(|e| e.to_string())?;
+    let mut digest = Sha256::new();
+    let mut bytes = 0;
+    let mut buffer = vec![0u8; 128 * 1024];
+    loop {
+        let n = file.read(&mut buffer).await.map_err(|e| e.to_string())?;
+        if n == 0 { break; }
+        bytes += n as u64;
+        digest.update(&buffer[..n]);
     }
-    let response = request
-        .send()
-        .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
-    if response.status() == StatusCode::PRECONDITION_FAILED && if_none_match {
-        return Ok(WebDavWriteResult {
-            bytes: 0,
-            etag: header_value(response.headers(), ETAG),
-            last_modified: header_value(response.headers(), LAST_MODIFIED),
-            server_date: header_value(response.headers(), DATE),
-        });
+    Ok((bytes, format!("{:x}", digest.finalize())))
+}
+
+async fn remote_digest(client: &Client, config: &WebDavDataConfig, url: Url, limit: u64) -> Result<Option<(u64, String)>, String> {
+    use sha2::{Digest, Sha256};
+    let mut response = client.get(url).basic_auth(&config.username, Some(&config.password))
+        .send().await.map_err(format_webdav_error)?;
+    if response.status() == StatusCode::NOT_FOUND { return Ok(None); }
+    if !response.status().is_success() { return Err(format!("WebDAV verification failed: {}", response.status())); }
+    let mut size = 0u64;
+    let mut digest = Sha256::new();
+    while let Some(chunk) = response.chunk().await.map_err(format_webdav_error)? {
+        size += chunk.len() as u64;
+        if size > limit { return Ok(Some((size, String::new()))); }
+        digest.update(&chunk);
     }
-    if !response.status().is_success() {
-        return Err(format!("WebDAV upload failed: {}", response.status()));
+    Ok(Some((size, format!("{:x}", digest.finalize()))))
+}
+
+// Never PUT to a published object: some WebDAV servers ignore If-None-Match
+// and truncate the old file before receiving the request body.
+async fn upload_verified_file(config: &WebDavDataConfig, local_path: &Path, remote_path: &str, if_none_match: bool) -> Result<WebDavWriteResult, String> {
+    let expected = file_digest(local_path).await?;
+    if expected.0 > 32 * 1024 * 1024 * 1024 { return Err("Upload exceeds 32 GiB limit.".into()); }
+    let client = webdav_client(config)?;
+    let destination = webdav_relative_url(config, remote_path)?;
+    let content_addressed = remote_path.starts_with("sync/v1/objects/blobs/sha256/");
+    if content_addressed && remote_path.rsplit('/').next() != Some(expected.1.as_str()) {
+        return Err("Local media no longer matches its sync hash; retry sync.".into());
     }
-    Ok(WebDavWriteResult {
-        bytes: length,
-        etag: header_value(response.headers(), ETAG),
-        last_modified: header_value(response.headers(), LAST_MODIFIED),
-        server_date: header_value(response.headers(), DATE),
-    })
+    let existing = remote_digest(&client, config, destination.clone(), expected.0).await?;
+    if existing.as_ref() == Some(&expected) {
+        return Ok(WebDavWriteResult { bytes: 0, etag: None, last_modified: None, server_date: None });
+    }
+    if existing.is_some() && if_none_match && !content_addressed {
+        return Err("WebDAV destination already exists with different content.".into());
+    }
+    ensure_webdav_relative_directories(&client, config, remote_path).await?;
+    let staging = webdav_relative_url(config, &format!("{remote_path}.upload-{}-{}", std::process::id(), timestamp_id()))?;
+    let result = async {
+        // A response read deadline must not expire while a slow uplink is still
+        // sending the body. The upload retains a connection and total deadline.
+        let upload_client = Client::builder().connect_timeout(std::time::Duration::from_secs(15))
+            .timeout(std::time::Duration::from_secs(1800)).danger_accept_invalid_certs(config.allow_invalid_cert)
+            .build().map_err(format_webdav_error)?;
+        let file = tokio::fs::File::open(local_path).await.map_err(|e| e.to_string())?;
+        let response = upload_client.put(staging.clone()).basic_auth(&config.username, Some(&config.password))
+            .header("Content-Type", "application/octet-stream").header("Content-Length", expected.0)
+            .body(reqwest::Body::from(file)).send().await
+            .map_err(|e| format!("WebDAV temporary upload failed ({remote_path}, {} bytes): {}", expected.0, format_webdav_error(e)))?;
+        if !response.status().is_success() { return Err(format!("WebDAV temporary upload failed: {}", response.status())); }
+        if remote_digest(&client, config, staging.clone(), expected.0).await?.as_ref() != Some(&expected) {
+            return Err("WebDAV uploaded file failed size/SHA-256 verification; published data was not changed.".into());
+        }
+        let response = client.request(Method::from_bytes(b"MOVE").unwrap(), staging.clone())
+            .basic_auth(&config.username, Some(&config.password)).header("Destination", destination.as_str())
+            .header("Overwrite", if content_addressed || !if_none_match { "T" } else { "F" })
+            .send().await.map_err(format_webdav_error)?;
+        if !response.status().is_success() { return Err(format!("WebDAV publish (MOVE) failed: {}; no direct-upload fallback was used.", response.status())); }
+        if remote_digest(&client, config, destination, expected.0).await?.as_ref() != Some(&expected) {
+            return Err("WebDAV published file failed verification; sync commit was not advanced.".into());
+        }
+        Ok(WebDavWriteResult { bytes: expected.0, etag: None, last_modified: None, server_date: None })
+    }.await;
+    // Only our unique staging path is eligible for best-effort cleanup.
+    let _ = client.delete(staging).basic_auth(&config.username, Some(&config.password)).send().await;
+    result
 }
 
 #[tauri::command]
@@ -340,7 +388,7 @@ async fn download_into_cache(root: &Path, config: WebDavDataConfig, remote_relat
         .basic_auth(&config.username, Some(&config.password))
         .send()
         .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
+        .map_err(|error| format_webdav_error(error))?;
     if !response.status().is_success() {
         return Err(format!("WebDAV download failed: {}", response.status()));
     }
@@ -452,7 +500,7 @@ async fn read_text_object(
         .basic_auth(&config.username, Some(&config.password))
         .send()
         .await
-        .map_err(|error| format_webdav_error(error.to_string()))?;
+        .map_err(|error| format_webdav_error(error))?;
     if response.status() == StatusCode::NOT_FOUND {
         return Ok(WebDavTextObject {
             exists: false,
@@ -543,7 +591,7 @@ async fn ensure_webdav_relative_directories(
             .basic_auth(&config.username, Some(&config.password))
             .send()
             .await
-            .map_err(|error| format_webdav_error(error.to_string()))?;
+            .map_err(|error| format_webdav_error(error))?;
         if !(response.status().is_success()
             || response.status().as_u16() == 405
             || response.status().as_u16() == 301)
@@ -630,13 +678,16 @@ fn timestamp_id() -> u128 {
         .as_millis()
 }
 
-fn format_webdav_error(error: String) -> String {
-    if error.to_ascii_lowercase().contains("certificate")
-        || error.to_ascii_lowercase().contains("tls")
-    {
-        return format!("WebDAV TLS error: {error}");
+fn format_webdav_error(error: reqwest::Error) -> String {
+    use std::error::Error;
+    let kind = if error.is_timeout() { "timeout" } else if error.is_connect() { "connection" } else if error.is_body() { "body transfer" } else { "request" };
+    let mut message = format!("WebDAV {kind} error: {error}");
+    let mut source = error.source();
+    while let Some(cause) = source {
+        message.push_str(&format!("; {cause}"));
+        source = cause.source();
     }
-    error
+    message
 }
 
 #[cfg(test)]
@@ -664,7 +715,7 @@ async fn download_to_file(mut response: reqwest::Response, path: &Path) -> Resul
     if response.content_length().is_some_and(|size| size > LIMIT) { return Err("Download exceeds 32 GiB limit.".into()); }
     let mut file = fs::OpenOptions::new().write(true).create_new(true).open(path).map_err(|e| e.to_string())?;
     let mut total = 0u64;
-    while let Some(chunk) = response.chunk().await.map_err(|e| format_webdav_error(e.to_string()))? {
+    while let Some(chunk) = response.chunk().await.map_err(|e| format_webdav_error(e))? {
         total += chunk.len() as u64;
         if total > LIMIT { return Err("Download exceeds 32 GiB limit.".into()); }
         file.write_all(&chunk).map_err(|e| e.to_string())?;
@@ -729,5 +780,74 @@ mod boundary_tests {
         for sql in ["DROP TABLE notes","UPDATE sqlite_master SET name = ?", "DELETE FROM notes; DELETE FROM oshis"] {
             assert!(validate_statements(&[SyncDatabaseStatement {query:sql.into(),values:vec![]}]).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod verified_upload_tests {
+    use super::*;
+    use std::{collections::HashMap, io::{BufRead, BufReader, Read, Write}, sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}}, net::TcpListener};
+
+    #[test]
+    fn staged_upload_repairs_corruption_skips_valid_files_and_never_publishes_truncation() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap(); listener.set_nonblocking(true).unwrap();
+        let address = listener.local_addr().unwrap();
+        let files = Arc::new(Mutex::new(HashMap::<String, Vec<u8>>::new()));
+        let puts = Arc::new(Mutex::new(Vec::<String>::new()));
+        let truncate = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
+        let (f,p,t,s) = (files.clone(),puts.clone(),truncate.clone(),stop.clone());
+        let server = std::thread::spawn(move || {
+            while !s.load(Ordering::Relaxed) {
+                let (mut socket,_) = match listener.accept() { Ok(v)=>v, Err(_)=>{std::thread::sleep(std::time::Duration::from_millis(2));continue;} };
+                socket.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+                let mut reader=BufReader::new(socket.try_clone().unwrap()); let mut line=String::new(); reader.read_line(&mut line).unwrap();
+                let parts:Vec<_>=line.split_whitespace().collect(); let method=parts[0].to_owned();let path=parts[1].to_owned();
+                let mut headers=HashMap::new(); loop {let mut l=String::new();reader.read_line(&mut l).unwrap();if l=="\r\n" {break;}if let Some((k,v))=l.split_once(':'){headers.insert(k.to_lowercase(),v.trim().to_owned());}}
+                let len=headers.get("content-length").and_then(|x|x.parse().ok()).unwrap_or(0);let mut body=vec![0u8;len];reader.read_exact(&mut body).unwrap();
+                let mut map=f.lock().unwrap();let mut result=Vec::new();let status=match method.as_str(){
+                    "GET"=>if let Some(data)=map.get(&path){result=data.clone();200}else{404},
+                    "MKCOL"=>201,
+                    "PUT"=>{p.lock().unwrap().push(path.clone());if t.load(Ordering::Relaxed){body.truncate(3);}map.insert(path,body);201}, // Deliberately ignores conditional headers, like the NAS.
+                    "MOVE"=>{let dest=Url::parse(headers.get("destination").unwrap()).unwrap().path().to_owned();if let Some(data)=map.remove(&path){map.insert(dest,data);201}else{404}},
+                    "DELETE"=>{map.remove(&path);204},_=>405,
+                };drop(map);
+                write!(socket,"HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",result.len()).unwrap();socket.write_all(&result).unwrap();
+            }
+        });
+        let root=std::env::temp_dir().join(format!("oshinote-upload-{}",timestamp_id()));fs::create_dir_all(&root).unwrap();let local=root.join("fixture");fs::write(&local,b"complete synthetic media").unwrap();
+        tauri::async_runtime::block_on(async {
+            let (_,hash)=file_digest(&local).await.unwrap();let remote=format!("sync/v1/objects/blobs/sha256/{}/{hash}",&hash[..2]);let key=format!("/isolated/{remote}");
+            let config=WebDavDataConfig{base_url:format!("http://{address}"),username:String::new(),password:String::new(),remote_path:"isolated".into(),allow_invalid_cert:false};
+            files.lock().unwrap().insert(key.clone(),b"bad".to_vec());
+            assert!(upload_verified_file(&config,&local,&remote,true).await.unwrap().bytes>0);
+            assert_eq!(files.lock().unwrap().get(&key).unwrap(),b"complete synthetic media");
+            let count=puts.lock().unwrap().len();assert_eq!(upload_verified_file(&config,&local,&remote,true).await.unwrap().bytes,0);assert_eq!(puts.lock().unwrap().len(),count);
+            files.lock().unwrap().insert(key.clone(),b"old broken object".to_vec());truncate.store(true,Ordering::Relaxed);
+            assert!(upload_verified_file(&config,&local,&remote,true).await.unwrap_err().contains("verification"));
+            assert_eq!(files.lock().unwrap().get(&key).unwrap(),b"old broken object");
+            assert!(puts.lock().unwrap().iter().all(|path|path.contains(".upload-")));
+            assert!(!files.lock().unwrap().keys().any(|path|path.contains(".upload-")));
+        });
+        stop.store(true,Ordering::Relaxed);server.join().unwrap();fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires explicit isolated NAS test configuration"]
+    fn live_isolated_nas_upload() {
+        let path=std::env::var("OSHINOTE_NAS_TEST_CONFIG").expect("isolated config path");
+        let mut config_json:serde_json::Value=serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        let encrypted:Vec<u8>=serde_json::from_value(config_json["protected_password"].take()).unwrap();
+        config_json["password"]=crate::credentials::unprotect_connection_secret(encrypted).unwrap().into();
+        let config:WebDavDataConfig=serde_json::from_value(config_json).unwrap();
+        assert!(config.remote_path.starts_with("BackUp/OshiNote-ResourceTest/diagnostic-"));
+        let root=std::env::temp_dir().join(format!("oshinote-live-upload-{}",timestamp_id()));fs::create_dir_all(&root).unwrap();let local=root.join("fixture");
+        fs::write(&local,(0..4_756_054).map(|n|(n%251) as u8).collect::<Vec<_>>()).unwrap();
+        tauri::async_runtime::block_on(async {
+            let (_,hash)=file_digest(&local).await.unwrap();let remote=format!("sync/v1/objects/blobs/sha256/{}/{hash}",&hash[..2]);
+            assert_eq!(upload_verified_file(&config,&local,&remote,true).await.unwrap().bytes,4_756_054);
+            assert_eq!(upload_verified_file(&config,&local,&remote,true).await.unwrap().bytes,0);
+        });
+        fs::remove_dir_all(root).unwrap();
     }
 }
